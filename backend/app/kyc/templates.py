@@ -7,6 +7,8 @@ looks like that country's format. Formats are data: extend the tables, not the l
 
 import re
 
+from app.kyc import idnumbers
+
 COUNTRY_NAMES = {
     "ZIMBABWE": "ZWE",
     "KENYA": "KEN",
@@ -27,18 +29,6 @@ COUNTRY_NAMES = {
     "UNITED STATES": "USA",
 }
 _ISO3 = set(COUNTRY_NAMES.values())
-
-# national ID number formats by issuing country (None = unknown, no opinion)
-_NUMBER_FORMATS = {
-    "ZWE": r"\d{2}-?\d{6,7}\s?[A-Z]\s?\d{2}",
-    "KEN": r"\d{7,8}",
-    "ZAF": r"\d{13}",
-    "NGA": r"\d{11}",
-    "GHA": r"GHA-?\d{9}-?\d",
-    "ZMB": r"\d{6}/\d{2}/\d",
-    "TZA": r"\d{8}-?\d{5}-?\d{5}-?\d{2}",
-    "UGA": r"C[MF][A-Z0-9]{12}",
-}
 
 _LABELS = {
     "surname": r"(?:SURNAME|FAMILY NAME|LAST NAME)",
@@ -103,27 +93,9 @@ def normalise_country(raw: str | None) -> str | None:
     return COUNTRY_NAMES.get(v)
 
 
-def _luhn(digits: str) -> bool:
-    total = 0
-    for i, ch in enumerate(reversed(digits)):
-        n = int(ch)
-        if i % 2:
-            n = n * 2 - 9 if n * 2 > 9 else n * 2
-        total += n
-    return total % 10 == 0
-
-
 def number_format_ok(country: str | None, doc_type: str | None, number: str | None) -> bool | None:
-    """Does a national ID number match its country's format? None = no opinion (unknown
-    country, not a national ID, or no number)."""
-    if not country or doc_type != "national_id" or not number:
+    """Can this national ID number be real for its country? None = no opinion (unknown country,
+    not a national ID, or no number). Details and advisory checks live in `kyc.idnumbers`."""
+    if doc_type != "national_id":
         return None
-    pattern = _NUMBER_FORMATS.get(country)
-    if pattern is None:
-        return None
-    value = number.strip().upper()
-    if not re.fullmatch(pattern, value):
-        return False
-    if country == "ZAF":
-        return _luhn(value)  # South African ID numbers carry a Luhn check digit
-    return True
+    return idnumbers.check(country, number).ok

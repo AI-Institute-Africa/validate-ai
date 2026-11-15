@@ -115,6 +115,7 @@ def test_parse_text_reads_labelled_lines():
         ("ZWE", "6312", False),
         ("ZAF", "8001015009087", True),
         ("ZAF", "8001015009088", False),
+        ("ZAF", "8002305009081", False),  # no 30 February, however the check digit works out
         ("KEN", "12345678", True),
         ("XYZ", "anything", None),
     ],
@@ -399,3 +400,36 @@ def test_real_ocr_reads_a_rendered_passport_page():
     assert parsed is not None and parsed.valid
     combined = agreement.combine({"id_ocr": got}, parsed)
     assert combined.agreement == 1.0 and not combined.conflicts
+
+
+def test_za_number_gives_birth_date_and_sex_with_a_century_that_is_never_in_the_future():
+    from datetime import date
+
+    from app.kyc import idnumbers
+
+    r = idnumbers.check("ZAF", "8001015009087", today=date(2026, 11, 15))
+    assert r.ok and r.dob == date(1980, 1, 1) and r.sex == "M"
+    # a person born this year must not be read as born a century ago
+    num = "260101" + "5009" + "08"
+    for c in "0123456789":
+        if idnumbers._luhn(num + c):
+            r = idnumbers.check("ZAF", num + c, today=date(2026, 11, 15))
+            assert r.ok and r.dob == date(2026, 1, 1)
+            break
+
+
+def test_zimbabwe_check_letter_is_advisory_and_handles_remainder_zero():
+    from app.kyc import idnumbers
+
+    # 63123456 % 23 == 2 -> B ; 23 * 2744498 = 63123454
+    assert idnumbers.check("ZWE", "63-123456 B 42").checksum == "valid"
+    r = idnumbers.check("ZWE", "63-123456 K 42")
+    assert (
+        r.ok is True and r.checksum == "invalid"
+    )  # still a possible ID: a person looks, we do not reject
+    # a serial that divides by 23 exactly must not crash or be rejected for lack of a letter
+    n = int("63" + "1000000")
+    n -= n % 23
+    s = str(n)
+    assert idnumbers.check("ZWE", f"{s[:2]}-{s[2:]} Z 42").checksum == "valid"
+    assert idnumbers.check("ZWE", "6312").ok is False

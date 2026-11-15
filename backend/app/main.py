@@ -7,6 +7,7 @@ from app.api.guardrails import router as guardrails_router
 from app.api.internal import router as internal_router
 from app.api.kyc import router as kyc_router
 from app.api.lookups import router as lookups_router
+from app.api.providers import router as providers_router
 from app.api.provisional import router as provisional_router
 from app.api.routes import router
 from app.api.whatsapp import router as whatsapp_router
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(whatsapp_router)
     app.include_router(kyc_router)
     app.include_router(lookups_router)
+    app.include_router(providers_router)
     app.include_router(internal_router)
     if settings.demo and settings.is_dev:
         from app.demo.api import router as demo_router
