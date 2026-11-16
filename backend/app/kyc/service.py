@@ -22,7 +22,7 @@ from app.extraction.schema import FieldReading
 from app.intake.files import RejectedFile, phash_to_int, prepare
 from app.intake.scan import scan
 from app.intake.storage import get_storage
-from app.kyc import agreement, auto, readers, states, templates
+from app.kyc import agreement, auto, idnumbers, readers, states, templates
 from app.kyc.auto import Inputs, KycError
 from app.kyc.cv import docintegrity, face, liveness
 from app.kyc.doc import classify, detect
@@ -425,6 +425,12 @@ def process(session: Session, kyc_id: uuid.UUID) -> None:
         flags.append("MULTIPLE_FACES_IN_SELFIE")
     checks.append({"name": "integrity", "ok": not flags, "flags": flags})
 
+    idn = idnumbers.check(country, number)
+    if doc_type == "national_id" and idn.ok is not None:
+        # advisory only: shown to the reviewer, never changes the outcome by itself
+        checks.append(
+            {"name": "id_number", "ok": idn.ok, "checksum": idn.checksum, "advisory": True}
+        )
     kyc.fields = {"values": reading.fields, "agreed": reading.agreed, "sources": reading.sources}
     kyc.checks = checks
     kyc.ocr_agreement = reading.agreement
