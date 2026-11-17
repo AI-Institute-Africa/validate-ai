@@ -8,8 +8,9 @@ message can cost someone money or trust, so nothing unreviewed is shown.
 2. For each row, read `english` and the `current_draft`. Write your wording in `reviewer_translation`
    (or leave the draft) and put `yes` in `approved` only if you would be happy to see it on a
    payment screen. Keep placeholders such as `{pct}` and `{n}` exactly as they are.
-3. `status` tells you where a row stands: `missing` (English only), `draft`, `signed-off`, or `flagged`
-   (an earlier draft was found wrong; the note says why: do not reuse it).
+3. `status` tells you where a row stands: `missing` (English only), `draft` (written, not yet checked by a
+   fluent speaker), `signed-off`, or `flagged` (an earlier draft was found wrong and has no replacement yet).
+   When a draft replaces a flagged one, the `note` shows the old wording and why it was wrong.
 4. Send the file back.
 
 ## For the developer
@@ -21,8 +22,21 @@ message can cost someone money or trust, so nothing unreviewed is shown.
   language marked reviewed must be complete.
 - Staging can preview drafts with `VITE_ALLOW_UNREVIEWED_TRANSLATIONS=true`. Never in production.
 
-## What was found wrong in the current drafts
-An automated audit (not a fluent speaker) flagged four drafts: Shona `hero.title` and `form.trust`, and
-Ndebele `form.trust` and `result.green.note`. They were removed from the live dictionaries so English
-shows, and kept in `FLAGGED_DRAFTS` for the reviewer. The audit could be wrong; a person decides. Many
-other Shona drafts reuse the same verb for "verify", so treat all drafts as unreviewed.
+## Where things stand
+Every payer-facing string (247) now has a Shona and a Ndebele draft, written in plain wording. That covers
+the payment and ID pages, the sidebar and page chrome, status names, file problems, and the messages the server
+sends about a payment (each message has a neutral key, so the screen can translate it without the server
+revealing why).
+None is signed off, so payers still see English. The admin and reviewer pages stay in English on purpose,
+and so do the demo-only parts (sample buttons, the demo banner).
+
+Not yet translated: messages sent outside the console (the WhatsApp outbox and the reject/approve texts in
+`backend/app/claims/service.py::_payer_text`), and the text inside the downloadable summary's header lines.
+To preview the drafts on a test site: set `VITE_ALLOW_UNREVIEWED_TRANSLATIONS=true`, or run
+`localStorage.setItem('validate-allow-draft-translations','1')` in the browser and pick the language.
+
+## What was found wrong in the earlier drafts
+An automated audit (not a fluent speaker) flagged four earlier drafts: Shona `hero.title` and `form.trust`,
+and Ndebele `form.trust` and `result.green.note`. All the earlier drafts were then replaced. The old wording
+is kept in `FLAGGED_DRAFTS` so it is not reused. The new drafts were also written without a fluent speaker,
+so a person must check them before they go live.

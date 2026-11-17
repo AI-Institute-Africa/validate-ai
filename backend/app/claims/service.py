@@ -158,3 +158,18 @@ REASON_TEXT = {
 
 def explain(reasons: list[str]) -> list[str]:
     return [REASON_TEXT[r] for r in reasons if r in REASON_TEXT]
+
+
+# Neutral names for the payer's screen, so it can show each message in the payer's language without
+# the API revealing why. A suspected-fake claim and a disputed credit read the same, and no name
+# hints at suspicion.
+PAYER_MESSAGE_KEY = {
+    "SUSPECTED_FAKE": "MANUAL_CHECK",
+    "CREDIT_DISPUTED": "MANUAL_CHECK",
+    "TAMPER_SUSPECTED": "IMAGE_CHECK",
+}
+
+
+def explain_keys(reasons: list[str]) -> list[str]:
+    """One key per message `explain` returns, in the same order."""
+    return [PAYER_MESSAGE_KEY.get(r, r) for r in reasons if r in REASON_TEXT]

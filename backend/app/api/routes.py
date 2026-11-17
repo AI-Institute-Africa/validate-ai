@@ -47,7 +47,7 @@ from app.api.schemas import (
     TokenOut,
 )
 from app.claims.facts import build_facts
-from app.claims.service import explain
+from app.claims.service import explain, explain_keys
 from app.claims.states import OUTCOME, REVIEWABLE
 from app.core import observability as obs
 from app.core import ratelimit
@@ -119,7 +119,9 @@ INTERNAL_REASONS = {"SUSPECTED_FAKE", "AUTO_APPROVED"}
 
 def claim_out(c: Claim, internal: bool = False) -> ClaimOut:
     messages = explain(c.reason_codes)
+    message_keys = explain_keys(c.reason_codes)
     if c.provisional_until is not None:
+        message_keys.append("PROVISIONAL")
         messages.append(
             f"Access is open until {c.provisional_until:%Y-%m-%d %H:%M} UTC "
             "while we confirm your payment."
@@ -129,6 +131,7 @@ def claim_out(c: Claim, internal: bool = False) -> ClaimOut:
             **{k: getattr(c, k) for k in ClaimOut.model_fields if hasattr(c, k)},
             "outcome": OUTCOME[ClaimState(c.state)],
             "messages": messages,
+            "message_keys": message_keys,
         }
     )
     if not internal:

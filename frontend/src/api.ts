@@ -20,6 +20,7 @@ export type Claim = {
   approval_tier: string | null;
   reason_codes: string[];
   messages: string[];
+  message_keys?: string[]; // one neutral key per message, so a screen can translate it
   candidate_credit_id: string | null;
   risk_score: number | null;
   risk_level: string | null;

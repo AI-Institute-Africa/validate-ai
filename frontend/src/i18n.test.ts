@@ -12,14 +12,19 @@ describe("dictionaries", () => {
       expect(problems).toEqual([]);
     });
 
+    it(`${lang} has a draft for every string (nothing falls back to English by accident)`, () => {
+      const c = coverage(lang, EN, DICTS[lang], REVIEWED_KEYS[lang]);
+      expect(c.missing).toEqual([]);
+    });
+
     it(`${lang}: nothing is signed off that does not exist, and a flagged draft is never live`, () => {
       for (const k of REVIEWED_KEYS[lang]) {
         expect(DICTS[lang][k], `signed-off key ${k} has no text`).toBeDefined();
         expect(FLAGGED_DRAFTS[lang][k], `signed-off key ${k} is also flagged`).toBeUndefined();
       }
       for (const [k, f] of Object.entries(FLAGGED_DRAFTS[lang])) {
-        expect(DICTS[lang][k], `flagged draft ${k} is still in the live dictionary`).toBeUndefined();
-        expect(DICTS[lang][k] ?? "").not.toBe(f.text);
+        // the old wording stays out; a fresh draft may take its place (still unreviewed)
+        expect(DICTS[lang][k] ?? "", `flagged draft ${k} is back in the live dictionary`).not.toBe(f.text);
       }
     });
 

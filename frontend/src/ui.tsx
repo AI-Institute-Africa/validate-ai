@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { hasRole, switchPersona } from "./api";
 import { personaForRole } from "./personas";
-import { reasonText, stateInfo, type Tone } from "./labels";
+import { reasonText, stateInfo, stateText, type Tone } from "./labels";
 import { useI18n } from "./i18n";
 
 export function Chip({ tone = "neutral", children, title }: { tone?: Tone; children: ReactNode; title?: string }) {
@@ -16,11 +16,12 @@ export function Chip({ tone = "neutral", children, title }: { tone?: Tone; child
 
 // One status pill for claims and identity checks alike.
 export function StateChip({ state }: { state: string }) {
+  const { t } = useI18n();
   const s = stateInfo(state);
   return (
     <Chip tone={s.tone} title={s.hint}>
       <span className="chip-dot" aria-hidden />
-      {s.label}
+      {stateText(t, state, s.label)}
     </Chip>
   );
 }

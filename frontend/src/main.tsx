@@ -35,9 +35,9 @@ const KycReview = lazy(() => import("./pages/KycReview"));
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
 
 function LangSwitch() {
-  const { lang, setLang } = useI18n();
+  const { lang, setLang, t } = useI18n();
   return (
-    <select className="lang-switch" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label="Language">
+    <select className="lang-switch" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("shell.language")}>
       {(Object.keys(LANG_LABELS) as Lang[]).map((l) => (
         <option key={l} value={l}>
           {langLabel(l)}
@@ -67,14 +67,14 @@ type Item = { to: string; icon: string; label: string; min?: string; end?: boole
 function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
   return [
     {
-      title: "Start",
-      items: [{ to: "/", icon: "🏠", label: "Home & tour", end: true }],
+      title: t("nav.group.start"),
+      items: [{ to: "/", icon: "🏠", label: t("nav.home"), end: true }],
     },
     {
-      title: "Payments",
+      title: t("nav.group.payments"),
       items: [
-        { to: "/verify", icon: "🧾", label: t("nav.scan") === "nav.scan" ? "Verify a payment" : "Verify a payment" },
-        { to: "/image-to-text", icon: "🔤", label: t("nav.imageToText") === "nav.imageToText" ? "Image to text" : t("nav.imageToText") },
+        { to: "/verify", icon: "🧾", label: t("nav.verifyPayment") },
+        { to: "/image-to-text", icon: "🔤", label: t("nav.imageToText") },
         { to: "/queue", icon: "📥", label: "Review queue", min: "reviewer", badge: <Count queryKey="queue-count" path="/review/queue" /> },
         { to: "/fraud", icon: "🛡️", label: "Suspected fakes", min: "reviewer", badge: <Count queryKey="fraud-summary" path="/fraud/alerts/summary" pick={(d) => d.open_high ?? 0} /> },
         { to: "/credits", icon: "🏦", label: "Bank credits", min: "reviewer" },
@@ -83,9 +83,9 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
       ],
     },
     {
-      title: "Identity",
+      title: t("nav.group.identity"),
       items: [
-        { to: "/kyc", icon: "🪪", label: "Verify an ID" },
+        { to: "/kyc", icon: "🪪", label: t("nav.verifyId") },
         { to: "/kyc/review", icon: "🔍", label: "ID checks", min: "reviewer", end: true, badge: <Count queryKey="kyc-count" path="/kyc/review/queue" /> },
       ],
     },
@@ -94,7 +94,7 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
       items: [
         { to: "/alerts", icon: "🔔", label: "Payment alerts", min: "reviewer" },
         { to: "/exposure", icon: "📊", label: "Exposure", min: "admin" },
-        { to: "/guardrails", icon: "🚧", label: t("nav.guardrails") === "nav.guardrails" ? "Guardrails" : t("nav.guardrails"), min: "admin" },
+        { to: "/guardrails", icon: "🚧", label: t("nav.guardrails"), min: "admin" },
         { to: "/replay", icon: "🧪", label: "Replay & accuracy", min: "admin" },
       ],
     },
@@ -118,10 +118,16 @@ const TITLES: [string, string][] = [
   ["/replay", "Replay & accuracy"],
 ];
 
+// pages payers see are translated; staff pages stay in English
+const TRANSLATED_TITLES: Record<string, string> = { "/kyc": "nav.verifyId", "/verify": "nav.verifyPayment", "/image-to-text": "nav.imageToText" };
+
 function useTitle(): string {
   const { pathname } = useLocation();
-  if (pathname === "/") return "Home";
-  return TITLES.find(([p]) => pathname === p || pathname.startsWith(p + "/"))?.[1] ?? "Validate";
+  const { t } = useI18n();
+  if (pathname === "/") return t("title.home");
+  const hit = TITLES.find(([p]) => pathname === p || pathname.startsWith(p + "/"));
+  if (!hit) return "Validate";
+  return TRANSLATED_TITLES[hit[0]] ? t(TRANSLATED_TITLES[hit[0]]) : hit[1];
 }
 
 function PersonaMenu({ onReset }: { onReset: () => void }) {
@@ -196,7 +202,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const demo = demoInfo();
   return (
     <div className="app">
-      <a className="skip-link" href="#main">Skip to content</a>
+      <a className="skip-link" href="#main">{t("shell.skip")}</a>
       {demo && (
         <div className="demo-bar" role="note">
           <b>DEMO</b>
@@ -205,7 +211,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           </span>
         </div>
       )}
-      <aside className={`sidebar${menu ? " open" : ""}`} aria-label="Main navigation">
+      <aside className={`sidebar${menu ? " open" : ""}`} aria-label={t("shell.nav")}>
         <NavLink to="/" className="brand">
           <span className="logo" aria-hidden>V</span>
           <span className="brand-name">
@@ -231,15 +237,15 @@ function Shell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="side-foot">
-          A receipt is a claim, not a confirmation.
+          {t("side.foot1")}
           <br />
-          The AI reads. Rules and people decide.
+          {t("side.foot2")}
         </div>
       </aside>
       <div className={`scrim${menu ? " show" : ""}`} onClick={() => setMenu(false)} />
       <div className="content">
         <header className="topbar">
-          <button type="button" className="menu-btn" onClick={() => setMenu(true)} aria-label="Open menu">☰</button>
+          <button type="button" className="menu-btn" onClick={() => setMenu(true)} aria-label={t("shell.menu")}>☰</button>
           <span className="crumb">{title}</span>
           <span className="spacer" />
           <LangSwitch />
@@ -248,7 +254,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         </header>
         <main id="main" tabIndex={-1}>{children}</main>
         <footer>
-          <strong>Validate</strong> — know that a payment, or a person, is real. {demo ? "Demo build with synthetic data." : ""}
+          {t("footer.tag")} {demo ? "Demo build with synthetic data." : ""}
         </footer>
       </div>
       {reset.isPending && (

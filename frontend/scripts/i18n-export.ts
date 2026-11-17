@@ -15,8 +15,9 @@ for (const lang of ["sn", "nd"] as Lang[]) {
   for (const key of Object.keys(EN)) {
     const draft = DICTS[lang][key];
     const flagged = FLAGGED_DRAFTS[lang][key];
-    const status = flagged ? "flagged" : draft === undefined ? "missing" : REVIEWED_KEYS[lang].has(key) ? "signed-off" : "draft";
-    rows.push(csv([key, EN[key], draft ?? flagged?.text ?? "", status, flagged?.why ?? "", "", ""]));
+    const status = draft === undefined ? (flagged ? "flagged" : "missing") : REVIEWED_KEYS[lang].has(key) ? "signed-off" : "draft";
+    const note = flagged ? `An earlier draft was flagged: "${flagged.text}". ${flagged.why}` : "";
+    rows.push(csv([key, EN[key], draft ?? "", status, note, "", ""]));
   }
   writeFileSync(`i18n-review/${lang}.csv`, rows.join("\n") + "\n");
   const c = coverage(lang, EN, DICTS[lang], REVIEWED_KEYS[lang]);

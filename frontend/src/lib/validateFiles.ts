@@ -22,32 +22,41 @@ export function fileKey(f: FileLike): string {
   return `${f.name}:${f.size}`;
 }
 
-/** Drop files already in the list (same name and size), then check count, size and type. */
-export function validateFiles<T extends FileLike>(existing: T[], incoming: T[], text = ""): { files: T[]; errors: string[] } {
+export type Issue = { key: string; params: Record<string, string> };
+
+/** Drop files already in the list (same name and size), then check count, size and type.
+ *  `errors` are English sentences; `issues` carry a translation key and values so the screen can show
+ *  the same message in the payer's language. */
+export function validateFiles<T extends FileLike>(existing: T[], incoming: T[], text = ""): { files: T[]; errors: string[]; issues: Issue[] } {
   const errors: string[] = [];
+  const issues: Issue[] = [];
+  const fail = (msg: string, key: string, params: Record<string, string>) => {
+    errors.push(msg);
+    issues.push({ key, params });
+  };
   const seen = new Set(existing.map(fileKey));
   const files = [...existing];
   for (const f of incoming) {
     if (seen.has(fileKey(f))) continue;
     if (!ALLOWED_TYPES.has(f.type) && !ALLOWED_EXT.test(f.name)) {
-      errors.push(`${f.name}: this file type is not supported. Use a photo, PDF or Word file.`);
+      fail(`${f.name}: this file type is not supported. Use a photo, PDF or Word file.`, "file.err.type", { name: f.name });
       continue;
     }
     if (f.size > MAX_BYTES) {
-      errors.push(`${f.name}: larger than ${MAX_BYTES / 1024 / 1024} MB.`);
+      fail(`${f.name}: larger than ${MAX_BYTES / 1024 / 1024} MB.`, "file.err.size", { name: f.name, mb: String(MAX_BYTES / 1024 / 1024) });
       continue;
     }
     if (f.size === 0) {
-      errors.push(`${f.name}: the file is empty.`);
+      fail(`${f.name}: the file is empty.`, "file.err.empty", { name: f.name });
       continue;
     }
     if (files.length >= MAX_FILES) {
-      errors.push(`You can add up to ${MAX_FILES} files. ${f.name} was not added.`);
+      fail(`You can add up to ${MAX_FILES} files. ${f.name} was not added.`, "file.err.count", { max: String(MAX_FILES), name: f.name });
       continue;
     }
     seen.add(fileKey(f));
     files.push(f);
   }
   if (text.length > MAX_TEXT) errors.push(`Pasted text is longer than ${MAX_TEXT.toLocaleString()} characters.`);
-  return { files, errors };
+  return { files, errors, issues };
 }
