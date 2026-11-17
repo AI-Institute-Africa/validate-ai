@@ -38,7 +38,7 @@ def purge_payment_data(session: Session, now: datetime | None = None) -> dict[st
                 .where(
                     Evidence.org_id == org_id,
                     Evidence.purged_at.is_(None),
-                    Evidence.created_at < cutoff,
+                    Evidence.received_at < cutoff,
                     Claim.state.in_([s.value for s in FINISHED]),
                 )
                 .limit(1000)

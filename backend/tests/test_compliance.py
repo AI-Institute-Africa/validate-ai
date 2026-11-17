@@ -109,7 +109,7 @@ def test_retention_removes_files_and_alert_text_but_keeps_the_fingerprints(clien
         == 200
     )
     _policy(client, admin, evidence_retention_days=30)
-    session.execute(update(Evidence).values(created_at=datetime.now(UTC) - timedelta(days=45)))
+    session.execute(update(Evidence).values(received_at=datetime.now(UTC) - timedelta(days=45)))
     session.commit()
     assert retention.purge_payment_data(session)["evidence"] == 1
     session.commit()
@@ -134,7 +134,7 @@ def test_unfinished_claims_keep_their_files(client, session):
         declared_reference=TXN,
     )
     _policy(client, admin, evidence_retention_days=30)
-    session.execute(update(Evidence).values(created_at=datetime.now(UTC) - timedelta(days=90)))
+    session.execute(update(Evidence).values(received_at=datetime.now(UTC) - timedelta(days=90)))
     session.commit()
     assert retention.purge_payment_data(session)["evidence"] == 0
 

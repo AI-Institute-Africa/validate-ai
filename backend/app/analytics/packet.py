@@ -114,10 +114,10 @@ def build_packet(
                 "sha256": e.sha256,
                 "content_type": e.content_type,
                 "size_bytes": e.size_bytes,
-                "created_at": e.created_at.isoformat(),
+                "created_at": e.received_at.isoformat(),
             }
             for e in session.scalars(
-                select(Evidence).where(Evidence.claim_id == claim_id).order_by(Evidence.created_at)
+                select(Evidence).where(Evidence.claim_id == claim_id).order_by(Evidence.received_at)
             )
         ],
         "fields_read": [
