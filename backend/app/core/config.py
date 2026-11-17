@@ -154,6 +154,12 @@ class Settings(BaseSettings):
     smtp_from: str = "pops-engine@localhost"
     admin_alert_emails: list[str] = []
 
+    # official ZiG/USD rate from the Reserve Bank of Zimbabwe (see app/fx and docs/fx-rates.md)
+    fx_enabled: bool = False
+    # hours (UTC, cron syntax) on weekdays when the daily fetch tries until the file is found
+    fx_fetch_hours: str = "5-16"
+    fx_max_daily_move_pct: float = 25.0
+
     cors_origins: list[str] = ["http://localhost:5173"]
 
     # observability

@@ -25,6 +25,7 @@ from app.extraction.readers.base import Reader
 from app.extraction.service import ExtractionResult, build_readers, extract
 from app.fraud import risk
 from app.fraud.forensics import ela
+from app.fx.reasons import cross_currency_view
 from app.guardrails.rules import active_rules, evaluate_fields, plan_readers
 from app.intake.files import RENDERED_TYPES, prepare
 from app.intake.service import submission_evidence
@@ -281,6 +282,21 @@ def process_claim(
     reasons += flags
     checks.append({"layer": 3, "check": "validation", "flags": flags})
 
+    fx_view = None
+    if settings.fx_enabled:
+        fx_view = cross_currency_view(
+            session,
+            payment_currency=facts.currency or claim.declared_currency,
+            payment_minor=facts.amount_minor,
+            invoice_currency=obligation.currency,
+            invoice_minor=obligation.amount_minor,
+            on=(facts.occurred_at or claim.created_at).date(),
+            cfg=cfg,
+        )
+        if fx_view is not None:
+            reasons += fx_view.reasons
+            checks.append({"layer": 5, "check": "official_rate", **fx_view.snapshot})
+
     ref_reasons, ref_others = _reference_duplicates(session, claim, facts.reference)
     reasons += ref_reasons
     dup_others |= ref_others
@@ -365,6 +381,7 @@ def process_claim(
             "risk": {"score": assessment.score, "level": assessment.level},
             "evidence_sha256": [e.sha256 for e in evs],
             "models": {k: v for k, v in (run.model_versions or {}).items() if k != "failures"},
+            "fx": fx_view.snapshot if fx_view is not None else None,
             "guardrails": guardrail_log,
             "facts": {
                 "amount_minor": facts.amount_minor,

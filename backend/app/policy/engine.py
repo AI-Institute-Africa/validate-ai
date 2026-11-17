@@ -133,6 +133,15 @@ class PolicyConfig(BaseModel):
     # minutes a claim may wait for a human before admins are nudged again, one nudge per
     # level (ascending)
     review_sla_minutes: list[int] = Field(default_factory=lambda: [60, 240, 1440])
+    # official ZWG/USD rate (app/fx). Off by default: when on, a claim paid in a different currency
+    # from its invoice carries the converted amount and reasons for a person; the currency gate
+    # itself is unchanged and nothing is allocated across currencies.
+    fx_cross_currency_enabled: bool = False
+    fx_tolerance_bps: int = Field(default=300, ge=0, le=10_000)  # gap vs the invoice, basis points
+    fx_max_rate_age_days: int = Field(
+        default=4, ge=0, le=14
+    )  # longest a carried-forward rate may be
+
     # tamper forensics (blueprint 8, layer 6): a risk flag only. A hit routes the claim to a
     # reviewer; it can never approve, reject or allocate on its own.
     tamper_enabled: bool = True

@@ -6,6 +6,7 @@ tables are append-only; database triggers in the initial migration enforce this.
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
@@ -18,6 +19,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -661,3 +663,44 @@ class AlertMessage(Base):
         UniqueConstraint("source_id", "body_sha256", name="uq_alert_message_dedupe"),
         Index("ix_alert_messages_org_created", "org_id", "created_at"),
     )
+
+
+class FxRate(Base):
+    """An official daily ZWG-per-USD rate (the RBZ interbank ask rate), with its evidence.
+
+    Platform-wide, not per organisation. A corrected re-publication or a manual entry adds a new
+    row; the newest row for a date is the one in use, and older rows stay as history.
+    """
+
+    __tablename__ = "fx_rates"
+    rate_id: Mapped[uuid.UUID] = _pk()
+    rate_date: Mapped[date] = mapped_column(Date, nullable=False)
+    base: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
+    quote: Mapped[str] = mapped_column(String(3), nullable=False, default="ZWG")
+    bid: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    ask: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    mid: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text)
+    pdf_sha256: Mapped[str | None] = mapped_column(String(64))
+    pdf_object_key: Mapped[str | None] = mapped_column(Text)
+    method: Mapped[str] = mapped_column(String(10), nullable=False)  # direct | browser | manual
+    fetched_at: Mapped[datetime] = _created()
+    entered_by: Mapped[str | None] = mapped_column(String(80))
+    reason: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        CheckConstraint("ask > 0 AND bid > 0 AND mid > 0", name="fx_rate_positive"),
+        CheckConstraint("method in ('direct','browser','manual')", name="fx_method"),
+        Index("ix_fx_rates_date", "rate_date", "fetched_at"),
+    )
+
+
+class FxFetchLog(Base):
+    """One row per attempt to fetch a day's rate, for the admin status screen."""
+
+    __tablename__ = "fx_fetch_log"
+    log_id: Mapped[uuid.UUID] = _pk()
+    for_date: Mapped[date] = mapped_column(Date, nullable=False)
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text)
+    method: Mapped[str | None] = mapped_column(String(10))
+    attempted_at: Mapped[datetime] = _created()
