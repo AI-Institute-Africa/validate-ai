@@ -375,3 +375,61 @@ def test_a_qr_code_on_a_receipt_is_read_and_kept_as_data():
 def test_no_qr_means_no_qr_key_and_a_page_of_text_is_not_searched():
     assert "qr" not in prepare(_img("PNG"), MAX).meta
     assert "qr" not in prepare(HTML, MAX).meta
+
+
+# --- size limits: only camera RAW may exceed the normal limit ------------------------------------
+
+
+def test_only_camera_raw_may_be_larger_than_the_normal_limit():
+    small_limit, raw_limit = 1_000_000, 5_000_000
+    big_raw = (
+        _dng(_jpeg()) + b"\x00" * 2_000_000
+    )  # 2 MB: over the normal limit, inside the RAW limit
+    assert prepare(big_raw, small_limit, raw_limit).content_type == files.RAW
+    with pytest.raises(RejectedFile) as e:
+        prepare(_img("TIFF", size=(1200, 1200)) + b"\x00" * 2_000_000, small_limit, raw_limit)
+    assert e.value.code == "TOO_LARGE"
+    with pytest.raises(RejectedFile) as e:  # and RAW has its own ceiling
+        prepare(_dng(_jpeg()) + b"\x00" * 6_000_000, small_limit, raw_limit)
+    assert e.value.code == "TOO_LARGE"
+    with pytest.raises(RejectedFile):  # callers that pass no RAW limit keep the old behaviour
+        prepare(big_raw, small_limit)
+
+
+def test_a_request_over_the_total_budget_is_refused(client, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "max_claim_upload_bytes", 1_000)
+    h = login(client, "submitter")
+    ob = _obligation(client, h)
+    r = client.post(
+        "/claims",
+        headers=h,
+        data={"obligation_id": ob["obligation_id"], "claimant_ref": "l-1", "channel": "ecocash"},
+        files=[
+            ("file", ("a.png", _img("PNG"), "image/png")),
+            ("file", ("b.png", _img("PNG"), "image/png")),
+        ],
+    )
+    assert r.status_code == 413 and r.json()["detail"]["code"] == "REQUEST_TOO_LARGE"
+
+
+def test_a_large_camera_raw_goes_through_a_real_submission(client):
+    h = login(client, "submitter")
+    ob = _obligation(client, h)
+    raw = _dng(_jpeg((2400, 1600))) + b"\x07" * (14 * 1024 * 1024)  # ~14 MB, over the 10 MB limit
+    r = client.post(
+        "/claims",
+        headers=h,
+        data={"obligation_id": ob["obligation_id"], "claimant_ref": "l-1", "channel": "ecocash"},
+        files={"file": ("IMG_0001.dng", raw, "image/x-adobe-dng")},
+    )
+    assert r.status_code == 201, r.text
+    big_tiff = _img("TIFF", size=(2000, 1500)) + b"\x07" * (11 * 1024 * 1024)
+    r = client.post(
+        "/claims",
+        headers=h,
+        data={"obligation_id": ob["obligation_id"], "claimant_ref": "l-2", "channel": "ecocash"},
+        files={"file": ("scan.tiff", big_tiff, "image/tiff")},
+    )
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "TOO_LARGE"

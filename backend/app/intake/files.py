@@ -486,8 +486,8 @@ def _raw_photo(data: bytes) -> tuple[Image.Image, dict[str, Any]]:
     best = None
     for pos in starts:
         try:
-            img = Image.open(io.BytesIO(data[pos:]))
-            size = img.size  # header only: cheap
+            img = Image.open(io.BytesIO(data[pos : pos + 262_144]))  # the header says the size
+            size = img.size
         except Exception:  # noqa: BLE001, S112 - not a real JPEG, keep looking
             continue
         if best is None or size[0] * size[1] > best[0]:
@@ -497,7 +497,7 @@ def _raw_photo(data: bytes) -> tuple[Image.Image, dict[str, Any]]:
             "RAW_NO_PREVIEW",
             "this RAW file has no photo inside that we can read: export it as JPEG and send that",
         )
-    img = Image.open(io.BytesIO(data[best[1] :]))
+    img = Image.open(io.BytesIO(data[best[1] : best[1] + 40 * 1024 * 1024]))
     img.load()
     return img, {"raw": {"preview_px": list(img.size), "bytes": len(data)}}
 
@@ -902,11 +902,15 @@ def _qr_codes(pages: list[Image.Image]) -> list[str]:
     return found[:5]
 
 
-def prepare(data: bytes, max_bytes: int) -> PreparedFile:
+def prepare(data: bytes, max_bytes: int, raw_max_bytes: int | None = None) -> PreparedFile:
+    """Validate and read one file. `raw_max_bytes` lets camera RAW (large by nature) exceed
+    `max_bytes`; nothing else may."""
     if len(data) == 0:
         raise RejectedFile("EMPTY_FILE", "the file is empty")
     if len(data) > max_bytes:
-        raise RejectedFile("TOO_LARGE", f"files must be under {max_bytes // (1024 * 1024)} MB")
+        too_big_for_raw = raw_max_bytes is None or len(data) > raw_max_bytes
+        if too_big_for_raw or not _is_raw(data):
+            raise RejectedFile("TOO_LARGE", f"files must be under {max_bytes // (1024 * 1024)} MB")
     ctype = sniff(data)
     sha = hashlib.sha256(data).hexdigest()
     meta: dict[str, Any] = {}

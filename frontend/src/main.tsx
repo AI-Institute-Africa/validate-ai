@@ -9,10 +9,12 @@ import { PERSONA_LIST } from "./personas";
 import { ToastProvider, useToast } from "./toast";
 import { useTheme } from "./theme";
 import { Avatar } from "./ui";
+import { Icon } from "./components/Icon";
 import Home from "./pages/Home";
 import "./tokens.css";
 import "./styles.css";
 import "./ui.css";
+import "./motion.css";
 
 // Each page loads on demand, so a payer on a slow phone never downloads the admin console.
 const Scan = lazy(() => import("./pages/Scan"));
@@ -52,10 +54,10 @@ function LangSwitch() {
 }
 
 function ThemeButton() {
-  const { cycle, icon, label } = useTheme();
+  const { cycle, choice, label } = useTheme();
   return (
     <button type="button" className="ghost icon-btn" onClick={cycle} title={label} aria-label={label}>
-      <span aria-hidden>{icon}</span>
+      <Icon name={choice === "dark" ? "moon" : choice === "light" ? "sun" : "monitor"} size={17} />
     </button>
   );
 }
@@ -72,37 +74,37 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
   return [
     {
       title: t("nav.group.start"),
-      items: [{ to: "/", icon: "🏠", label: t("nav.home"), end: true }],
+      items: [{ to: "/", icon: "home", label: t("nav.home"), end: true }],
     },
     {
       title: t("nav.group.payments"),
       items: [
-        { to: "/verify", icon: "🧾", label: t("nav.verifyPayment") },
-        { to: "/image-to-text", icon: "🔤", label: t("nav.imageToText") },
-        { to: "/queue", icon: "📥", label: "Review queue", min: "reviewer", badge: <Count queryKey="queue-count" path="/review/queue" /> },
-        { to: "/fraud", icon: "🛡️", label: "Suspected fakes", min: "reviewer", badge: <Count queryKey="fraud-summary" path="/fraud/alerts/summary" pick={(d) => d.open_high ?? 0} /> },
-        { to: "/credits", icon: "🏦", label: "Bank credits", min: "reviewer" },
-        { to: "/obligations", icon: "📄", label: "Invoices", min: "reviewer" },
-        { to: "/auto", icon: "⚡", label: "Auto-approved", min: "reviewer" },
+        { to: "/verify", icon: "receipt", label: t("nav.verifyPayment") },
+        { to: "/image-to-text", icon: "text", label: t("nav.imageToText") },
+        { to: "/queue", icon: "inbox", label: "Review queue", min: "reviewer", badge: <Count queryKey="queue-count" path="/review/queue" /> },
+        { to: "/fraud", icon: "shield", label: "Suspected fakes", min: "reviewer", badge: <Count queryKey="fraud-summary" path="/fraud/alerts/summary" pick={(d) => d.open_high ?? 0} /> },
+        { to: "/credits", icon: "bank", label: "Bank credits", min: "reviewer" },
+        { to: "/obligations", icon: "file", label: "Invoices", min: "reviewer" },
+        { to: "/auto", icon: "bolt", label: "Auto-approved", min: "reviewer" },
       ],
     },
     {
       title: t("nav.group.identity"),
       items: [
-        { to: "/kyc", icon: "🪪", label: t("nav.verifyId") },
-        { to: "/kyc/review", icon: "🔍", label: "ID checks", min: "reviewer", end: true, badge: <Count queryKey="kyc-count" path="/kyc/review/queue" /> },
+        { to: "/kyc", icon: "id", label: t("nav.verifyId") },
+        { to: "/kyc/review", icon: "search", label: "ID checks", min: "reviewer", end: true, badge: <Count queryKey="kyc-count" path="/kyc/review/queue" /> },
       ],
     },
     {
       title: "Operations",
       items: [
-        { to: "/alerts", icon: "🔔", label: "Payment alerts", min: "reviewer" },
-        { to: "/exposure", icon: "📊", label: "Exposure", min: "admin" },
-        { to: "/guardrails", icon: "🚧", label: t("nav.guardrails"), min: "admin" },
-        { to: "/replay", icon: "🧪", label: "Replay & accuracy", min: "admin" },
-        { to: "/fx", icon: "💱", label: "Exchange rate", min: "admin" },
-        { to: "/scorecard", icon: "📈", label: "Pilot scorecard", min: "admin" },
-        { to: "/compliance", icon: "🔐", label: "Compliance", min: "admin" },
+        { to: "/alerts", icon: "bell", label: "Payment alerts", min: "reviewer" },
+        { to: "/exposure", icon: "chart", label: "Exposure", min: "admin" },
+        { to: "/guardrails", icon: "sliders", label: t("nav.guardrails"), min: "admin" },
+        { to: "/replay", icon: "flask", label: "Replay & accuracy", min: "admin" },
+        { to: "/fx", icon: "refresh", label: "Exchange rate", min: "admin" },
+        { to: "/scorecard", icon: "chart", label: "Pilot scorecard", min: "admin" },
+        { to: "/compliance", icon: "lock", label: "Compliance", min: "admin" },
       ],
     },
   ];
@@ -180,7 +182,7 @@ function PersonaMenu({ onReset }: { onReset: () => void }) {
             <>
               <hr />
               <button type="button" role="menuitem" className="persona-item" onClick={() => { setOpen(false); onReset(); }}>
-                <span className="avatar" style={{ background: "var(--muted)", width: 34, height: 34 }} aria-hidden>↺</span>
+                <span className="avatar" style={{ background: "var(--muted)", width: 34, height: 34 }} aria-hidden><Icon name="refresh" size={16} /></span>
                 <span>
                   <b>Reset demo data</b>
                   <span className="d">Wipe everything and start again</span>
@@ -217,16 +219,14 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div className="demo-bar" role="note">
           <b>DEMO</b>
           <span>
-            Everything here is synthetic. Documents are fictional and the readers and face matcher are simulated.
+            Synthetic data. Documents are fictional; readers and face matcher are simulated.
           </span>
         </div>
       )}
       <aside className={`sidebar${menu ? " open" : ""}`} aria-label={t("shell.nav")}>
         <NavLink to="/" className="brand">
           <span className="logo" aria-hidden>V</span>
-          <span className="brand-name">
-            Validate<span className="dot">.ai</span>
-          </span>
+          <span className="brand-name">Validate</span>
         </NavLink>
         <nav>
           {groups(t).map((g) => {
@@ -237,7 +237,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 <div className="nav-title">{g.title}</div>
                 {items.map((i) => (
                   <NavLink key={i.to} to={i.to} end={i.end ?? i.to === "/"}>
-                    <span className="ico" aria-hidden>{i.icon}</span>
+                    <span className="ico"><Icon name={i.icon} size={17} /></span>
                     {i.label}
                     {i.badge}
                   </NavLink>
@@ -246,23 +246,20 @@ function Shell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="side-foot">
-          {t("side.foot1")}
-          <br />
-          {t("side.foot2")}
-        </div>
       </aside>
       <div className={`scrim${menu ? " show" : ""}`} onClick={() => setMenu(false)} />
       <div className="content">
         <header className="topbar">
-          <button type="button" className="menu-btn" onClick={() => setMenu(true)} aria-label={t("shell.menu")}>☰</button>
+          <button type="button" className="menu-btn" onClick={() => setMenu(true)} aria-label={t("shell.menu")}><Icon name="menu" size={18} /></button>
           <span className="crumb">{title}</span>
           <span className="spacer" />
           <LangSwitch />
           <ThemeButton />
           <PersonaMenu onReset={confirmReset} />
         </header>
-        <main id="main" tabIndex={-1}>{children}</main>
+        <main id="main" tabIndex={-1}>
+          <div key={pathname} className="page">{children}</div>
+        </main>
         <footer>
           {t("footer.tag")} {demo ? "Demo build with synthetic data." : ""}
         </footer>

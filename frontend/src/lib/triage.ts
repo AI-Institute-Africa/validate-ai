@@ -5,6 +5,7 @@ import type { Claim } from "../api";
 
 // Mirrors RED_REASONS in backend/app/policy/engine.py plus fake-receipt signals.
 export const FLAG_REASONS = new Set([
+  "PAYEE_NOT_TRUSTED",
   "DUPLICATE_FILE",
   "DUPLICATE_NEAR_FILE",
   "DUPLICATE_REFERENCE",

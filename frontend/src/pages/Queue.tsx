@@ -160,7 +160,7 @@ export default function Queue() {
     <section className="rv" id="rv-panel">
       <PageHeader
         title="Review queue"
-        sub="Claims waiting for a person. Click a column title to sort. Click a row, or use j and k then Enter, to open the receipt, the matching bank credit and the decision."
+        sub="Claims waiting for a person. Open one to see the receipt, the matching bank credit and the decision."
         actions={<ShortcutLegend title="Queue shortcuts" shortcuts={[["j ↓", "Next claim"], ["k ↑", "Previous claim"], ["x", "Tick or untick the claim in focus"], ["Enter", "Open the claim in focus"], ["?", "Show this list"]]} />}
       />
       <div
@@ -184,18 +184,14 @@ export default function Queue() {
         <button type="button" role="tab" data-bucket="flagged" aria-controls="rv-panel" tabIndex={bucket === "flagged" ? 0 : -1} aria-selected={bucket === "flagged"} className="rv-tab flagged" onClick={() => setBucket("flagged")}>
           Flagged / high risk <span className="rv-tabcount">{counts.flagged}</span>
         </button>
-        <Link className="rv-tab" to="/auto">Auto-verified (audit) →</Link>
+        <Link className="rv-tab" to="/auto">Auto-verified (audit)</Link>
       </div>
       <div className="rv-filters">
-        <div className="rv-pills" role="group" aria-label="Show claims">
+        <select value={state} onChange={(e) => setState(e.target.value)} aria-label="Show claims">
           {FILTERS.map(([v, label]) => (
-            <button key={v} type="button" className="rv-pill" aria-pressed={state === v} onClick={() => setState(v)}>
-              {label}
-            </button>
+            <option key={v} value={v}>{label}</option>
           ))}
-        </div>
-      </div>
-      <div className="rv-filters">
+        </select>
         <input
           className="rv-search"
           type="search"

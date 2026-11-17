@@ -4,33 +4,35 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 14px/1.55 var(--font-sans);
+  font-feature-settings: "tnum" 0, "cv11" 1;
   -webkit-font-smoothing: antialiased;
 }
 a { color: var(--accent); }
 code { font-family: ui-monospace, "Cascadia Mono", monospace; font-size: 0.92em; background: var(--bg); border-radius: 4px; padding: 0 4px; }
 h1, h2, h3 { margin: 0 0 10px; line-height: 1.25; }
-h1 { font-size: 26px; letter-spacing: -0.02em; }
-h2 { font-size: 16px; }
-h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+h1 { font-family: var(--font-serif); font-size: 28px; font-weight: 600; letter-spacing: -0.015em; }
+h2 { font-size: 16px; font-weight: 600; }
+h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+.num, .n { font-variant-numeric: tabular-nums; }
 p { margin: 0 0 10px; }
 ul { margin: 0; padding-left: 18px; }
 
 /* Brand mark (the app shell itself lives in ui.css) */
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
 .logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--grad);
-  color: #fff;
-  font-weight: 800;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-serif);
+  font-weight: 700;
   font-size: 17px;
   display: grid;
   place-items: center;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
 }
-.brand-name { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.brand-name { font-family: var(--font-serif); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
 .brand-name .dot { color: var(--accent); }
 .pill {
   font-size: 11px;
@@ -47,9 +49,8 @@ ul { margin: 0; padding-left: 18px; }
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 16px 18px;
-  margin-bottom: 14px;
-  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  margin-bottom: 16px;
 }
 .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .toolbar h2 { margin: 0; }
@@ -85,24 +86,26 @@ button {
   padding: 8px 14px;
   border-radius: 8px;
   border: 1px solid transparent;
-  background: var(--grad);
-  color: #fff;
-  font-weight: 600;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 550;
   cursor: pointer;
-  transition: filter 0.15s, opacity 0.15s;
+  transition: background var(--quick) var(--ease), border-color var(--quick) var(--ease), transform var(--quick) var(--ease), opacity var(--quick);
 }
-button:hover:not(:disabled) { filter: brightness(1.06); }
+button:hover:not(:disabled) { background: var(--accent-strong); }
+button:active:not(:disabled) { transform: translateY(1px) scale(0.985); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 button.ghost { background: transparent; color: var(--text); border-color: var(--line); font-weight: 500; }
+button.ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 5%, transparent); border-color: color-mix(in srgb, var(--text) 25%, var(--line)); }
 button.danger { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
 button.small { padding: 3px 10px; font-size: 12px; font-weight: 500; }
 
 label { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-weight: 500; }
 label .muted { font-weight: 400; }
 
-table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-thead th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--bg); }
+thead th { font-size: 11.5px; color: var(--muted); font-weight: 600; letter-spacing: 0.03em; background: transparent; border-bottom: 1px solid var(--line); }
 tbody tr:last-child td { border-bottom: none; }
 
 .split { display: grid; gap: 16px; align-items: start; }
@@ -126,15 +129,16 @@ dl.meta dt { color: var(--muted); }
 .hero p { max-width: 640px; }
 
 .dropzone {
-  border: 2px dashed var(--line);
+  border: 1px dashed color-mix(in srgb, var(--text) 28%, var(--line));
   text-align: center;
   padding: 22px 18px 18px;
   transition: border-color 0.15s, background 0.15s;
 }
 .dropzone.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--panel)); }
 .dropzone.filled { border-style: solid; text-align: left; padding: 16px 18px; }
-.drop-icon { font-size: 30px; margin-bottom: 4px; }
-.drop-glyph { display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); font-size: 24px; }
+.drop-icon { margin-bottom: 4px; }
+.drop-glyph { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line); color: var(--accent); transition: transform var(--calm) var(--ease), border-color var(--quick) var(--ease); }
+.dropzone:hover .drop-glyph, .dropzone.over .drop-glyph { transform: translateY(-2px); border-color: var(--accent); }
 
 .capture-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
 @media (max-width: 560px) { .capture-row { grid-template-columns: 1fr; } }
@@ -149,8 +153,9 @@ dl.meta dt { color: var(--muted); }
   border: 1px solid var(--line);
   font-weight: 600;
 }
-.capture:hover { border-color: var(--accent); color: var(--accent); }
-.capture .glyph { font-size: 20px; margin-bottom: 2px; }
+.capture:hover:not(:disabled) { border-color: var(--text); background: var(--panel); }
+.capture { font-weight: 550; }
+.capture .glyph { display: grid; place-items: center; color: var(--accent); margin-bottom: 4px; }
 
 .file-row { display: flex; gap: 12px; align-items: center; }
 .file-row .grow { flex: 1; }
@@ -331,7 +336,7 @@ input[type="range"] { padding: 0; accent-color: var(--accent); }
   border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--panel);
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 8px 24px rgba(27, 36, 32, 0.14);
   font-size: 13px;
   animation: toast-in 0.2s ease-out;
 }
@@ -385,17 +390,21 @@ input[type="range"] { padding: 0; accent-color: var(--accent); }
   border: 1px solid var(--line);
 }
 .empty-state { text-align: center; padding: 30px 18px; }
-.empty-glyph { font-size: 38px; margin-bottom: 8px; }
+.empty-glyph { display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line); color: var(--accent); margin-bottom: 12px; animation: pop var(--calm) var(--ease) both; }
 
 /* ── header controls ────────────────────────────────── */
 .lang-switch {
-  width: auto;
-  padding: 5px 8px;
+  width: 4.6em; /* the language name only: the long "(draft)" option text must not widen it */
+  padding: 4px 6px;
   font-size: 12px;
-  border-radius: 8px;
-  background: var(--bg);
+  font-weight: 550;
+  border-radius: 6px;
+  border-color: transparent;
+  background: transparent;
+  cursor: pointer;
 }
-.icon-btn { padding: 6px 10px; font-weight: 400; }
+.lang-switch:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.icon-btn { padding: 6px 8px; font-weight: 400; border-color: transparent; display: inline-grid; place-items: center; }
 
 /* ── audit timeline ─────────────────────────────────── */
 .timeline { list-style: none; margin: 8px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); }
@@ -445,7 +454,7 @@ code.key { display: inline-block; padding: 2px 6px; background: var(--panel); bo
 .box { position: absolute; border: 2px solid var(--ok); border-radius: 3px; pointer-events: none; }
 .box.warn { border-color: var(--warn); }
 .box.tamper { border-color: var(--bad); background: rgba(220, 38, 38, 0.18); }
-.box.hot { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.45); border-color: var(--accent); }
+.box.hot { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--accent); }
 .warn-text { color: var(--warn); }
 td.reasons { font-size: 12px; color: var(--muted); max-width: 360px; }
 .state-financially_confirmed, .state-approved { color: var(--ok); }

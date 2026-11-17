@@ -236,6 +236,7 @@ const SN: Record<string, string> = {
   "state.VERIFIED": "Yaongororwa",
   "state.EXPIRED": "Yapera",
   "file.err.type": "{name}: rudzi rwefaira iri harubvumirwi. Shandisa foto, zvakaskenwa, PDF, faira reWord, Excel kana PowerPoint, email, kana zvinyorwa chete.",
+  "file.err.total": "{name}: mafaira ese pamwe chete haafanire kupfuura {mb} MB.",
   "file.err.legacy": "{name}: mafaira ekare e-.doc, .xls ne-.ppt haagoni kuverengwa zvakachengeteka. Sevha seePDF kana se-.docx, .xlsx, .pptx wozotumira.",
   "file.err.size": "{name}: rakakura kupfuura {mb} MB.",
   "file.err.empty": "{name}: faira haririmo chinhu.",
@@ -268,6 +269,7 @@ const SN: Record<string, string> = {
   "msg.NO_CREDIT_FOUND": "Hatisati taona kubhadhara uku mumarekodhi edu ebhengi.",
   "msg.DOCUMENT_TRUNCATED": "Gwaro rako rakareba; chikwata chedu chemari chichatarisa mapeji asara.",
   "msg.PROVISIONAL": "Mvumo yakavhurika kusvika {until} UTC tichiri kusimbisa kubhadhara kwako.",
+  "msg.PAYEE_MISMATCH": "Munhu anogamuchira parisiti yako haaenderani neakaundi yedu. Tarisa kuti wakabhadhara kuakaundi chaiyo.",
 };
 
 const ND: Record<string, string> = {
@@ -488,6 +490,7 @@ const ND: Record<string, string> = {
   "state.VERIFIED": "Kuqinisekisiwe",
   "state.EXPIRED": "Kuphelile",
   "file.err.type": "{name}: lolu hlobo lwefayili alwamukelwa. Sebenzisa isithombe, okuskenwe, i-PDF, ifayili ye-Word, i-Excel kumbe i-PowerPoint, i-imeyili, kumbe umbhalo kuphela.",
+  "file.err.total": "{name}: amafayili wonke ndawonye akumele adlule u-{mb} MB.",
   "file.err.legacy": "{name}: amafayili amadala e-.doc, .xls le-.ppt akwazi ukufundwa ngokuphepha. Yigcine njenge-PDF kumbe njenge-.docx, .xlsx, .pptx bese uyithumela.",
   "file.err.size": "{name}: likhulu kuka-{mb} MB.",
   "file.err.empty": "{name}: ifayili ayilalutho.",
@@ -520,6 +523,7 @@ const ND: Record<string, string> = {
   "msg.NO_CREDIT_FOUND": "Asikakuboni lokhu kukhokha kumarekhodi ethu ebhanki.",
   "msg.DOCUMENT_TRUNCATED": "Incwadi yakho ende; iqembu lethu lezimali lizahlola amakhasi asele.",
   "msg.PROVISIONAL": "Imvume ivuliwe kuze kube ngu-{until} UTC siqinisekisa ukukhokha kwakho.",
+  "msg.PAYEE_MISMATCH": "Ogunyaziweyo kurisithi yakho akavumelani le-akhawunti yethu. Sicela uhlole ukuthi ukhokhele ku-akhawunti efanele.",
 };
 
 export const EN: Record<string, string> = {
@@ -743,6 +747,7 @@ export const EN: Record<string, string> = {
   "state.VERIFIED": "Verified",
   "state.EXPIRED": "Expired",
   "file.err.type": "{name}: this file type is not supported. Use a photo, scan, PDF, Word, Excel or PowerPoint file, an email, or plain text.",
+  "file.err.total": "{name}: together the files may not be more than {mb} MB.",
   "file.err.legacy": "{name}: old .doc, .xls and .ppt files cannot be read safely. Save it as a PDF or as .docx, .xlsx, .pptx and send that.",
   "file.err.size": "{name}: larger than {mb} MB.",
   "file.err.empty": "{name}: the file is empty.",
@@ -775,6 +780,7 @@ export const EN: Record<string, string> = {
   "msg.NO_CREDIT_FOUND": "We have not yet seen this payment in our bank records.",
   "msg.DOCUMENT_TRUNCATED": "Your document is long; our finance team will check the remaining pages.",
   "msg.PROVISIONAL": "Access is open until {until} UTC while we confirm your payment.",
+  "msg.PAYEE_MISMATCH": "The recipient on your receipt does not match our account. Please check that you paid the right account.",
 };
 
 export const DICTS: Record<Lang, Record<string, string>> = { en: EN, sn: SN, nd: ND };

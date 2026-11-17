@@ -70,6 +70,21 @@ class _Detector:
         if not self.yunet and self.haar is None:
             raise FaceUnavailable(f"no face detector: {self.path} not found")
 
+    def landmarks(self, img: Image.Image) -> list[tuple[tuple[int, int, int, int], np.ndarray]]:
+        """Each face as (box, five landmarks), largest first. Needs YuNet (Haar has none)."""
+        if not self.yunet:
+            raise FaceUnavailable("aligned matching needs the YuNet face detector (landmarks)")
+        bgr = cv2.cvtColor(np.asarray(img.convert("RGB")), cv2.COLOR_RGB2BGR)
+        det = cv2.FaceDetectorYN.create(self.path, "", (bgr.shape[1], bgr.shape[0]), 0.7)
+        _, faces = det.detect(bgr)
+        out: list[tuple[tuple[int, int, int, int], np.ndarray]] = []
+        for f in [] if faces is None else faces:
+            x, y, w, h = (int(v) for v in f[:4])
+            # right eye, left eye, nose tip, right and left mouth corner (as the image shows them)
+            pts = np.asarray(f[4:14], dtype=np.float32).reshape(5, 2)
+            out.append(((x, y, w, h), pts))
+        return sorted(out, key=lambda x: x[0][2] * x[0][3], reverse=True)
+
     def boxes(self, img: Image.Image) -> list[tuple[int, int, int, int]]:
         rgb = np.asarray(img.convert("RGB"))
         bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
@@ -84,6 +99,35 @@ class _Detector:
                 for b in self.haar.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
             ]
         return sorted(found, key=lambda b: b[2] * b[3], reverse=True)  # type: ignore[arg-type,return-value]
+
+
+# The ArcFace models (InsightFace's w600k_r50 and kin) are trained on faces warped so that five
+# landmarks land on these points in a 112 x 112 picture: left eye, right eye, nose, left and right
+# mouth corner.
+ARCFACE_TEMPLATE = np.array(
+    [
+        [38.2946, 51.6963],
+        [73.5318, 51.5014],
+        [56.0252, 71.7366],
+        [41.5493, 92.3655],
+        [70.7299, 92.2041],
+    ],
+    dtype=np.float32,
+)
+
+
+def align_face(img: Image.Image, landmarks: np.ndarray, side: int = 112) -> Image.Image:
+    """Warp a face so its five landmarks sit on the ArcFace template (a similarity transform:
+    rotate, scale, shift; never a shear). `landmarks` is 5 x 2, in the order of ARCFACE_TEMPLATE."""
+    pts = np.asarray(landmarks, dtype=np.float32).reshape(5, 2)
+    matrix, _ = cv2.estimateAffinePartial2D(
+        pts, ARCFACE_TEMPLATE * (side / 112.0), method=cv2.LMEDS
+    )
+    if matrix is None:
+        raise FaceUnavailable("could not align the face")
+    bgr = cv2.cvtColor(np.asarray(img.convert("RGB")), cv2.COLOR_RGB2BGR)
+    out = cv2.warpAffine(bgr, matrix, (side, side), flags=cv2.INTER_LINEAR, borderValue=0)
+    return Image.fromarray(cv2.cvtColor(out, cv2.COLOR_BGR2RGB))
 
 
 class OnnxFaceMatcher:
@@ -120,6 +164,32 @@ class OnnxFaceMatcher:
         return out / (np.linalg.norm(out) or 1.0)
 
 
+class InsightFaceMatcher(OnnxFaceMatcher):
+    """ArcFace embeddings (InsightFace's w600k_r50 or similar ONNX) on ALIGNED faces.
+
+    The plain ONNX matcher crops a loose box; ArcFace models score noticeably better when the eyes,
+    nose and mouth are warped onto fixed points first, which is what they were trained on. Alignment
+    uses the five landmarks YuNet reports, so YuNet is required: without it we refuse rather than
+    quietly match worse. The weights are never bundled: InsightFace's pretrained models are for
+    non-commercial research (see docs/models.md).
+    """
+
+    name = "insightface"
+
+    def __init__(self) -> None:
+        super().__init__()
+        if not self.detector.yunet:
+            raise FaceUnavailable("the insightface backend needs the YuNet detector for landmarks")
+        self.version = f"insightface:{os.path.basename(get_settings().kyc_face_model_path)}"
+
+    def id_portrait(self, card: Image.Image) -> Image.Image | None:
+        faces = self.detector.landmarks(card)
+        return align_face(card, faces[0][1], self.side) if faces else None
+
+    def selfie_faces(self, selfie: Image.Image) -> list[Image.Image]:
+        return [align_face(selfie, pts, self.side) for _, pts in self.detector.landmarks(selfie)]
+
+
 class FakeFaceMatcher:
     """Tests and demos: the portrait is a fixed region of the card, the selfie is the whole
     frame, and an embedding is a normalised thumbnail, so the same picture matches itself and
@@ -154,6 +224,8 @@ def build_matcher() -> FaceMatcher:
         return DemoFaceMatcher()
     if backend == "onnx":
         return OnnxFaceMatcher()
+    if backend == "insightface":
+        return InsightFaceMatcher()
     raise FaceUnavailable("face matching is not configured (POPS_KYC_FACE_BACKEND=none)")
 
 

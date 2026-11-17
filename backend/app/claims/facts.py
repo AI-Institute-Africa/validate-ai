@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.claims.payees import is_trusted
 from app.extraction import templates
 from app.extraction.agreement import FinalField
 from app.models import Claim, ExtractedField, Obligation, VerificationRun
@@ -24,6 +25,7 @@ FACT_FLAGS = {
     "RECEIPT_STATUS_NOT_SUCCESS",
     "CURRENCY_NOT_ON_RECEIPT",
     "AWAITING_CREDIT",
+    "PAYEE_NOT_TRUSTED",
 }
 
 
@@ -130,10 +132,13 @@ def build_facts(
             flags.append("EXTRACTION_UNCONFIRMED")
             break
 
-    if too_many_low_confidence(
-        fields, load_policy(session, claim.org_id).config.max_low_confidence_fields
-    ):
+    cfg = load_policy(session, claim.org_id).config
+    if too_many_low_confidence(fields, cfg.max_low_confidence_fields):
         flags.append("MANY_LOW_CONFIDENCE_FIELDS")
+    # the receipt names a recipient that is not one of our trusted payees (only when some are set)
+    recipient = agreed("beneficiary")
+    if cfg.trusted_payees and recipient and not is_trusted(recipient, cfg.trusted_payees):
+        flags.append("PAYEE_NOT_TRUSTED")
 
     # "missing" means nobody could read it; a disputed reading is a review case, not missing
     if amount is None and not (fields.get("amount") and fields["amount"].value):

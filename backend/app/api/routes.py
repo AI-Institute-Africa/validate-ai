@@ -175,6 +175,29 @@ def _obligation(db: Session, p: Principal, obligation_id: uuid.UUID) -> Obligati
     return o
 
 
+async def _read_uploads(uploads: list[UploadFile] | None) -> list[bytes]:
+    """Read the files of one request. Each may be as large as camera RAW (the rest of the pipeline
+    refuses anything else over the normal limit), and the whole request has a memory budget."""
+    s = get_settings()
+    cap = max(s.max_upload_bytes, s.max_raw_upload_bytes) + 1
+    out: list[bytes] = []
+    total = 0
+    for f in uploads or []:
+        data = await f.read(cap)
+        total += len(data)
+        if total > s.max_claim_upload_bytes:
+            raise HTTPException(
+                413,
+                {
+                    "code": "REQUEST_TOO_LARGE",
+                    "message": "send at most "
+                    f"{s.max_claim_upload_bytes // (1024 * 1024)} MB in total",
+                },
+            )
+        out.append(data)
+    return out
+
+
 def _limit_previews(p: Principal) -> None:
     try:
         ratelimit.check(
@@ -401,11 +424,11 @@ async def preview_claim_files(
     readers = build_readers()
     files_out = []
     for upload in uploads:
-        data = await upload.read(settings.max_upload_bytes + 1)
+        data = await upload.read(max(settings.max_upload_bytes, settings.max_raw_upload_bytes) + 1)
         # same gate as a real submission: nothing is parsed before the malware scan (fail closed)
         try:
             scan(data)
-            prepared = prepare(data, settings.max_upload_bytes)
+            prepared = prepare(data, settings.max_upload_bytes, settings.max_raw_upload_bytes)
         except InfectedFile as exc:
             obs.UPLOADS_REJECTED.labels("MALWARE_DETECTED").inc()
             raise HTTPException(
@@ -484,10 +507,10 @@ async def image_to_text(
     """
     _limit_text_conversions(p)
     settings = get_settings()
-    data = await file.read(settings.max_upload_bytes + 1)
+    data = await file.read(max(settings.max_upload_bytes, settings.max_raw_upload_bytes) + 1)
     try:
         scan(data)
-        prepared = prepare(data, settings.max_upload_bytes)
+        prepared = prepare(data, settings.max_upload_bytes, settings.max_raw_upload_bytes)
     except InfectedFile as exc:
         obs.UPLOADS_REJECTED.labels("MALWARE_DETECTED").inc()
         raise HTTPException(
@@ -620,8 +643,7 @@ async def submit_claim(
             amount = parse_minor(declared_amount, currency)
         except MoneyError as exc:
             raise HTTPException(422, str(exc)) from exc
-    limit = get_settings().max_upload_bytes + 1
-    data = [await f.read(limit) for f in file or []]
+    data = await _read_uploads(file)
     if text and text.strip():
         data.append(text.strip().encode("utf-8"))
     if not data:
@@ -711,8 +733,7 @@ async def add_evidence(
     if claim.state != ClaimState.NEEDS_INFORMATION:
         raise HTTPException(409, "evidence can only be added when information was requested")
     _limit_uploads(p, claim.claimant_ref)
-    limit = get_settings().max_upload_bytes + 1
-    data = [await f.read(limit) for f in file or []]
+    data = await _read_uploads(file)
     if text and text.strip():
         data.append(text.strip().encode("utf-8"))
     if not data:

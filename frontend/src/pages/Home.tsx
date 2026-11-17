@@ -4,7 +4,9 @@ import { Link } from "react-router-dom";
 import { api, hasRole } from "../api";
 import { deliverMoney, demoInfo, runScenario, type ScenarioInfo, type ScenarioResult } from "../demo";
 import { stateInfo } from "../labels";
-import { Chip, InspectLink, Reasons, StateChip } from "../ui";
+import { Icon } from "../components/Icon";
+import { useCountUp } from "../lib/useCountUp";
+import { InspectLink, Reasons, StateChip } from "../ui";
 
 // The curated order for the guided tour; every other story stays available below it.
 const TOUR = ["pay-clear", "pay-waiting", "pay-edited", "kyc-clear", "kyc-mismatch", "kyc-edited"];
@@ -88,7 +90,7 @@ function Outcome({ result, info, onFollow, following }: { result: ScenarioResult
   );
 }
 
-export function ScenarioPanel({ info, compact = false, footer }: { info: ScenarioInfo; compact?: boolean; footer?: React.ReactNode }) {
+export function ScenarioPanel({ info, compact = false, quiet = false, footer }: { info: ScenarioInfo; compact?: boolean; quiet?: boolean; footer?: React.ReactNode }) {
   const [result, setResult] = useState<ScenarioResult | null>(null);
   const run = useMutation({ mutationFn: () => runScenario(info.id), onSuccess: setResult });
   const follow = useMutation({ mutationFn: deliverMoney, onSuccess: setResult });
@@ -102,8 +104,8 @@ export function ScenarioPanel({ info, compact = false, footer }: { info: Scenari
       <div className="scn-body">
         {!result && (
           <div className="scn-actions">
-            <button type="button" className="lg" disabled={run.isPending} onClick={() => run.mutate()}>
-              {run.isPending ? "Running…" : "▶  Run this story"}
+            <button type="button" className={quiet ? "secondary lg" : "lg"} disabled={run.isPending} onClick={() => run.mutate()}>
+              {run.isPending ? "Running…" : <><Icon name="play" size={14} /> Run this story</>}
             </button>
             {run.isPending && <span className="muted small">Acting as the payer, then the system…</span>}
             {run.isError && <span className="error">{(run.error as Error).message}</span>}
@@ -112,7 +114,7 @@ export function ScenarioPanel({ info, compact = false, footer }: { info: Scenari
         {result && !compact && (
           <div className="scn-actions">
             <button type="button" className="secondary" disabled={run.isPending} onClick={() => { setResult(null); run.reset(); }}>
-              ↺ Run it again
+              <Icon name="refresh" size={14} /> Run it again
             </button>
           </div>
         )}
@@ -120,6 +122,16 @@ export function ScenarioPanel({ info, compact = false, footer }: { info: Scenari
       {result && <Outcome result={result} info={info} following={follow.isPending} onFollow={(f) => follow.mutate(f.params)} />}
       {follow.isError && <p className="error" style={{ margin: 12 }}>{(follow.error as Error).message}</p>}
       {footer}
+    </div>
+  );
+}
+
+function Figure({ n, label }: { n: number | undefined; label: string }) {
+  const shown = useCountUp(n);
+  return (
+    <div className="stat">
+      <div className="n">{shown ?? "–"}</div>
+      <div className="l">{label}</div>
     </div>
   );
 }
@@ -139,10 +151,7 @@ function Stats() {
   return (
     <div className="stats" aria-label="Live numbers">
       {items.map((s) => (
-        <div className="stat" key={s.l}>
-          <div className="n">{s.n ?? "–"}</div>
-          <div className="l">{s.l}</div>
-        </div>
+        <Figure key={s.l} n={s.n} label={s.l} />
       ))}
     </div>
   );
@@ -171,8 +180,8 @@ export default function Home() {
       <section className="hero2">
         <h1>Know that a payment, or a person, is real. In seconds.</h1>
         <p>
-          Validate reads receipts and identity documents, checks them against the money and against each other, and
-          approves the clear cases on its own. Anything doubtful goes to a person, with the reasons laid out.
+          Validate reads receipts and identity documents and checks them against the money. The clear cases are
+          approved by fixed rules; anything doubtful goes to a person, with the reasons.
         </p>
         <div className="cta">
           <button
@@ -183,15 +192,15 @@ export default function Home() {
               setTimeout(() => document.getElementById("tour")?.scrollIntoView({ behavior: "smooth" }), 50);
             }}
           >
-            ▶ Start the 3-minute tour
+            Start the 3-minute tour
           </button>
-          <Link className="btn ghost lg" to="/verify">Try it yourself</Link>
+          <Link className="btn secondary lg" to="/verify">Try it yourself</Link>
         </div>
-        <div className="pillars">
-          <div className="pillar"><b>1 · It reads</b><span>Two independent readers pull the facts from the picture.</span></div>
-          <div className="pillar"><b>2 · It checks</b><span>The money, the rules and the documents must all agree.</span></div>
-          <div className="pillar"><b>3 · A person decides when unsure</b><span>Nothing doubtful is approved or rejected by a machine.</span></div>
-        </div>
+        <ol className="how-steps" aria-label="How it works">
+          <li><b>It reads</b>Two readers pull the facts from the picture.</li>
+          <li><b>It checks</b>The money, the rules and the documents must agree.</li>
+          <li><b>A person decides</b>Anything doubtful is never decided by a machine.</li>
+        </ol>
       </section>
 
       <Stats />
@@ -204,9 +213,9 @@ export default function Home() {
           </div>
           {!started && (
             <div className="card">
-              <p>
-                You are signed in as the <b>administrator</b>, so every page is open to you. Use the menu at the top
-                right to step into the payer's or the reviewer's seat at any time.
+              <p style={{ marginBottom: 14 }}>
+                You are signed in as the <b>administrator</b>. Use the menu at the top right to step into the
+                payer's or the reviewer's seat at any time.
               </p>
               <button type="button" onClick={() => setStarted(true)}>Begin</button>
             </div>
@@ -217,7 +226,7 @@ export default function Home() {
                 {tour.map((t, i) => (
                   <li key={t.id}>
                     <button type="button" className={`tour-step${i === step ? " on" : ""}${seen.has(i) ? " done" : ""}`} onClick={() => go(i)} aria-current={i === step}>
-                      <span className="num">{seen.has(i) ? "✓" : i + 1}</span>
+                      <span className="num">{seen.has(i) ? <Icon name="check" size={13} /> : i + 1}</span>
                       <span>
                         {t.title}
                         <small>{t.group === "payments" ? "Payments" : "Identity"}</small>
@@ -229,11 +238,11 @@ export default function Home() {
               <div>
                 <ScenarioPanel key={current.id} info={current} />
                 <div className="tour-nav">
-                  <button type="button" className="secondary" disabled={step === 0} onClick={() => go(step - 1)}>← Back</button>
+                  <button type="button" className="secondary" disabled={step === 0} onClick={() => go(step - 1)}>Back</button>
                   {step < tour.length - 1 ? (
-                    <button type="button" onClick={() => go(step + 1)}>Next story →</button>
+                    <button type="button" onClick={() => go(step + 1)}>Next story</button>
                   ) : (
-                    <Link className="btn" to="/verify">Now try it yourself →</Link>
+                    <Link className="btn" to="/verify">Now try it yourself</Link>
                   )}
                 </div>
               </div>
@@ -250,9 +259,9 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <div className="grid cols-2">
+          <div className="grid cols-2 reveal">
             {more.map((s) => (
-              <ScenarioPanel key={s.id} info={s} />
+              <ScenarioPanel key={s.id} info={s} quiet />
             ))}
           </div>
         </>
@@ -281,9 +290,9 @@ export default function Home() {
         </div>
       </div>
       {demo && (
-        <p className="muted small" style={{ marginTop: 18 }}>
-          <Chip tone="info">Simulated</Chip> In this demo the vision readers and face matcher are simulated and only understand the sample
-          documents the demo generates. In a real deployment they are a vision model and a face model you supply.
+        <p className="muted small" style={{ marginTop: 28 }}>
+          In this demo the readers and face matcher are simulated and understand only the sample documents it
+          generates. A real deployment uses a vision model and a face model you supply.
         </p>
       )}
     </div>

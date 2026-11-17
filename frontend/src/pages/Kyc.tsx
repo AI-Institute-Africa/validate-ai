@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, post } from "../api";
 import { demoInfo, prepareKyc, sampleFile } from "../demo";
 import { DOC_TYPES } from "../labels";
+import { Icon } from "../components/Icon";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { Chip, PageHeader, StateChip } from "../ui";
@@ -43,7 +44,7 @@ function Drop({ label, hint, file, onFile, optional }: { label: string; hint: st
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
     >
-      <span className="ph">{url ? <img src={url} alt="" /> : "📷"}</span>
+      <span className="ph">{url ? <img src={url} alt="" /> : <Icon name="camera" size={22} />}</span>
       <span style={{ flex: 1 }}>
         <b>{label} {optional && <span className="muted small">{t("kyc.optional")}</span>}</b>
         <span className="muted small">{file ? file.name : hint}</span>

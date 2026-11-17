@@ -27,6 +27,8 @@ DEFAULT_FRAUD_WEIGHTS: dict[str, int] = {
     "PDF_EDITED_AFTER_CREATION": 30,
     "PAYER_HISTORY": 30,
     "EDITABLE_DOCUMENT": 30,
+    "RECIPIENT_NOT_TRUSTED": 40,
+    "PAYEE_CHANGED": 20,
     "PROOFS_DISAGREE": 35,
     "PASTED_TEXT": 25,
     "ELA_LOCAL_EDIT": 25,
@@ -92,6 +94,10 @@ class PolicyConfig(BaseModel):
     kyc_required_for_staff: bool = False
     # our receiving accounts / merchant codes; a credit must land on one of these
     beneficiary_aliases: list[str] = Field(default_factory=lambda: ["MAIN"])
+    # who a receipt may name as the recipient (names, wallet numbers, merchant codes). A receipt
+    # addressed to anyone else is flagged PAYEE_NOT_TRUSTED and never auto-approved.
+    # Empty = no opinion.
+    trusted_payees: list[str] = Field(default_factory=list)
     success_statuses: list[str] = Field(default_factory=lambda: ["success"])
     date_window_hours: int = 72
     amount_tolerance_minor: int = 0  # fee tolerance; 0 = exact
@@ -305,6 +311,7 @@ RED_REASONS = {
     "REFERENCE_ALREADY_CONSUMED",
     "CREDIT_NOT_SUCCESS",
     "WRONG_BENEFICIARY",
+    "PAYEE_NOT_TRUSTED",
     "CREDIT_FULLY_ALLOCATED",
     "CURRENCY_MISMATCH",
     "AMOUNT_MISMATCH",

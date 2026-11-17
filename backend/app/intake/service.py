@@ -25,7 +25,8 @@ def store_evidence(
     submission_id: uuid.UUID | None = None,
     index: int = 0,
 ) -> Evidence:
-    prepared = prepare(data, get_settings().max_upload_bytes)
+    cfg = get_settings()
+    prepared = prepare(data, cfg.max_upload_bytes, cfg.max_raw_upload_bytes)
     prepared.meta["submission_id"] = str(submission_id or uuid.uuid4())
     prepared.meta["submission_index"] = index
     # scan before anything touches storage; ScannerUnavailable propagates (fail closed)
@@ -95,6 +96,7 @@ def create_claim(
     declared_currency: str | None,
     declared_reference: str | None,
     source_type: str = "upload",
+    payer_lang: str | None = None,
     client_key: str | None = None,
     request_fingerprint: str | None = None,
     consent_version: str | None = None,
@@ -114,6 +116,7 @@ def create_claim(
         client_key=client_key,
         request_fingerprint=request_fingerprint,
         consent_version=consent_version,
+        payer_lang=payer_lang,
     )
     session.add(claim)
     session.flush()
