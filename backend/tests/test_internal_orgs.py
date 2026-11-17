@@ -116,7 +116,12 @@ def test_production_refuses_a_short_provisioning_key(monkeypatch):
     monkeypatch.delenv("POPS_VLM_BACKEND")
     monkeypatch.delenv("POPS_KYC_FACE_BACKEND")
     monkeypatch.delenv("POPS_PIPELINE_MODE")
-    base = {"_env_file": None, "jwt_secret": "x" * 40, "clamav_host": "clamav"}
+    base = {
+        "_env_file": None,
+        "jwt_secret": "x" * 40,
+        "clamav_host": "clamav",
+        "data_region": "ZA-test",
+    }
     validate_for_startup(Settings(**base))  # unset is fine: the endpoint simply stays off
     validate_for_startup(Settings(**base, provisioning_key="k" * 32))
     with pytest.raises(ConfigError) as e:

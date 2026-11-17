@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import ai_http
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.db import get_session
@@ -70,6 +71,18 @@ def _rule(db: Session, p: Principal, rule_id: uuid.UUID) -> GuardrailRule:
     if rule is None or rule.removed_at is not None:
         raise HTTPException(404, "guardrail not found")
     return rule
+
+
+@router.get("/ai-status")
+def ai_status(p: Admin) -> dict:
+    """Every model endpoint we are configured to call, and whether production would allow it."""
+    s = get_settings()
+    return {
+        "enforced": not s.is_dev,
+        "allowed_hosts": s.ai_allowed_hosts,
+        "endpoints": ai_http.endpoints(s),
+        "local_only": ["face matching (ONNX)", "liveness (heuristics)", "OCR (Tesseract)"],
+    }
 
 
 @router.get("/guardrails")

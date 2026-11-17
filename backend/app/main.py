@@ -2,7 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.alerts import router as alerts_router
+from app.api.analytics import router as analytics_router
+from app.api.compliance import router as compliance_router
 from app.api.fraud import router as fraud_router
+from app.api.fx import router as fx_router
 from app.api.guardrails import router as guardrails_router
 from app.api.internal import router as internal_router
 from app.api.kyc import router as kyc_router
@@ -23,6 +26,9 @@ def create_app() -> FastAPI:
         title="POPs Engine",
         version="0.2.0",
         description="Proof-of-payment verification. The AI reads; deterministic policy approves.",
+        docs_url="/docs" if settings.docs_on else None,
+        redoc_url="/redoc" if settings.docs_on else None,
+        openapi_url="/openapi.json" if settings.docs_on else None,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -36,6 +42,9 @@ def create_app() -> FastAPI:
     app.include_router(router)
     app.include_router(guardrails_router)
     app.include_router(fraud_router)
+    app.include_router(fx_router)
+    app.include_router(analytics_router)
+    app.include_router(compliance_router)
     app.include_router(provisional_router)
     app.include_router(alerts_router)
     app.include_router(whatsapp_router)

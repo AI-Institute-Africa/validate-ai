@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     lookup_mode: Literal["off", "shadow"] = "off"
     lookup_disabled: bool = False  # global kill switch
     lookup_backend: Literal["fake", "browser"] = "fake"
+    # the browser backend's own language model is chosen by the browser-use library; set this
+    # only after confirming it runs on a host we control
+    lookup_browser_allowed: bool = False
     lookup_allowed_domains: list[str] = []
     lookup_timeout_seconds: int = 60
 
@@ -106,11 +109,14 @@ class Settings(BaseSettings):
     # against human decisions. Proposals never touch claim state, so this is safe to flip on;
     # flip it off to stop recording. The AI proposer additionally obeys the guardrail kill switch.
     shadow_mode_enabled: bool = False
-    # Local daemon: http://127.0.0.1:11434 (no key). Ollama Cloud: https://ollama.com + API key.
-    ollama_url: str = "https://ollama.com"
+    # Self-hosted by default: no outside AI service is called. In production the host must be
+    # private or listed in ai_allowed_hosts (see app/core/ai_http.py).
+    ollama_url: str = "http://ollama:11434"
     ollama_api_key: str | None = None
     ollama_model: str = "qwen3-vl:235b"
     ollama_timeout_seconds: float = 120.0
+    # hosts (exact or parent domain) a model call may reach in production, besides private ones
+    ai_allowed_hosts: list[str] = []
     donut_model_path: str = "./var/models/donut-pops"
     ocr_backend: Literal["tesseract", "none"] = "tesseract"
     ocr_languages: str = "eng"
@@ -158,6 +164,18 @@ class Settings(BaseSettings):
     smtp_from: str = "pops-engine@localhost"
     admin_alert_emails: list[str] = []
 
+    # official ZiG/USD rate from the Reserve Bank of Zimbabwe (see app/fx and docs/fx-rates.md)
+    fx_enabled: bool = False
+    # hours (UTC, cron syntax) on weekdays when the daily fetch tries until the file is found
+    fx_fetch_hours: str = "5-16"
+    fx_max_daily_move_pct: float = 25.0
+
+    # where this deployment's data lives, for audit packets and the compliance screen (for example
+    # "ZA-af-south-1" or "ZW-onprem"). Required in production: hosting is a deliberate choice.
+    data_region: str | None = None
+    # interactive API docs (/docs); default on in dev and off in production
+    docs_enabled: bool | None = None
+
     cors_origins: list[str] = ["http://localhost:5173"]
 
     # observability
@@ -169,9 +187,19 @@ class Settings(BaseSettings):
     def is_dev(self) -> bool:
         return self.env in ("dev", "test")
 
+    @property
+    def docs_on(self) -> bool:
+        return self.is_dev if self.docs_enabled is None else self.docs_enabled
+
 
 class ConfigError(RuntimeError):
     pass
+
+
+def ai_http_host_ok(url: str, allowed: list[str]) -> bool:
+    from app.core.ai_http import host_allowed  # local import: ai_http imports this module
+
+    return host_allowed(url, allowed)
 
 
 def validate_for_startup(s: Settings) -> None:
@@ -195,6 +223,20 @@ def validate_for_startup(s: Settings) -> None:
         problems.append("POPS_LOOKUP_BACKEND=fake is for tests and demos only")
     if s.lookup_mode != "off" and not s.lookup_allowed_domains:
         problems.append("POPS_LOOKUP_ALLOWED_DOMAINS must list the provider domains")
+    if s.lookup_mode != "off" and s.lookup_backend == "browser" and not s.lookup_browser_allowed:
+        problems.append(
+            "POPS_LOOKUP_BACKEND=browser may call an outside AI service; confirm the model it "
+            "uses is on a host we control, then set POPS_LOOKUP_BROWSER_ALLOWED=true"
+        )
+    if not ai_http_host_ok(s.ollama_url, s.ai_allowed_hosts):
+        problems.append(
+            "POPS_OLLAMA_URL points to an outside AI service; use a private host or list it in "
+            "POPS_AI_ALLOWED_HOSTS"
+        )
+    if s.ollama_api_key:
+        problems.append("POPS_OLLAMA_API_KEY must be empty: no hosted AI keys in production")
+    if not (s.data_region or "").strip():
+        problems.append("POPS_DATA_REGION must say where the data is hosted (e.g. ZA-af-south-1)")
     if s.kyc_face_backend in ("fake", "demo"):
         problems.append(f"POPS_KYC_FACE_BACKEND={s.kyc_face_backend} is for tests and demos only")
     if not s.clamav_host:

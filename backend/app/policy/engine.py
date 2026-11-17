@@ -139,6 +139,24 @@ class PolicyConfig(BaseModel):
     # minutes a claim may wait for a human before admins are nudged again, one nudge per
     # level (ascending)
     review_sla_minutes: list[int] = Field(default_factory=lambda: [60, 240, 1440])
+    # official ZWG/USD rate (app/fx). Off by default: when on, a claim paid in a different currency
+    # from its invoice carries the converted amount and reasons for a person; the currency gate
+    # itself is unchanged and nothing is allocated across currencies.
+    fx_cross_currency_enabled: bool = False
+    fx_tolerance_bps: int = Field(default=300, ge=0, le=10_000)  # gap vs the invoice, basis points
+    fx_max_rate_age_days: int = Field(
+        default=4, ge=0, le=14
+    )  # longest a carried-forward rate may be
+
+    # retention for payment evidence files and raw alert text (None = keep); see app/compliance
+    evidence_retention_days: int | None = Field(default=None, ge=30, le=3650)
+    alert_body_retention_days: int | None = Field(default=None, ge=30, le=3650)
+    # pilot scorecard: minutes of staff time one manual check is assumed to cost (BRD: about 2)
+    pilot_minutes_per_manual_check: int = Field(default=2, ge=0, le=120)
+    # reviewer corrections may be exported as training labels only with consent on record
+    training_export_consent: bool = False
+    training_consent_ref: str | None = Field(default=None, max_length=200)
+
     # tamper forensics (blueprint 8, layer 6): a risk flag only. A hit routes the claim to a
     # reviewer; it can never approve, reject or allocate on its own.
     tamper_enabled: bool = True

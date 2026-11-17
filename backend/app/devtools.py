@@ -81,6 +81,21 @@ def ecocash_fields(txn: str = "PP251021.1432.A12345", amount: str = "40.00", **o
     return base
 
 
+def zwg_fields(txn: str, amount: str, provider: str = "EcoCash", **over) -> dict:
+    """A receipt in Zimbabwe Gold (ZiG): same shape as the USD one, only the currency differs."""
+    return ecocash_fields(txn=txn, amount=amount, currency="ZWG", provider=provider, **over)
+
+
+def innbucks_fields(txn: str = "IB2610170001", amount: str = "40.00", **over) -> dict:
+    """An InnBucks-style receipt (reference layout is a placeholder until real samples arrive)."""
+    return ecocash_fields(txn=txn, amount=amount, provider="InnBucks", **over)
+
+
+def omari_fields(txn: str = "OM2610170001", amount: str = "40.00", **over) -> dict:
+    """An O'mari-style receipt (reference layout is a placeholder until real samples arrive)."""
+    return ecocash_fields(txn=txn, amount=amount, provider="Omari", **over)
+
+
 def splice_receipt(
     base: bytes, patch: bytes, box: tuple[int, int, int, int], *, seed: int = 20261021
 ) -> bytes:

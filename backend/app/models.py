@@ -6,6 +6,7 @@ tables are append-only; database triggers in the initial migration enforce this.
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
@@ -18,6 +19,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -151,6 +153,7 @@ class Claim(Base):
     approval_tier: Mapped[str | None] = mapped_column(String(5))
     reason_codes: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     candidate_credit_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("credits.credit_id"))
+    consent_version: Mapped[str | None] = mapped_column(String(20))  # privacy notice the payer saw
     # fraud risk (app/fraud): a flag for humans, never an approval input
     risk_score: Mapped[int | None] = mapped_column(Integer)
     risk_level: Mapped[str | None] = mapped_column(String(10))
@@ -194,6 +197,7 @@ class Evidence(Base):
     claim_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("claims.claim_id"), nullable=False)
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organisations.org_id"), nullable=False)
     object_key: Mapped[str] = mapped_column(String(300), nullable=False)
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # files removed
     preview_key: Mapped[str | None] = mapped_column(String(300))  # rendered PNG for viewer
     forensics_key: Mapped[str | None] = mapped_column(String(300))  # ELA heatmap for admins
     content_type: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -652,6 +656,7 @@ class AlertMessage(Base):
     subject: Mapped[str | None] = mapped_column(String(300))
     body: Mapped[str] = mapped_column(Text, nullable=False)
     body_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # text removed
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # credited | duplicate | ignored | rejected | unparsed | conflict
     status: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -662,6 +667,77 @@ class AlertMessage(Base):
     __table_args__ = (
         UniqueConstraint("source_id", "body_sha256", name="uq_alert_message_dedupe"),
         Index("ix_alert_messages_org_created", "org_id", "created_at"),
+    )
+
+
+class FxRate(Base):
+    """An official daily ZWG-per-USD rate (the RBZ interbank ask rate), with its evidence.
+
+    Platform-wide, not per organisation. A corrected re-publication or a manual entry adds a new
+    row; the newest row for a date is the one in use, and older rows stay as history.
+    """
+
+    __tablename__ = "fx_rates"
+    rate_id: Mapped[uuid.UUID] = _pk()
+    rate_date: Mapped[date] = mapped_column(Date, nullable=False)
+    base: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
+    quote: Mapped[str] = mapped_column(String(3), nullable=False, default="ZWG")
+    bid: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    ask: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    mid: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text)
+    pdf_sha256: Mapped[str | None] = mapped_column(String(64))
+    pdf_object_key: Mapped[str | None] = mapped_column(Text)
+    method: Mapped[str] = mapped_column(String(10), nullable=False)  # direct | browser | manual
+    fetched_at: Mapped[datetime] = _created()
+    entered_by: Mapped[str | None] = mapped_column(String(80))
+    reason: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        CheckConstraint("ask > 0 AND bid > 0 AND mid > 0", name="fx_rate_positive"),
+        CheckConstraint("method in ('direct','browser','manual')", name="fx_method"),
+        Index("ix_fx_rates_date", "rate_date", "fetched_at"),
+    )
+
+
+class FxFetchLog(Base):
+    """One row per attempt to fetch a day's rate, for the admin status screen."""
+
+    __tablename__ = "fx_fetch_log"
+    log_id: Mapped[uuid.UUID] = _pk()
+    for_date: Mapped[date] = mapped_column(Date, nullable=False)
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text)
+    method: Mapped[str | None] = mapped_column(String(10))
+    attempted_at: Mapped[datetime] = _created()
+
+
+class Incident(Base):
+    """A personal-data incident (for example a breach) and its reporting clock.
+
+    The reporting duty is 24 hours from detection according to the BRD (to be confirmed with
+    counsel): `due_at` is detection plus 24 hours, and reminders go to admins until it is reported.
+    """
+
+    __tablename__ = "incidents"
+    incident_id: Mapped[uuid.UUID] = _pk()
+    org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organisations.org_id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False)  # breach | near_miss | other
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    window_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    window_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="open")
+    reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    report_reference: Mapped[str | None] = mapped_column(String(200))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = _created()
+    __table_args__ = (
+        CheckConstraint("kind in ('breach','near_miss','other')", name="incident_kind"),
+        CheckConstraint("status in ('open','reported','closed')", name="incident_status"),
+        Index("ix_incidents_org_status", "org_id", "status"),
     )
 
 

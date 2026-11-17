@@ -14,7 +14,7 @@ from typing import Any
 import httpx
 
 from app.demo import art
-from app.devtools import dmy, ecocash_fields, statement_csv
+from app.devtools import DAY, dmy, ecocash_fields, innbucks_fields, statement_csv, zwg_fields
 
 DEMO_ORG = "Demo Academy"
 PERSONAS = {
@@ -26,15 +26,21 @@ PERSONAS = {
 
 POLICY = {
     "auto_approve_enabled": True,
-    "auto_approve_channels": ["ecocash"],
-    "auto_approve_max_minor": {"USD": 20_000},
+    "auto_approve_channels": ["ecocash", "innbucks"],
+    "auto_approve_max_minor": {"USD": 20_000, "ZWG": 600_000},
+    # a currency with no limit here always needs a second approver (the engine fails closed)
+    "second_approver_above_minor": {"USD": 50_000, "ZWG": 1_500_000},
+    # an invoice paid in the other currency is never settled by itself: with the official rate on
+    # file it goes to a person, with the converted amount shown
+    "fx_cross_currency_enabled": True,
+    "fx_tolerance_bps": 300,
     "auto_approve_audit_pct": 20,
     "kyc_auto_verify_mode": "on",
     "kyc_allowed_countries": [art.COUNTRY],
     "kyc_min_face_score": 0.6,
     "kyc_audit_pct": 25,
 }
-POLICY_VERSION = "demo-v1"
+POLICY_VERSION = "demo-v3"
 
 
 class DemoError(RuntimeError):
@@ -112,7 +118,10 @@ def _seed() -> int:
     return uuid.uuid4().int % 1_000_000 + 1
 
 
-def new_invoice(api: Api, *, amount: int = 4000) -> dict:
+DEMO_RATE = "27.2508"  # ZWG per USD: the RBZ ask rate of 13 Nov 2026, used as a sample
+
+
+def new_invoice(api: Api, *, amount: int = 4000, currency: str = "USD") -> dict:
     return api.call(
         "admin",
         "POST",
@@ -121,18 +130,21 @@ def new_invoice(api: Api, *, amount: int = 4000) -> dict:
             "learner_ref": f"learner-{_uid()}",
             "type": "instalment",
             "amount_minor": amount,
-            "currency": "USD",
+            "currency": currency,
             "description": "Short course: instalment 1 of 3",
         },
     )
 
 
-def import_statement(api: Api, txn: str, amount: str) -> None:
+def import_statement(
+    api: Api, txn: str, amount: str, *, currency: str = "USD", rail: str = "EcoCash"
+) -> None:
     row = {
         "date": dmy("14:35"),
-        "narrative": "EcoCash payment received",
+        "narrative": f"{rail} payment received",
         "reference": txn,
         "credit": amount,
+        "currency": currency,
     }
     api.call(
         "reviewer",
@@ -150,6 +162,8 @@ class PaymentSample:
     txn: str
     amount: str  # printed on the receipt
     note: str
+    channel: str = "ecocash"
+    currency: str = "USD"
 
 
 def payment_sample(api: Api, variant: str) -> PaymentSample:
@@ -205,7 +219,62 @@ def payment_sample(api: Api, variant: str) -> PaymentSample:
             "40.00",
             "A photo that is too blurry to read.",
         )
+    if variant == "zig":
+        ob = new_invoice(api, amount=109_000, currency="ZWG")  # ZWG 1,090.00
+        import_statement(api, txn, "1090.00", currency="ZWG")
+        return PaymentSample(
+            ob,
+            api.receipt(zwg_fields(txn, "1090.00", sender=sender)),
+            txn,
+            "1090.00",
+            "A ZiG invoice paid in ZiG: same rules, same proof, no conversion.",
+            currency="ZWG",
+        )
+    if variant == "innbucks":
+        ob = new_invoice(api)
+        ib = f"IB{uuid.uuid4().int % 10**10:010d}"
+        import_statement(api, ib, "40.00", rail="InnBucks")
+        return PaymentSample(
+            ob,
+            api.receipt(innbucks_fields(txn=ib, amount="40.00", sender=sender), brand="innbucks"),
+            ib,
+            "40.00",
+            "An InnBucks receipt. Any wallet works: the proof is the money, not the app.",
+            channel="innbucks",
+        )
+    if variant == "usd_in_zig":
+        ob = new_invoice(api)  # USD 40.00
+        _ensure_rate(api)
+        zig = f"{40 * float(DEMO_RATE):.2f}"  # what 40 USD is at the official ask rate
+        import_statement(api, txn, zig, currency="ZWG")
+        return PaymentSample(
+            ob,
+            api.receipt(zwg_fields(txn, zig, sender=sender)),
+            txn,
+            zig,
+            f"A USD 40.00 invoice paid as ZWG {zig}, which is exactly USD 40.00 at the official rate.",
+            currency="ZWG",
+        )
     raise KeyError(variant)
+
+
+def _ensure_rate(api: Api) -> None:
+    """Make sure an official rate is on file for the receipt day (the demo has no internet)."""
+    if not api.call("admin", "GET", "/admin/fx/status")["enabled"]:
+        raise DemoError("this story needs POPS_FX_ENABLED=true")
+    try:
+        api.call("reviewer", "GET", "/fx/rates", params={"on": DAY.isoformat()})
+    except DemoError:
+        api.call(
+            "approver",
+            "POST",
+            "/admin/fx/manual",
+            json={
+                "rate_date": DAY.isoformat(),
+                "ask": DEMO_RATE,
+                "reason": "Demo: sample rate copied from the RBZ daily sheet of 13 Nov 2026",
+            },
+        )
 
 
 def submit_receipt(api: Api, s: PaymentSample) -> dict:
@@ -216,7 +285,7 @@ def submit_receipt(api: Api, s: PaymentSample) -> dict:
         data={
             "obligation_id": s.invoice["obligation_id"],
             "claimant_ref": s.invoice["learner_ref"],
-            "channel": "ecocash",
+            "channel": s.channel,
         },
         files={"file": ("receipt.png", s.png, "image/png")},
     )
@@ -366,6 +435,56 @@ def _pay_blurry(api: Api) -> Result:
             Step("payer", "Uploads a blurry photo of the receipt."),
             Step("system", "The picture is too soft to read reliably, so nothing is guessed."),
             Step("system", "The payer is asked to retake it, in plain language."),
+        ],
+    )
+
+
+def _pay_zig(api: Api) -> Result:
+    return _pay(
+        api,
+        "pay-zig",
+        "zig",
+        "A ZiG payment, approved like any other.",
+        [
+            Step("payer", "Uploads a receipt for a ZWG 1,090.00 instalment."),
+            Step("system", "The currency is read from the receipt: ZWG, not guessed."),
+            Step("system", "The bank statement shows ZWG 1,090.00 with the same reference."),
+            Step("system", "Same currency, exact amount, every rule passes: approved."),
+        ],
+    )
+
+
+def _pay_innbucks(api: Api) -> Result:
+    return _pay(
+        api,
+        "pay-innbucks",
+        "innbucks",
+        "InnBucks, EcoCash, bank transfer: the same proof.",
+        [
+            Step("payer", "Uploads an InnBucks receipt."),
+            Step("system", "The wallet is recognised; the rules do not depend on which one it is."),
+            Step(
+                "system", "The money is on the statement, so the claim is confirmed and approved."
+            ),
+        ],
+    )
+
+
+def _pay_usd_in_zig(api: Api) -> Result:
+    return _pay(
+        api,
+        "pay-usd-in-zig",
+        "usd_in_zig",
+        "A USD invoice paid in ZiG: a person decides, with the official rate in front of them.",
+        [
+            Step("payer", "Pays a USD 40.00 invoice with ZWG at the day's rate."),
+            Step("system", "Two currencies never settle each other automatically."),
+            Step(
+                "system",
+                "The amount is converted at the Reserve Bank's published ask rate and shown "
+                "to the reviewer, with the date and the source of the rate.",
+            ),
+            Step("reviewer", "Sees the converted amount next to the invoice and decides."),
         ],
     )
 
@@ -666,6 +785,36 @@ SCENARIOS: list[Scenario] = [
         _pay_blurry,
     ),
     Scenario(
+        "pay-zig",
+        "payments",
+        "Pay in ZiG",
+        "A ZWG invoice paid in ZWG is approved like a USD one.",
+        "Both currencies are first-class. The currency gate is strict, and nothing is converted when it does not have to be.",
+        "APPROVED",
+        "AUTO_APPROVED",
+        _pay_zig,
+    ),
+    Scenario(
+        "pay-innbucks",
+        "payments",
+        "Pay with InnBucks",
+        "Another wallet, the same proof.",
+        "The engine verifies the money, not the app that showed the receipt.",
+        "APPROVED",
+        "AUTO_APPROVED",
+        _pay_innbucks,
+    ),
+    Scenario(
+        "pay-usd-in-zig",
+        "payments",
+        "USD invoice paid in ZiG",
+        "A person decides, with the official rate shown.",
+        "Mixed-currency payments are never settled automatically; the reviewer gets the converted amount at the Reserve Bank's published rate.",
+        "PENDING_REVIEW",
+        "CROSS_CURRENCY_AT_OFFICIAL_RATE",
+        _pay_usd_in_zig,
+    ),
+    Scenario(
         "kyc-clear",
         "identity",
         "Verify an ID in seconds",
@@ -737,7 +886,16 @@ SCENARIOS: list[Scenario] = [
     ),
 ]
 BY_ID = {s.id: s for s in SCENARIOS}
-PAYMENT_VARIANTS = ("matched", "unmatched", "edited", "short", "blurry")
+PAYMENT_VARIANTS = (
+    "matched",
+    "unmatched",
+    "edited",
+    "short",
+    "blurry",
+    "zig",
+    "innbucks",
+    "usd_in_zig",
+)
 KYC_VARIANTS = ("clear", "mismatch", "expired", "noface", "shared", "passport", "edited")
 
 # the order in which a fresh demo is populated, so every console page has something in it
@@ -748,6 +906,9 @@ SEED_ORDER = [
     "pay-edited",
     "pay-reused",
     "pay-short",
+    "pay-zig",
+    "pay-innbucks",
+    "pay-usd-in-zig",
     "kyc-clear",
     "kyc-clear",
     "kyc-mismatch",

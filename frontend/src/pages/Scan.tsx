@@ -5,6 +5,7 @@ import { newKey } from "../lib/outbox";
 import { useClaimSender } from "../lib/useClaimSender";
 import { demoInfo, preparePayment, sampleFile } from "../demo";
 import { useI18n } from "../i18n";
+import { CONSENT_VERSION } from "../lib/consent";
 import { cropImage, NO_TRIM, rotateImage, shrinkImage, type Trim } from "../lib/imageEdit";
 import { Dialog } from "../components/Dialog";
 import { ACCEPT } from "../lib/fileTypes";
@@ -53,6 +54,9 @@ const SAMPLES: { id: string; label: string; hint: string }[] = [
   { id: "edited", label: "Edited receipt", hint: "The image shows signs of editing" },
   { id: "short", label: "Paid part", hint: "Less than the invoice amount" },
   { id: "blurry", label: "Blurry photo", hint: "Too blurry to read" },
+  { id: "zig", label: "Paid in ZiG", hint: "A ZWG invoice paid in ZWG" },
+  { id: "innbucks", label: "Paid with InnBucks", hint: "Another wallet, same proof" },
+  { id: "usd_in_zig", label: "USD invoice paid in ZiG", hint: "A person decides, with the official rate" },
 ];
 
 function tierClass(tier: string): string {
@@ -349,6 +353,7 @@ export default function Scan() {
         obligation_id: obligation!.obligation_id,
         claimant_ref: claimantRef.trim(),
         channel,
+        consent_version: CONSENT_VERSION,
       };
       if (pasted.trim()) fields.text = pasted.trim();
       if (declaredAmount.trim()) fields.declared_amount = declaredAmount.trim();
@@ -851,6 +856,7 @@ export default function Scan() {
               </p>
             )}
             <p className="muted small">{t("form.trust")}</p>
+            <p className="muted small">{t("consent.notice")}</p>
           </form>
         </div>
 

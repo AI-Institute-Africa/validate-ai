@@ -44,7 +44,7 @@ def test_safe_production_config_boots(monkeypatch):
     monkeypatch.delenv("POPS_VLM_BACKEND")
     monkeypatch.delenv("POPS_KYC_FACE_BACKEND")
     monkeypatch.delenv("POPS_PIPELINE_MODE")
-    s = Settings(_env_file=None, jwt_secret="x" * 40, clamav_host="clamav")
+    s = Settings(_env_file=None, jwt_secret="x" * 40, clamav_host="clamav", data_region="ZA-test")
     validate_for_startup(s)
 
 

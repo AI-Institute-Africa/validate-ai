@@ -140,7 +140,7 @@ def _send(channel: str, ev: OutboxEvent, http: httpx.Client, session: Session) -
         return
     if channel == "cognify":
         body = json.dumps(
-            {"id": str(ev.event_id), "type": ev.event_type, "data": ev.payload},
+            {"v": 1, "id": str(ev.event_id), "type": ev.event_type, "data": ev.payload},
             separators=(",", ":"),
         ).encode()
         headers = {

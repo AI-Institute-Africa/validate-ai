@@ -1,5 +1,7 @@
 """Shadow mode (blueprint phase 4, innovation 8): proposals are advisory, never actions."""
 
+import httpx
+
 from app.core.config import get_settings
 from tests.conftest import ecocash_fields, login, make_receipt
 from tests.test_flow import TXN, _import, _obligation, _stmt_row, _submit
@@ -96,11 +98,10 @@ def _fake_ai_post(outcome="approve", credit_id=None):
 
 def test_ai_proposer_records_advisory_row_when_allowed(client, monkeypatch):
     """With the AI configured and allowed, a model proposal is recorded beside the baseline."""
-    from app.shadow import proposer as shadow
 
     _enable_shadow(monkeypatch)
     monkeypatch.setattr(get_settings(), "vlm_backend", "ollama")
-    monkeypatch.setattr(shadow.httpx, "post", _fake_ai_post())
+    monkeypatch.setattr(httpx, "post", _fake_ai_post())
     sub, rev = login(client, "submitter"), login(client, "reviewer")
     ob = _obligation(client, sub)
     _submit(client, sub, ob, make_receipt(ecocash_fields()), declared_amount="40.00")
@@ -118,11 +119,10 @@ def test_ai_proposer_records_advisory_row_when_allowed(client, monkeypatch):
 
 def test_kill_switch_stops_the_ai_proposer_but_not_the_baseline(client, monkeypatch):
     """The AI kill switch that turns off the reader also turns off the AI proposer."""
-    from app.shadow import proposer as shadow
 
     _enable_shadow(monkeypatch)
     monkeypatch.setattr(get_settings(), "vlm_backend", "ollama")
-    monkeypatch.setattr(shadow.httpx, "post", _fake_ai_post())
+    monkeypatch.setattr(httpx, "post", _fake_ai_post())
     sub, adm, rev = (
         login(client, "submitter"),
         login(client, "admin"),
@@ -150,15 +150,13 @@ def test_ai_proposer_fails_soft(client, monkeypatch):
     """A model outage costs a proposal, never a claim (fail-soft by design)."""
     import httpx
 
-    from app.shadow import proposer as shadow
-
     _enable_shadow(monkeypatch)
     monkeypatch.setattr(get_settings(), "vlm_backend", "ollama")
 
     def boom(*a, **kw):
         raise httpx.ConnectError("model unreachable")
 
-    monkeypatch.setattr(shadow.httpx, "post", boom)
+    monkeypatch.setattr(httpx, "post", boom)
     sub, rev = login(client, "submitter"), login(client, "reviewer")
     ob = _obligation(client, sub)
     claim = _submit(client, sub, ob, make_receipt(ecocash_fields()), declared_amount="40.00")

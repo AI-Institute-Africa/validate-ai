@@ -1,0 +1,8 @@
+[
+  {
+    "name": "innbucks_merchant",
+    "provider": "INNBUCKS",
+    "sender_pattern": "innbucks",
+    "pattern": "(?:received|payment of)\\s+(?P<currency>USD|ZWG|ZiG|\\$)\\s?(?P<amount>[\\d,]+\\.\\d{2})\\s+from\\s+(?P<payer>[A-Za-z .'-]+?)\\s*(?:\\(?(?P<phone>\\+?\\d{9,12})\\)?)?[.,].*?(?:txn id|trans(?:action)? id|ref(?:erence)?)[:\\s]*(?P<reference>[A-Z0-9.]{6,30})"
+  }
+]
