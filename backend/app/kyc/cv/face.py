@@ -77,14 +77,13 @@ class _Detector:
         bgr = cv2.cvtColor(np.asarray(img.convert("RGB")), cv2.COLOR_RGB2BGR)
         det = cv2.FaceDetectorYN.create(self.path, "", (bgr.shape[1], bgr.shape[0]), 0.7)
         _, faces = det.detect(bgr)
-        out = []
+        out: list[tuple[tuple[int, int, int, int], np.ndarray]] = []
         for f in [] if faces is None else faces:
-            box = tuple(int(v) for v in f[:4])
-            pts = np.asarray(f[4:14], dtype=np.float32).reshape(
-                5, 2
-            )  # right eye, left eye, nose, ...
-            out.append((box, pts))
-        return sorted(out, key=lambda x: x[0][2] * x[0][3], reverse=True)  # type: ignore[return-value]
+            x, y, w, h = (int(v) for v in f[:4])
+            # right eye, left eye, nose tip, right and left mouth corner (as the image shows them)
+            pts = np.asarray(f[4:14], dtype=np.float32).reshape(5, 2)
+            out.append(((x, y, w, h), pts))
+        return sorted(out, key=lambda x: x[0][2] * x[0][3], reverse=True)
 
     def boxes(self, img: Image.Image) -> list[tuple[int, int, int, int]]:
         rgb = np.asarray(img.convert("RGB"))

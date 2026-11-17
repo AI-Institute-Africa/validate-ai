@@ -313,7 +313,9 @@ def assess(
         add(
             "RECIPIENT_NOT_TRUSTED",
             "The receipt names a recipient that is not one of this organisation's trusted payees.",
-            recipient=(fields or {}).get("beneficiary") and fields["beneficiary"].normalised,
+            recipient=fields["beneficiary"].normalised
+            if fields and "beneficiary" in fields
+            else None,
         )
     changed = _payee_changed(session, claim, fields)
     if changed:
