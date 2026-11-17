@@ -164,13 +164,26 @@ class Claim(Base):
     # set while the payer holds provisional access for this claim (app/provisional)
     provisional_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     correlation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), default=_uuid)
+    # a client-chosen key (Idempotency-Key header) so a retried upload cannot create a second
+    # claim, and a fingerprint of what was sent so the same key with different content is refused
+    client_key: Mapped[str | None] = mapped_column(String(80))
+    request_fingerprint: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     evidence: Mapped[list["Evidence"]] = relationship(back_populates="claim")
-    __table_args__ = (Index("ix_claims_org_state", "org_id", "state"),)
+    __table_args__ = (
+        Index("ix_claims_org_state", "org_id", "state"),
+        Index(
+            "uq_claims_org_client_key",
+            "org_id",
+            "client_key",
+            unique=True,
+            postgresql_where=text("client_key IS NOT NULL"),
+        ),
+    )
 
 
 class Evidence(Base):

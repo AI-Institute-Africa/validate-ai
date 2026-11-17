@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, post } from "../api";
 import { demoInfo, prepareKyc, sampleFile } from "../demo";
 import { DOC_TYPES } from "../labels";
+import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { Chip, PageHeader, StateChip } from "../ui";
 
@@ -18,15 +19,11 @@ const SAMPLES: { id: string; label: string; hint: string }[] = [
   { id: "noface", label: "No face in selfie", hint: "Asked to retake" },
 ];
 
-const NEXT: Record<string, string> = {
-  VERIFIED: "Verified automatically. This identity now counts as checked everywhere that asks for it.",
-  NEEDS_REVIEW: "Received. A reviewer will look at it. Nothing is rejected automatically.",
-  NEEDS_INFORMATION: "We could not use the photos. Retake them using the tips on this page and submit again.",
-  REJECTED: "We could not verify this identity.",
-};
+const NEXT_STATES = ["VERIFIED", "NEEDS_REVIEW", "NEEDS_INFORMATION", "REJECTED"];
 
 function Drop({ label, hint, file, onFile, optional }: { label: string; hint: string; file: File | null; onFile: (f: File | null) => void; optional?: boolean }) {
   const input = useRef<HTMLInputElement>(null);
+  const { t } = useI18n();
   const [over, setOver] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -48,12 +45,12 @@ function Drop({ label, hint, file, onFile, optional }: { label: string; hint: st
     >
       <span className="ph">{url ? <img src={url} alt="" /> : "📷"}</span>
       <span style={{ flex: 1 }}>
-        <b>{label} {optional && <span className="muted small">(optional)</span>}</b>
+        <b>{label} {optional && <span className="muted small">{t("kyc.optional")}</span>}</b>
         <span className="muted small">{file ? file.name : hint}</span>
       </span>
       {file && (
         <button type="button" className="ghost small" onClick={(e) => { e.stopPropagation(); onFile(null); }}>
-          Remove
+          {t("kyc.remove")}
         </button>
       )}
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
@@ -62,6 +59,7 @@ function Drop({ label, hint, file, onFile, optional }: { label: string; hint: st
 }
 
 export default function Kyc() {
+  const { t } = useI18n();
   const toast = useToast();
   const demo = demoInfo();
   const [subjectType, setSubjectType] = useState("payer");
@@ -99,7 +97,7 @@ export default function Kyc() {
 
   const submit = useMutation({
     mutationFn: () => {
-      if (!front || !selfie) throw new Error("Add a photo of the ID and a selfie.");
+      if (!front || !selfie) throw new Error(t("kyc.err.photos"));
       const fd = new FormData();
       fd.append("subject_type", subjectType);
       if (subjectRef.trim()) fd.append("subject_ref", subjectRef.trim());
@@ -118,8 +116,8 @@ export default function Kyc() {
   return (
     <div>
       <PageHeader
-        title="Verify an identity"
-        sub="Photograph the ID and take a selfie. The AI only reads the document; fixed rules, or a person, decide."
+        title={t("kyc.title")}
+        sub={t("kyc.sub")}
       />
       <div className="grid cols-2" style={{ alignItems: "start" }}>
         <div className="card">
@@ -136,35 +134,35 @@ export default function Kyc() {
               {note && <p className="learn" style={{ marginTop: 0 }}><b>This sample:</b> {note}</p>}
             </>
           )}
-          <h3>Who is being verified</h3>
+          <h3>{t("kyc.who")}</h3>
           <div className="inline-pair" style={{ marginBottom: 10 }}>
-            <select value={subjectType} onChange={(e) => setSubjectType(e.target.value)} aria-label="Who is being verified">
-              <option value="payer">A payer / learner</option>
-              <option value="staff">Me (staff)</option>
-              <option value="org">An organisation (admin)</option>
+            <select value={subjectType} onChange={(e) => setSubjectType(e.target.value)} aria-label={t("kyc.who")}>
+              <option value="payer">{t("kyc.who.payer")}</option>
+              <option value="staff">{t("kyc.who.staff")}</option>
+              <option value="org">{t("kyc.who.org")}</option>
             </select>
             {subjectType !== "staff" && (
-              <input placeholder="Learner reference" value={subjectRef} onChange={(e) => setSubjectRef(e.target.value)} aria-label="Reference" />
+              <input placeholder={t("kyc.ref")} value={subjectRef} onChange={(e) => setSubjectRef(e.target.value)} aria-label={t("kyc.ref")} />
             )}
           </div>
-          <Drop label="ID or passport photo page" hint="The side with the photo. Flat, well lit, all four corners visible." file={front} onFile={setFront} />
-          <Drop label="Back of the ID" hint="Only if the card has a second side." file={back} onFile={setBack} optional />
-          <Drop label="Selfie" hint="Your face, facing the camera, good light, no one else in the shot." file={selfie} onFile={setSelfie} />
+          <Drop label={t("kyc.front.label")} hint={t("kyc.front.hint")} file={front} onFile={setFront} />
+          <Drop label={t("kyc.back.label")} hint={t("kyc.back.hint")} file={back} onFile={setBack} optional />
+          <Drop label={t("kyc.selfie.label")} hint={t("kyc.selfie.hint")} file={selfie} onFile={setSelfie} />
           <button type="button" className="lg" disabled={submit.isPending || !front || !selfie} onClick={() => submit.mutate()}>
-            {submit.isPending ? "Checking…" : "Submit for verification"}
+            {submit.isPending ? t("kyc.checking") : t("kyc.submit")}
           </button>
         </div>
 
         <div>
           <div className="card" aria-live="polite">
-            <h3>Result</h3>
-            {!result && !submit.isPending && <p className="muted">Your result appears here, usually within a few seconds.</p>}
+            <h3>{t("kyc.result")}</h3>
+            {!result && !submit.isPending && <p className="muted">{t("kyc.result.empty")}</p>}
             {submit.isPending && (
               <ul className="checks">
-                {["Finding the card in the photo", "Reading the document twice, independently", "Comparing the ID photo with the selfie", "Running the rules"].map((t, i) => (
-                  <li key={t} className="story" style={{ animationDelay: `${i * 500}ms`, display: "flex" }}>
+                {[t("kyc.step1"), t("kyc.step2"), t("kyc.step3"), t("kyc.step4")].map((text, i) => (
+                  <li key={i} className="story" style={{ animationDelay: `${i * 500}ms`, display: "flex" }}>
                     <span className="mk na">…</span>
-                    {t}
+                    {text}
                   </li>
                 ))}
               </ul>
@@ -172,28 +170,28 @@ export default function Kyc() {
             {result && (
               <>
                 <p><StateChip state={result.state} /></p>
-                <p>{NEXT[result.state] ?? result.state}</p>
+                <p>{NEXT_STATES.includes(result.state) ? t(`kyc.next.${result.state}`) : result.state}</p>
                 {result.message && <div className="bubble">{result.message}</div>}
               </>
             )}
           </div>
           <div className="card">
-            <h3>Photo tips</h3>
+            <h3>{t("kyc.tips.title")}</h3>
             <ul className="small muted">
-              <li>Put the card on a plain surface. Avoid glare on the plastic.</li>
-              <li>Show the whole card, then the whole page for a passport.</li>
-              <li>For the selfie: just you, face visible, no filters, not a photo of a photo.</li>
-              <li>Accepted: {Object.values(DOC_TYPES).join(", ")}.</li>
+              <li>{t("kyc.tip1")}</li>
+              <li>{t("kyc.tip2")}</li>
+              <li>{t("kyc.tip3")}</li>
+              <li>{t("kyc.tip4").replace("{types}", Object.keys(DOC_TYPES).map((k) => t(`doc.${k}`)).join(", "))}</li>
             </ul>
           </div>
           <div className="card">
-            <h3>Is someone verified?</h3>
-            <input placeholder="Learner reference" value={lookup} onChange={(e) => setLookup(e.target.value)} aria-label="Reference to look up" />
+            <h3>{t("kyc.lookup.title")}</h3>
+            <input placeholder={t("kyc.ref")} value={lookup} onChange={(e) => setLookup(e.target.value)} aria-label={t("kyc.lookup.ref")} />
             {status.data && (
               <p style={{ marginTop: 10 }}>
-                {status.data.verified ? <Chip tone="ok">Verified</Chip> : <Chip tone="neutral">Not verified</Chip>}
-                {status.data.state && <span className="muted small"> latest check: {status.data.state.toLowerCase().replace(/_/g, " ")}</span>}
-                {status.data.expires_at && <span className="muted small"> · valid until {new Date(status.data.expires_at).toLocaleDateString()}</span>}
+                {status.data.verified ? <Chip tone="ok">{t("kyc.verified")}</Chip> : <Chip tone="neutral">{t("kyc.notverified")}</Chip>}
+                {status.data.state && <span className="muted small"> {t("kyc.latest").replace("{state}", t(`state.${status.data.state}`))}</span>}
+                {status.data.expires_at && <span className="muted small"> · {t("kyc.valid").replace("{date}", new Date(status.data.expires_at).toLocaleDateString())}</span>}
               </p>
             )}
           </div>

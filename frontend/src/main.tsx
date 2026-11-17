@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
@@ -10,31 +10,34 @@ import { ToastProvider, useToast } from "./toast";
 import { useTheme } from "./theme";
 import { Avatar } from "./ui";
 import Home from "./pages/Home";
-import Scan from "./pages/Scan";
-import Bulk from "./pages/Bulk";
-import Track from "./pages/Track";
-import ImageToText from "./pages/ImageToText";
-import Guardrails from "./pages/Guardrails";
-import Fraud from "./pages/Fraud";
-import Alerts from "./pages/Alerts";
-import Replay from "./pages/Replay";
-import Queue from "./pages/Queue";
-import ClaimReview from "./pages/ClaimReview";
-import Credits from "./pages/Credits";
-import Obligations from "./pages/Obligations";
-import Exposure from "./pages/Exposure";
-import AutoApproved from "./pages/AutoApproved";
-import Kyc from "./pages/Kyc";
-import KycReview from "./pages/KycReview";
+import "./tokens.css";
 import "./styles.css";
 import "./ui.css";
+
+// Each page loads on demand, so a payer on a slow phone never downloads the admin console.
+const Scan = lazy(() => import("./pages/Scan"));
+const Bulk = lazy(() => import("./pages/Bulk"));
+const Track = lazy(() => import("./pages/Track"));
+const ImageToText = lazy(() => import("./pages/ImageToText"));
+const Guardrails = lazy(() => import("./pages/Guardrails"));
+const Fraud = lazy(() => import("./pages/Fraud"));
+const Alerts = lazy(() => import("./pages/Alerts"));
+const Replay = lazy(() => import("./pages/Replay"));
+const Queue = lazy(() => import("./pages/Queue"));
+const ClaimReview = lazy(() => import("./pages/ClaimReview"));
+const Credits = lazy(() => import("./pages/Credits"));
+const Obligations = lazy(() => import("./pages/Obligations"));
+const Exposure = lazy(() => import("./pages/Exposure"));
+const AutoApproved = lazy(() => import("./pages/AutoApproved"));
+const Kyc = lazy(() => import("./pages/Kyc"));
+const KycReview = lazy(() => import("./pages/KycReview"));
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
 
 function LangSwitch() {
-  const { lang, setLang } = useI18n();
+  const { lang, setLang, t } = useI18n();
   return (
-    <select className="lang-switch" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label="Language">
+    <select className="lang-switch" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("shell.language")}>
       {(Object.keys(LANG_LABELS) as Lang[]).map((l) => (
         <option key={l} value={l}>
           {langLabel(l)}
@@ -64,14 +67,14 @@ type Item = { to: string; icon: string; label: string; min?: string; end?: boole
 function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
   return [
     {
-      title: "Start",
-      items: [{ to: "/", icon: "🏠", label: "Home & tour", end: true }],
+      title: t("nav.group.start"),
+      items: [{ to: "/", icon: "🏠", label: t("nav.home"), end: true }],
     },
     {
-      title: "Payments",
+      title: t("nav.group.payments"),
       items: [
-        { to: "/verify", icon: "🧾", label: t("nav.scan") === "nav.scan" ? "Verify a payment" : "Verify a payment" },
-        { to: "/image-to-text", icon: "🔤", label: t("nav.imageToText") === "nav.imageToText" ? "Image to text" : t("nav.imageToText") },
+        { to: "/verify", icon: "🧾", label: t("nav.verifyPayment") },
+        { to: "/image-to-text", icon: "🔤", label: t("nav.imageToText") },
         { to: "/queue", icon: "📥", label: "Review queue", min: "reviewer", badge: <Count queryKey="queue-count" path="/review/queue" /> },
         { to: "/fraud", icon: "🛡️", label: "Suspected fakes", min: "reviewer", badge: <Count queryKey="fraud-summary" path="/fraud/alerts/summary" pick={(d) => d.open_high ?? 0} /> },
         { to: "/credits", icon: "🏦", label: "Bank credits", min: "reviewer" },
@@ -80,9 +83,9 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
       ],
     },
     {
-      title: "Identity",
+      title: t("nav.group.identity"),
       items: [
-        { to: "/kyc", icon: "🪪", label: "Verify an ID" },
+        { to: "/kyc", icon: "🪪", label: t("nav.verifyId") },
         { to: "/kyc/review", icon: "🔍", label: "ID checks", min: "reviewer", end: true, badge: <Count queryKey="kyc-count" path="/kyc/review/queue" /> },
       ],
     },
@@ -91,7 +94,7 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
       items: [
         { to: "/alerts", icon: "🔔", label: "Payment alerts", min: "reviewer" },
         { to: "/exposure", icon: "📊", label: "Exposure", min: "admin" },
-        { to: "/guardrails", icon: "🚧", label: t("nav.guardrails") === "nav.guardrails" ? "Guardrails" : t("nav.guardrails"), min: "admin" },
+        { to: "/guardrails", icon: "🚧", label: t("nav.guardrails"), min: "admin" },
         { to: "/replay", icon: "🧪", label: "Replay & accuracy", min: "admin" },
       ],
     },
@@ -115,10 +118,16 @@ const TITLES: [string, string][] = [
   ["/replay", "Replay & accuracy"],
 ];
 
+// pages payers see are translated; staff pages stay in English
+const TRANSLATED_TITLES: Record<string, string> = { "/kyc": "nav.verifyId", "/verify": "nav.verifyPayment", "/image-to-text": "nav.imageToText" };
+
 function useTitle(): string {
   const { pathname } = useLocation();
-  if (pathname === "/") return "Home";
-  return TITLES.find(([p]) => pathname === p || pathname.startsWith(p + "/"))?.[1] ?? "Validate";
+  const { t } = useI18n();
+  if (pathname === "/") return t("title.home");
+  const hit = TITLES.find(([p]) => pathname === p || pathname.startsWith(p + "/"));
+  if (!hit) return "Validate";
+  return TRANSLATED_TITLES[hit[0]] ? t(TRANSLATED_TITLES[hit[0]]) : hit[1];
 }
 
 function PersonaMenu({ onReset }: { onReset: () => void }) {
@@ -193,6 +202,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const demo = demoInfo();
   return (
     <div className="app">
+      <a className="skip-link" href="#main">{t("shell.skip")}</a>
       {demo && (
         <div className="demo-bar" role="note">
           <b>DEMO</b>
@@ -201,7 +211,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           </span>
         </div>
       )}
-      <aside className={`sidebar${menu ? " open" : ""}`} aria-label="Main navigation">
+      <aside className={`sidebar${menu ? " open" : ""}`} aria-label={t("shell.nav")}>
         <NavLink to="/" className="brand">
           <span className="logo" aria-hidden>V</span>
           <span className="brand-name">
@@ -227,31 +237,31 @@ function Shell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="side-foot">
-          A receipt is a claim, not a confirmation.
+          {t("side.foot1")}
           <br />
-          The AI reads. Rules and people decide.
+          {t("side.foot2")}
         </div>
       </aside>
       <div className={`scrim${menu ? " show" : ""}`} onClick={() => setMenu(false)} />
       <div className="content">
         <header className="topbar">
-          <button type="button" className="menu-btn" onClick={() => setMenu(true)} aria-label="Open menu">☰</button>
+          <button type="button" className="menu-btn" onClick={() => setMenu(true)} aria-label={t("shell.menu")}>☰</button>
           <span className="crumb">{title}</span>
           <span className="spacer" />
           <LangSwitch />
           <ThemeButton />
           <PersonaMenu onReset={confirmReset} />
         </header>
-        <main id="main">{children}</main>
+        <main id="main" tabIndex={-1}>{children}</main>
         <footer>
-          <strong>Validate</strong> — know that a payment, or a person, is real. {demo ? "Demo build with synthetic data." : ""}
+          {t("footer.tag")} {demo ? "Demo build with synthetic data." : ""}
         </footer>
       </div>
       {reset.isPending && (
-        <div className="overlay" role="alertdialog" aria-live="polite">
+        <div className="overlay" role="alertdialog" aria-modal="true" aria-labelledby="reset-title" aria-live="polite">
           <div className="modal">
             <div className="spinner" />
-            <h2>Resetting the demo</h2>
+            <h2 id="reset-title">Resetting the demo</h2>
             <p className="muted">Clearing everything and replaying the sample stories. About 15 seconds.</p>
           </div>
         </div>
@@ -271,6 +281,7 @@ void ensureSession()
             <ToastProvider>
               <BrowserRouter>
                 <Shell>
+                  <Suspense fallback={<div className="spinner" role="status" aria-label="Loading" />}>
                   <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/verify" element={<Scan />} />
@@ -291,6 +302,7 @@ void ensureSession()
                     <Route path="/kyc/review" element={<KycReview />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
+                  </Suspense>
                 </Shell>
               </BrowserRouter>
             </ToastProvider>

@@ -230,3 +230,4 @@ frontend/dist/
 .ruff_cache/
 *.tsbuildinfo
 .venv-demo
+frontend/shots/

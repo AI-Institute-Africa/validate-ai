@@ -119,3 +119,44 @@ export const DOC_TYPES: Record<string, string> = {
   passport: "Passport",
   drivers_licence: "Driving licence",
 };
+
+/** Which calm sentence a payer sees while a person is involved (a translation key; the wording lives in
+ *  i18n). It never says why in a way that hints at suspicion; real reasons are for staff only. */
+export function payerWaitKey(state: string): "wait.review" | "wait.money" | null {
+  switch (state.toUpperCase()) {
+    case "PENDING_REVIEW":
+    case "DUPLICATE_HOLD":
+    case "NEEDS_REVIEW":
+      return "wait.review";
+    case "AWAITING_FINANCIAL_CONFIRMATION":
+      return "wait.money";
+    default:
+      return null;
+  }
+}
+
+/** The status name in the reader's language: the translation if there is one, else the English label. */
+export function stateText(t: (k: string) => string, state: string, fallback?: string): string {
+  const key = `state.${state.toUpperCase()}`;
+  const v = t(key);
+  return v === key ? (fallback ?? stateInfo(state).label) : v;
+}
+
+/** The payer messages in the reader's language. Each message has a neutral key from the server; if a key
+ *  has no translation we show the server's own English sentence, so nothing is ever blank. */
+export function payerMessages(
+  claim: { messages: string[]; message_keys?: string[]; provisional_until?: string | null },
+  t: (k: string) => string,
+): string[] {
+  return claim.messages.map((english, i) => {
+    const key = claim.message_keys?.[i];
+    if (!key) return english;
+    const id = `msg.${key}`;
+    const text = t(id);
+    if (text === id) return english;
+    if (key === "PROVISIONAL" && claim.provisional_until) {
+      return text.replace("{until}", new Date(claim.provisional_until).toISOString().slice(0, 16).replace("T", " "));
+    }
+    return text;
+  });
+}

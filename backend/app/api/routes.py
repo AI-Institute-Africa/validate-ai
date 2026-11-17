@@ -1,10 +1,12 @@
 """HTTP API. Every query is scoped to the caller's organisation; the frontend is never trusted."""
 
+import hashlib
+import re
 import uuid
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -45,7 +47,7 @@ from app.api.schemas import (
     TokenOut,
 )
 from app.claims.facts import build_facts
-from app.claims.service import explain
+from app.claims.service import explain, explain_keys
 from app.claims.states import OUTCOME, REVIEWABLE
 from app.core import observability as obs
 from app.core import ratelimit
@@ -69,7 +71,7 @@ from app.extraction.service import build_readers, extract
 from app.extraction.transcription import TranscriptionUnavailable
 from app.extraction.transcription import transcribe as transcribe_file
 from app.guardrails.rules import active_rules, plan_readers
-from app.intake.files import RejectedFile, prepare
+from app.intake.files import ACTIVE_CONTENT_TYPES, RejectedFile, prepare
 from app.intake.scan import InfectedFile, ScannerUnavailable, scan
 from app.intake.service import create_claim, resubmit
 from app.intake.storage import get_storage
@@ -117,7 +119,9 @@ INTERNAL_REASONS = {"SUSPECTED_FAKE", "AUTO_APPROVED"}
 
 def claim_out(c: Claim, internal: bool = False) -> ClaimOut:
     messages = explain(c.reason_codes)
+    message_keys = explain_keys(c.reason_codes)
     if c.provisional_until is not None:
+        message_keys.append("PROVISIONAL")
         messages.append(
             f"Access is open until {c.provisional_until:%Y-%m-%d %H:%M} UTC "
             "while we confirm your payment."
@@ -127,6 +131,7 @@ def claim_out(c: Claim, internal: bool = False) -> ClaimOut:
             **{k: getattr(c, k) for k in ClaimOut.model_fields if hasattr(c, k)},
             "outcome": OUTCOME[ClaimState(c.state)],
             "messages": messages,
+            "message_keys": message_keys,
         }
     )
     if not internal:
@@ -539,10 +544,44 @@ async def image_to_text(
     }
 
 
+def _request_fingerprint(
+    obligation_id: uuid.UUID,
+    claimant_ref: str,
+    channel: str,
+    amount: int | None,
+    currency: str | None,
+    reference: str | None,
+    data: list[bytes],
+) -> str:
+    """What was sent, as one hash: the same key must always mean the same upload."""
+    h = hashlib.sha256()
+    for part in (str(obligation_id), claimant_ref, channel, str(amount), currency, reference):
+        h.update(f"{part}\x1f".encode())
+    for blob in data:
+        h.update(hashlib.sha256(blob).digest())
+    return h.hexdigest()
+
+
+def _replay(
+    db: Session, p: Principal, response: Response, claim: Claim, fingerprint: str
+) -> ClaimOut:
+    if claim.request_fingerprint != fingerprint:
+        raise HTTPException(
+            409,
+            {
+                "code": "IDEMPOTENCY_KEY_REUSED",
+                "message": "this key was already used for a different upload",
+            },
+        )
+    response.status_code = 200  # same claim as before, not a new one
+    return claim_out(_claim(db, p, claim.claim_id), p.at_least(Role.REVIEWER))
+
+
 @router.post("/claims", response_model=ClaimOut, status_code=201, tags=["claims"])
 async def submit_claim(
     db: DB,
     p: Any_,
+    response: Response,
     obligation_id: Annotated[uuid.UUID, Form()],
     claimant_ref: Annotated[str, Form()],
     # one or more proofs for the same payment; repeat the "file" field for several
@@ -553,9 +592,19 @@ async def submit_claim(
     declared_amount: Annotated[str | None, Form()] = None,
     declared_currency: Annotated[str | None, Form()] = None,
     declared_reference: Annotated[str | None, Form()] = None,
+    # a retried upload (flaky connection) sends the same key and gets the same claim back
+    idempotency_key: Annotated[str | None, Header(max_length=80)] = None,
 ) -> ClaimOut:
+    if idempotency_key is not None and not re.fullmatch(r"[A-Za-z0-9._:-]{8,80}", idempotency_key):
+        raise HTTPException(422, "Idempotency-Key must be 8-80 letters, digits or . _ : -")
     obligation = _obligation(db, p, obligation_id)
-    _limit_uploads(p, claimant_ref)
+    replay = None
+    if idempotency_key:
+        replay = db.scalars(
+            select(Claim).where(Claim.org_id == p.org_id, Claim.client_key == idempotency_key)
+        ).first()
+    if replay is None:
+        _limit_uploads(p, claimant_ref)  # a replay is not a new upload, so it costs no quota
     currency = normalise_currency(declared_currency) if declared_currency else obligation.currency
     if currency is None:
         raise HTTPException(422, "unsupported currency")
@@ -571,6 +620,11 @@ async def submit_claim(
         data.append(text.strip().encode("utf-8"))
     if not data:
         raise HTTPException(422, "attach a proof of payment file or paste the payment message")
+    fingerprint = _request_fingerprint(
+        obligation_id, claimant_ref, channel, amount, currency, declared_reference, data
+    )
+    if replay is not None:
+        return _replay(db, p, response, replay, fingerprint)
     try:
         claim = create_claim(
             db,
@@ -582,6 +636,8 @@ async def submit_claim(
             declared_amount_minor=amount,
             declared_currency=currency,
             declared_reference=declared_reference,
+            client_key=idempotency_key,
+            request_fingerprint=fingerprint if idempotency_key else None,
         )
     except RejectedFile as exc:
         obs.UPLOADS_REJECTED.labels(exc.code).inc()
@@ -596,7 +652,17 @@ async def submit_claim(
             },
             headers={"Retry-After": "30"},
         ) from exc
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # two requests with the same key raced: the other one won, so answer with its claim
+        db.rollback()
+        winner = db.scalars(
+            select(Claim).where(Claim.org_id == p.org_id, Claim.client_key == idempotency_key)
+        ).first()
+        if winner is None:
+            raise
+        return _replay(db, p, response, winner, fingerprint)
     dispatch_pipeline(claim.claim_id)
     db.expire_all()
     return claim_out(_claim(db, p, claim.claim_id), p.at_least(Role.REVIEWER))
@@ -683,15 +749,16 @@ def evidence_content(
         key, ctype = ev.preview_key, "image/png"
     else:
         key, ctype = ev.object_key, ev.content_type
-    return Response(
-        get_storage().get(key),
-        media_type=ctype,
-        headers={
-            "Cache-Control": "private, max-age=60",
-            "X-Content-Type-Options": "nosniff",
-            "Content-Security-Policy": "default-src 'none'",
-        },
-    )
+    headers = {
+        "Cache-Control": "private, max-age=60",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'",
+    }
+    if ctype in ACTIVE_CONTENT_TYPES:
+        # a web page or vector file from a stranger is never shown by the browser: it is downloaded
+        ctype = "application/octet-stream"
+        headers["Content-Disposition"] = "attachment"
+    return Response(get_storage().get(key), media_type=ctype, headers=headers)
 
 
 # --- credits ----------------------------------------------------------------------------------

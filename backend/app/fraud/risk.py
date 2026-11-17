@@ -25,6 +25,7 @@ from app.core.audit import audit
 from app.extraction import templates
 from app.extraction.agreement import FinalField
 from app.guardrails.rules import active_rules, reason_code
+from app.intake.files import EDITABLE_TYPES
 from app.intake.service import submission_evidence
 from app.models import (
     ApprovalTier,
@@ -141,12 +142,12 @@ def _file_signals(ev: Evidence, add: Any) -> None:
             created=pdf.get("creationDate"),
             modified=pdf.get("modDate"),
         )
-    if ev.content_type.endswith("wordprocessingml.document"):
+    if ev.content_type in EDITABLE_TYPES:
         add(
             "EDITABLE_DOCUMENT",
-            "A Word document is easy to type up or edit; banks and mobile "
-            "money apps do not issue receipts as Word files.",
-            properties=(ev.meta or {}).get("docx", {}),
+            "A word-processor, spreadsheet, slide or web document is easy to type up or edit; "
+            "banks and mobile money apps do not issue receipts like this.",
+            properties=(ev.meta or {}).get("docx") or (ev.meta or {}).get("office", {}),
         )
     ela = (ev.meta or {}).get("ela")
     if ela and ela.get("suspicious"):

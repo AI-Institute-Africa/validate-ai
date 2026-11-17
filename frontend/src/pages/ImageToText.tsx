@@ -1,3 +1,4 @@
+import { ACCEPT } from "../lib/fileTypes";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { post } from "../api";
@@ -304,7 +305,7 @@ export default function ImageToText() {
             <input
               ref={uploadRef}
               type="file"
-              accept="image/*,.heic,.heif,application/pdf,.docx,.eml,message/rfc822,.txt,text/plain"
+              accept={ACCEPT}
               hidden
               onChange={(e) => {
                 pick(e.target.files);

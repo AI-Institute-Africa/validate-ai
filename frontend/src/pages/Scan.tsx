@@ -1,14 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { api, hasRole, money, pingBackend, post, type Claim, type Obligation } from "../api";
+import { api, hasRole, money, post, type Claim, type Obligation } from "../api";
+import { newKey } from "../lib/outbox";
+import { useClaimSender } from "../lib/useClaimSender";
 import { demoInfo, preparePayment, sampleFile } from "../demo";
 import { useI18n } from "../i18n";
-import { cropImage, NO_TRIM, rotateImage, type Trim } from "../lib/imageEdit";
+import { cropImage, NO_TRIM, rotateImage, shrinkImage, type Trim } from "../lib/imageEdit";
 import { Dialog } from "../components/Dialog";
+import { ACCEPT } from "../lib/fileTypes";
 import { validateFiles } from "../lib/validateFiles";
 import { Link } from "react-router-dom";
 import { useToast } from "../toast";
 import { EmptyState, Loading, PageHeader, Reasons, StateChip } from "../ui";
+import { payerMessages, payerWaitKey, stateText } from "../labels";
 import "./scan.css";
 
 type Recent = { claim_id: string; code: string; when: string };
@@ -69,28 +73,29 @@ function formatCode(raw: string): string {
 }
 
 function OfflineBanner() {
-  const [online, setOnline] = useState(true);
+  const { t } = useI18n();
+  // the browser tells us when the connection comes and goes: no polling, which would cost mobile data
+  const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   useEffect(() => {
-    let alive = true;
-    const check = () => void pingBackend().then((ok) => alive && setOnline(ok));
-    check();
-    const id = window.setInterval(check, 15000);
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
     return () => {
-      alive = false;
-      window.clearInterval(id);
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
     };
   }, []);
   if (online) return null;
   return (
     <div className="offline-banner" role="alert">
-      ⚠ Can't reach the validation service. Your upload will work again once it is back —
-      nothing is lost.
+      ⚠ {t("offline.banner")}
     </div>
   );
 }
 
 function notifyDone(claim: Claim, t: (k: string) => string) {
-  const text = claim.messages[0] ?? `${t("result.title")}: ${prettyState(claim.state)}`;
+  const text = payerMessages(claim, t)[0] ?? `${t("result.title")}: ${stateText(t, claim.state, prettyState(claim.state))}`;
   try {
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       new Notification("Validate", { body: text, tag: claim.claim_id });
@@ -106,14 +111,14 @@ function downloadSummary(claim: Claim, code: string, t: (k: string) => string) {
     "================================",
     `Claim:        ${claim.claim_id}`,
     `Payment code: ${code || "—"}`,
-    `${t("result.status")}:     ${prettyState(claim.state)}`,
+    `${t("result.status")}:     ${stateText(t, claim.state, prettyState(claim.state))}`,
     `${t("result.outcome")}:    ${claim.outcome.replace(/_/g, " ")}`,
     `Tier:         ${claim.evidence_tier}`,
     ...(claim.declared_amount_minor !== null
       ? [`${t("result.declared")}:    ${money(claim.declared_amount_minor, claim.declared_currency)}`]
       : []),
     "",
-    ...claim.messages.map((m) => `• ${m}`),
+    ...payerMessages(claim, t).map((m) => `• ${m}`),
     "",
     new Date().toLocaleString(),
     "A receipt is a claim, not a confirmation.",
@@ -128,9 +133,10 @@ function downloadSummary(claim: Claim, code: string, t: (k: string) => string) {
 }
 
 function Stepper({ current, done }: { current: 1 | 2 | 3; done: [boolean, boolean, boolean] }) {
-  const items = ["Add proof", "Details", "Result"];
+  const { t } = useI18n();
+  const items = [t("step.addProof"), t("step.details"), t("step.result")];
   return (
-    <ol className="scan-stepper" aria-label="Progress">
+    <ol className="scan-stepper" aria-label={t("step.aria")}>
       {items.map((label, i) => {
         const n = i + 1;
         const cls = done[i] ? "done" : n === current ? "current" : "";
@@ -155,12 +161,16 @@ function ResultCard({ claim, code, onRetry }: { claim: Claim; code: string; onRe
     red: t("tier.red"),
   };
   return (
-    <div className="card result" aria-live="polite">
+    <div className="card result">
+      {/* only this one line is announced to screen readers when the state changes */}
+      <p className="sr-only" role="status">
+        {done ? t("result.title") : t("result.checking")}: {stateText(t, claim.state, prettyState(claim.state))}
+      </p>
       <div className="result-head">
         <div>
           <h2>{done ? t("result.title") : t("result.checking")}</h2>
           <p className="muted small">
-            Claim <code>{claim.claim_id.slice(0, 8)}</code>
+            {t("result.claim")} <code>{claim.claim_id.slice(0, 8)}</code>
           </p>
         </div>
         <div className="scan-chips">
@@ -189,10 +199,12 @@ function ResultCard({ claim, code, onRetry }: { claim: Claim; code: string; onRe
         </p>
       )}
 
+      {done && payerWaitKey(state) && <p className="wait-note" role="status">{t(payerWaitKey(state)!)}</p>}
+
       {/* payers only ever see the server's plain messages */}
       {claim.messages.length > 0 && (
         <ul className="messages">
-          {claim.messages.map((m, i) => (
+          {payerMessages(claim, t).map((m, i) => (
             <li key={i}>{m}</li>
           ))}
         </ul>
@@ -200,9 +212,9 @@ function ResultCard({ claim, code, onRetry }: { claim: Claim; code: string; onRe
 
       <dl className="meta">
         <dt>{t("result.status")}</dt>
-        <dd className={`state state-${claim.state}`}>{prettyState(claim.state)}</dd>
+        <dd className={`state state-${claim.state}`}>{stateText(t, claim.state, prettyState(claim.state))}</dd>
         <dt>{t("result.outcome")}</dt>
-        <dd>{claim.outcome.replace(/_/g, " ")}</dd>
+        <dd>{stateText(t, claim.outcome, claim.outcome.replace(/_/g, " "))}</dd>
         {claim.declared_amount_minor !== null && (
           <>
             <dt>{t("result.declared")}</dt>
@@ -224,15 +236,15 @@ function ResultCard({ claim, code, onRetry }: { claim: Claim; code: string; onRe
       {done && (
         <div className="scan-result-actions">
           <Link className="btn secondary" to={`/track/${claim.claim_id}`}>
-            Track this payment
+            {t("result.track")}
           </Link>
           {state === "NEEDS_INFORMATION" && (
             <button type="button" onClick={onRetry}>
-              Upload a clearer copy
+              {t("result.retry")}
             </button>
           )}
           <button type="button" className="ghost small" onClick={() => downloadSummary(claim, code, t)}>
-            ⬇ Download summary
+            ⬇ {t("result.download")}
           </button>
         </div>
       )}
@@ -303,40 +315,53 @@ export default function Scan() {
     }
   }, [claim.data, t, toast]);
 
-  const submit = useMutation({
-    mutationFn: () => {
-      const fd = new FormData();
-      fd.set("obligation_id", obligation!.obligation_id);
-      fd.set("claimant_ref", claimantRef.trim());
-      fd.set("channel", channel);
-      files.forEach((f) => fd.append("file", f));
-      if (pasted.trim()) fd.set("text", pasted.trim());
-      if (declaredAmount.trim()) fd.set("declared_amount", declaredAmount.trim());
-      if (declaredReference.trim()) fd.set("declared_reference", declaredReference.trim());
-      return post<Claim>("/claims", fd);
-    },
-    onSuccess: (c) => {
-      setFormError(null);
-      setClaimId(c.claim_id);
-      wasProcessing.current = true;
-      const next = [
-        { claim_id: c.claim_id, code: code.trim().toUpperCase(), when: new Date().toISOString() },
-        ...recent.filter((r) => r.claim_id !== c.claim_id),
-      ];
-      setRecent(next);
-      saveRecent(next);
-      toast("info", "Receipt uploaded — checking it now.");
-      try {
-        if (typeof Notification !== "undefined" && Notification.permission === "default") void Notification.requestPermission();
-      } catch {
-        /* ignore */
-      }
-    },
-    onError: (e) => {
-      setFormError((e as Error).message);
-      toast("err", (e as Error).message);
-    },
+  // sends with progress; if the connection fails the upload waits on this phone and is sent again
+  // with the same key, so a retry can never create a second claim
+  const sender = useClaimSender((c, item) => {
+    setFormError(null);
+    setClaimId(c.claim_id);
+    wasProcessing.current = true;
+    const next = [
+      { claim_id: c.claim_id, code: item.label, when: new Date().toISOString() },
+      ...recent.filter((r) => r.claim_id !== c.claim_id),
+    ];
+    setRecent(next);
+    saveRecent(next);
+    toast("info", t("toast.uploaded"));
+    try {
+      if (typeof Notification !== "undefined" && Notification.permission === "default") void Notification.requestPermission();
+    } catch {
+      /* ignore */
+    }
   });
+  useEffect(() => {
+    if (sender.error) {
+      setFormError(sender.error);
+      toast("err", sender.error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sender.error]);
+  const submit = {
+    isPending: sender.state.phase === "sending",
+    mutate: () => {
+      const fields: Record<string, string> = {
+        obligation_id: obligation!.obligation_id,
+        claimant_ref: claimantRef.trim(),
+        channel,
+      };
+      if (pasted.trim()) fields.text = pasted.trim();
+      if (declaredAmount.trim()) fields.declared_amount = declaredAmount.trim();
+      if (declaredReference.trim()) fields.declared_reference = declaredReference.trim();
+      void sender.send({
+        key: newKey(),
+        createdAt: Date.now(),
+        attempts: 0,
+        fields,
+        files: files.map((f) => ({ name: f.name, type: f.type, blob: f })),
+        label: code.trim().toUpperCase(),
+      });
+    },
+  };
 
   const readFiles = useMutation({
     mutationFn: async (list?: File[]) => {
@@ -356,12 +381,17 @@ export default function Scan() {
     onError: (e) => setFormError((e as Error).message),
   });
 
-  const pick = (list: ArrayLike<File> | null | undefined, replace = false) => {
-    const picked = Array.from(list ?? []);
+  // the same message in the payer's language (pasted-text limit has no key and stays English)
+  const issueText = (issue: { key: string; params: Record<string, string> } | undefined, fallback: string | undefined) =>
+    issue ? Object.entries(issue.params).reduce((s, [k, v]) => s.replace(`{${k}}`, v), t(issue.key)) : (fallback ?? null);
+
+  const pick = async (list: ArrayLike<File> | null | undefined, replace = false) => {
+    // big phone photos are shrunk first: faster on mobile data, and the size limit is then rarely hit
+    const picked = await Promise.all(Array.from(list ?? []).map(shrinkImage));
     if (!picked.length) return;
     const checked = validateFiles(replace ? [] : files, picked, pasted);
     if (checked.files.length === (replace ? 0 : files.length)) {
-      setFormError(checked.errors[0] ?? null); // nothing new was usable
+      setFormError(issueText(checked.issues[0], checked.errors[0])); // nothing new was usable
       return;
     }
     setFormError(null);
@@ -372,7 +402,7 @@ export default function Scan() {
     readFiles.reset();
     fileSelectionVersion.current += 1;
     const next = checked.files;
-    if (checked.errors.length) setFormError(checked.errors[0]);
+    if (checked.errors.length) setFormError(issueText(checked.issues[0], checked.errors[0]));
     setFiles(next);
     if (replace || !files.length) {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -387,7 +417,7 @@ export default function Scan() {
       const turned = await rotateImage(first);
       pick([turned, ...files.slice(1)], true);
     } catch {
-      setFormError("Couldn't rotate that photo. Retake it instead.");
+      setFormError(t("err.rotate"));
     }
   };
 
@@ -402,7 +432,7 @@ export default function Scan() {
       setTrim(NO_TRIM);
       pick([cropped, ...files.slice(1)], true);
     } catch {
-      setFormError("Couldn't crop that photo. Retake it instead.");
+      setFormError(t("err.crop"));
     }
   };
 
@@ -426,8 +456,8 @@ export default function Scan() {
       await qc.invalidateQueries({ queryKey: ["obligations"] });
       return { variant, s, f };
     },
-    onSuccess: ({ variant, s, f }) => {
-      pick([f], true);
+    onSuccess: async ({ variant, s, f }) => {
+      await pick([f], true); // pick resets the form state; it must finish before we set the sample's
       setSampleId(variant);
       setSampleNote(s.note);
       setCode(formatCode(s.payment_code));
@@ -473,20 +503,20 @@ export default function Scan() {
   return (
     <>
       {cropOpen && previewUrl && (
-        <Dialog title="Crop the photo" onClose={() => setCropOpen(false)}>
-          <p className="small muted">Trim away the background so the receipt fills the picture. Keep the amount, date and reference in view.</p>
+        <Dialog title={t("crop.title")} onClose={() => setCropOpen(false)}>
+          <p className="small muted">{t("crop.help")}</p>
           <div className="crop-preview">
-            <img src={previewUrl} alt="Photo to crop" style={{ clipPath: `inset(${trim.top}% ${trim.right}% ${trim.bottom}% ${trim.left}%)` }} />
+            <img src={previewUrl} alt={t("crop.alt")} style={{ clipPath: `inset(${trim.top}% ${trim.right}% ${trim.bottom}% ${trim.left}%)` }} />
           </div>
           {(["top", "right", "bottom", "left"] as const).map((edge) => (
             <label key={edge} className="small crop-row">
-              {edge}
+              {t(`crop.${edge}`)}
               <input type="range" min={0} max={45} step={1} value={trim[edge]} onChange={(e) => setTrim({ ...trim, [edge]: Number(e.target.value) })} />
             </label>
           ))}
           <div className="dialog-actions">
-            <button type="button" className="ghost" onClick={() => setCropOpen(false)}>Cancel</button>
-            <button type="button" onClick={() => void applyCrop()}>Use this crop</button>
+            <button type="button" className="ghost" onClick={() => setCropOpen(false)}>{t("crop.cancel")}</button>
+            <button type="button" onClick={() => void applyCrop()}>{t("crop.apply")}</button>
           </div>
         </Dialog>
       )}
@@ -541,12 +571,12 @@ export default function Scan() {
             }}
           >
             <h2 className="scan-step-title">
-              <span className="num" aria-hidden>1</span> Add your proof of payment
+              <span className="num" aria-hidden>1</span> {t("scan.title")}
             </h2>
             {file ? (
               <div className="file-row">
                 {previewUrl ? (
-                  <img src={previewUrl} alt="Selected receipt" className="thumb" />
+                  <img src={previewUrl} alt={t("file.selected")} className="thumb" />
                 ) : (
                   <span aria-hidden className="file-icon">
                     {(file.name.split(".").pop() ?? "file").slice(0, 4).toUpperCase()}
@@ -554,7 +584,7 @@ export default function Scan() {
                 )}
                 <div className="grow">
                   <strong>{file.name}</strong>
-                  {files.length > 1 && <span className="muted small"> + {files.length - 1} more</span>}
+                  {files.length > 1 && <span className="muted small"> {t("file.more").replace("{n}", String(files.length - 1))}</span>}
                   <div className="muted small">
                     {(files.reduce((n, f) => n + f.size, 0) / 1024).toFixed(0)} KB · {t("drop.ready")}
                   </div>
@@ -568,22 +598,22 @@ export default function Scan() {
                       cameraRef.current?.click();
                     }}
                   >
-                    ↻ Retake
+                    ↻ {t("file.retake")}
                   </button>
                   {file.type.startsWith("image/") && file.type !== "image/heic" && (
                     <button type="button" className="ghost small" onClick={() => void rotateFirst()}>
-                      ⟳ Rotate
+                      ⟳ {t("file.rotate")}
                     </button>
                   )}
                   {previewUrl && file.type !== "image/heic" && (
                     <button type="button" className="ghost small" onClick={() => { setTrim(NO_TRIM); setCropOpen(true); }}>
-                      ✂ Crop
+                      ✂ {t("file.crop")}
                     </button>
                   )}
                   <button type="button" className="ghost small" onClick={() => { replaceUploadRef.current = true; uploadRef.current?.click(); }}>
-                    Re-upload
+                    {t("file.reupload")}
                   </button>
-                  <button type="button" className="ghost small" onClick={clearFile} aria-label="Remove file">
+                  <button type="button" className="ghost small" onClick={clearFile} aria-label={t("file.remove")}>
                     ✕
                   </button>
                 </div>
@@ -601,9 +631,9 @@ export default function Scan() {
 
             {files.length > 0 && !filePreview && (
               <div className="image-check">
-                <p className="muted small">Read the attachment and check that its payment details are clear before sending.</p>
+                <p className="muted small">{t("check.help")}</p>
                 <button type="button" className="secondary" disabled={readFiles.isPending} onClick={() => readFiles.mutate(undefined)}>
-                  {readFiles.isPending ? "Reading attachment…" : "Read attachment"}
+                  {readFiles.isPending ? t("check.reading") : t("check.read")}
                 </button>
               </div>
             )}
@@ -611,7 +641,7 @@ export default function Scan() {
               <div className={`image-check ${filePreview.readable ? "image-check-ok" : "image-check-needs-retake"}`}>
                 {filePreview.readable ? (
                   <>
-                    <strong>Check the details the reader found</strong>
+                    <strong>{t("check.found")}</strong>
                     {filePreview.files.map((item, index) => (
                       <div className="image-readout" key={`${item.name}-${index}`}>
                         <span className="muted small">{item.name} · {item.width} × {item.height}</span>
@@ -621,26 +651,26 @@ export default function Scan() {
                               <div key={field.name}><dt>{field.name.replace(/_/g, " ")}</dt><dd>{field.value}</dd></div>
                             ))}
                           </dl>
-                        ) : <span className="muted small">No payment details detected in this attachment.</span>}
+                        ) : <span className="muted small">{t("check.none")}</span>}
                       </div>
                     ))}
                     <button type="button" className={fileVerified ? "secondary verified" : "secondary"} onClick={() => setFileVerified((v) => !v)}>
-                      {fileVerified ? "✓ Proof verified" : "Verify: preview and payment details are readable"}
+                      {fileVerified ? `✓ ${t("form.ready")}` : t("form.readable")}
                     </button>
                   </>
                 ) : (
                   <>
-                    <strong>This proof is hard to read. Please upload a clearer copy.</strong>
+                    <strong>{t("check.hard")}</strong>
                     {filePreview.files.map((item, index) => (
                       <p className="muted small" key={`${item.name}-${index}`}>
-                        {item.name}: {item.quality_issues.length ? item.quality_issues.join(", ") : "payment details weren’t detected"}
+                        {item.name}: {item.quality_issues.length ? item.quality_issues.join(", ") : t("check.nodetails")}
                       </p>
                     ))}
                     <div className="inline">
                       {files.some((f) => f.type.startsWith("image/")) && (
-                        <button type="button" className="secondary" onClick={() => { clearFile(); cameraRef.current?.click(); }}>Retake photo</button>
+                        <button type="button" className="secondary" onClick={() => { clearFile(); cameraRef.current?.click(); }}>{t("check.retake")}</button>
                       )}
-                      <button type="button" className="secondary" onClick={() => { replaceUploadRef.current = true; uploadRef.current?.click(); }}>Re-upload</button>
+                      <button type="button" className="secondary" onClick={() => { replaceUploadRef.current = true; uploadRef.current?.click(); }}>{t("file.reupload")}</button>
                       {demo && sampleId && (
                         <button type="button" className="secondary" onClick={() => setFileVerified(true)}>
                           Send it anyway (demo)
@@ -658,11 +688,6 @@ export default function Scan() {
                 <span className="glyph" aria-hidden>📷</span>
                 {t("capture.photo")}
                 <span className="muted small">{t("capture.photo.sub")}</span>
-              </button>
-              <button type="button" className="capture" onClick={() => cameraRef.current?.click()}>
-                <span className="glyph" aria-hidden>▤</span>
-                {t("capture.scan")}
-                <span className="muted small">{t("capture.scan.sub")}</span>
               </button>
               <button type="button" className="capture" onClick={() => uploadRef.current?.click()}>
                 <span className="glyph" aria-hidden>📁</span>
@@ -683,7 +708,7 @@ export default function Scan() {
               ref={uploadRef}
               type="file"
               multiple
-              accept="image/*,.heic,.heif,application/pdf,.docx,.eml,message/rfc822,.txt,text/plain"
+              accept={ACCEPT}
               hidden
               onChange={(e) => {
                 const replace = replaceUploadRef.current;
@@ -692,7 +717,7 @@ export default function Scan() {
                 e.currentTarget.value = "";
               }}
             />
-            <p className="muted small">Photos, screenshots, PDFs, Word files and forwarded emails (.eml). Add up to 5 files for one payment.</p>
+            <p className="muted small">{t("file.note")}</p>
           </div>
 
           <form
@@ -722,15 +747,15 @@ export default function Scan() {
               ) : (
                 obligations.data && (
                   <>
-                    {obligations.data.length} obligation{obligations.data.length === 1 ? "" : "s"} loaded.
+                    {obligations.data.length === 1 ? t("form.loaded.one") : t("form.loaded").replace("{n}", String(obligations.data.length))}
                   </>
                 )
               )}
             </p>
             {obligations.isError && (
               <p className="error small" role="alert">
-                We couldn't load the list of payment codes.{" "}
-                <button type="button" className="link" onClick={() => void obligations.refetch()}>Try again</button>
+                {t("form.codeLoadError")}{" "}
+                <button type="button" className="link" onClick={() => void obligations.refetch()}>{t("form.tryagain")}</button>
               </p>
             )}
             {wanted.length >= 3 && obligations.isSuccess && !obligation && (
@@ -740,16 +765,16 @@ export default function Scan() {
               <div className="match">
                 <strong>{obligation.description}</strong>
                 <span className="muted small">
-                  {money(obligation.amount_minor, obligation.currency)} · learner {obligation.learner_ref}
+                  {money(obligation.amount_minor, obligation.currency)} · {t("form.learner").replace("{ref}", obligation.learner_ref)}
                 </span>
               </div>
             )}
 
             <label>
-              Or paste the payment SMS / message
+              {t("form.paste")}
               <textarea
                 rows={3}
-                placeholder="e.g. the EcoCash confirmation SMS"
+                placeholder={t("form.paste.ph")}
                 value={pasted}
                 maxLength={20000}
                 onChange={(e) => setPasted(e.target.value)}
@@ -776,15 +801,52 @@ export default function Scan() {
             <button type="submit" className="lg scan-submit" disabled={!canSubmit}>
               {submit.isPending ? t("form.submitting") : t("form.submit")}
             </button>
+            {sender.state.phase === "sending" && (
+              <div
+                className="upload-progress"
+                role="progressbar"
+                aria-label={t("send.label")}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(sender.state.progress * 100)}
+              >
+                <div className="upload-bar" style={{ width: `${Math.round(sender.state.progress * 100)}%` }} />
+                <span>{t("send.progress").replace("{pct}", String(Math.round(sender.state.progress * 100)))}</span>
+              </div>
+            )}
+            {sender.queued.length > 0 && (
+              <div className="outbox" role="status">
+                <b>{t("outbox.title").replace("{n}", String(sender.queued.length))}</b>
+                <p className="muted small">{t("outbox.help")}</p>
+                <ul>
+                  {sender.queued.map((q) => (
+                    <li key={q.key}>
+                      <span>{(q.files.length === 1 ? t("outbox.item.one") : t("outbox.item").replace("{n}", String(q.files.length))).replace("{label}", q.label || t("outbox.payment"))}</span>
+                      <button type="button" className="ghost small" onClick={() => void sender.discard(q.key)}>
+                        {t("outbox.discard")}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="outbox-actions">
+                  <button type="button" className="secondary small" onClick={() => void sender.retryNow()}>
+                    {t("outbox.sendnow")}
+                  </button>
+                  <button type="button" className="ghost small" onClick={() => void sender.clearAll()}>
+                    {t("outbox.clear")}
+                  </button>
+                </div>
+              </div>
+            )}
             {!canSubmit && !submit.isPending && (
               <p className="muted small scan-why">
                 {!hasProof
-                  ? "Add a receipt or paste the payment message to continue."
+                  ? t("why.proof")
                   : files.length > 0 && !fileVerified
-                    ? "Read the attachment and confirm it looks right to continue."
+                    ? t("why.confirm")
                     : !obligation
-                      ? "Enter a valid payment code to continue."
-                      : "Add your name or phone number to continue."}
+                      ? t("why.code")
+                      : t("why.name")}
               </p>
             )}
             <p className="muted small">{t("form.trust")}</p>
@@ -793,26 +855,25 @@ export default function Scan() {
 
         <div className="stack" ref={resultRef}>
           <h2 className="scan-step-title scan-result-title">
-            <span className="num" aria-hidden>3</span> Result
+            <span className="num" aria-hidden>3</span> {t("step.result")}
           </h2>
           {claim.isError && !claim.data && (
             <div className="card">
-              <p className="error" role="alert">We couldn't load that check. {(claim.error as Error).message}</p>
+              <p className="error" role="alert">{t("result.loaderror")} {(claim.error as Error).message}</p>
               <button type="button" className="secondary" onClick={() => void claim.refetch()}>
-                Try again
+                {t("form.tryagain")}
               </button>
             </div>
           )}
           {claim.isFetching && !claim.data && !claim.isError && <Loading lines={4} />}
           {claim.data && <ResultCard claim={claim.data} code={code} onRetry={retry} />}
           {claim.data && isProcessing(claim.data.state) && (
-            <p className="muted small">This page refreshes automatically every couple of seconds.</p>
+            <p className="muted small">{t("result.refresh")}</p>
           )}
 
           {!claimId && !submit.isPending && (
-            <EmptyState icon="🧾" title="No result yet">
-              Add your proof and payment details, then press check. Your result appears here, usually
-              within a few seconds.
+            <EmptyState icon="🧾" title={t("result.empty.title")}>
+              {t("result.empty.body")}
             </EmptyState>
           )}
 

@@ -20,6 +20,7 @@ export type Claim = {
   approval_tier: string | null;
   reason_codes: string[];
   messages: string[];
+  message_keys?: string[]; // one neutral key per message, so a screen can translate it
   candidate_credit_id: string | null;
   risk_score: number | null;
   risk_level: string | null;
@@ -318,4 +319,51 @@ export async function blobUrl(path: string): Promise<string> {
   const res = await fetch(`${API}${path}`, { headers: t ? { Authorization: `Bearer ${t}` } : {} });
   if (!res.ok) throw new ApiError(res.status, res.statusText);
   return URL.createObjectURL(await res.blob());
+}
+
+/** The network failed or timed out before the server answered. Safe to try again with the same key. */
+export class NetworkError extends Error {}
+
+/**
+ * POST a form with upload progress (fetch cannot report it). The `Idempotency-Key` makes a retry safe:
+ * if the first try reached the server, the retry returns the same claim instead of a second one.
+ */
+export function postWithProgress<T>(
+  path: string,
+  form: FormData,
+  opts: { key: string; onProgress?: (fraction: number) => void; signal?: AbortSignal; timeoutMs?: number },
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API}${path}`);
+    const t = token();
+    if (t) xhr.setRequestHeader("Authorization", `Bearer ${t}`);
+    xhr.setRequestHeader("Idempotency-Key", opts.key);
+    xhr.timeout = opts.timeoutMs ?? 120_000;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) opts.onProgress?.(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      let body: unknown = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        /* non-JSON body */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        opts.onProgress?.(1);
+        resolve(body as T);
+        return;
+      }
+      const d = (body as { detail?: unknown } | null)?.detail;
+      const msg = typeof d === "string" ? d : (d as { message?: string } | undefined)?.message ?? xhr.statusText;
+      if (xhr.status === 401) setSession(null);
+      reject(new ApiError(xhr.status, msg));
+    };
+    xhr.onerror = () => reject(new NetworkError("Could not reach the service."));
+    xhr.ontimeout = () => reject(new NetworkError("The upload took too long."));
+    xhr.onabort = () => reject(new DOMException("Aborted", "AbortError"));
+    opts.signal?.addEventListener("abort", () => xhr.abort());
+    xhr.send(form);
+  });
 }

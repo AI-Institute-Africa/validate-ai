@@ -1,15 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { API, api, Candidate, Claim, Field, hasRole, money, post, ReviewDetail } from "../api";
 import { humanize, stateInfo } from "../labels";
-import { useToast } from "../toast";
+import { useToast, useUndo } from "../toast";
 import { Dialog } from "../components/Dialog";
 import { compareRows, lowConfidenceCount, type CompareStatus } from "../lib/comparison";
-import { REJECT_CONSEQUENCES, REJECT_PAYER_MESSAGE, REQUEST_INFO_NOTE } from "../lib/payerMessages";
+import { REJECT_CONSEQUENCES, REJECT_PAYER_MESSAGE, REJECT_REASONS, REQUEST_INFO_NOTE } from "../lib/payerMessages";
 import { cssFilter, DEFAULT_VIEW, isDefault, rotateBy, setLevel, zoomBy } from "../lib/viewer";
 import { Chip, Loading, Reasons, StateChip } from "../ui";
-import { agoText, EvidenceChip, TierBadge } from "./Queue";
+import { agoText, EvidenceChip, loadSort, TierBadge } from "./Queue";
+import { sortClaims } from "../lib/sortClaims";
+import { ShortcutLegend } from "../components/ShortcutLegend";
 import { RiskBadge, SignalList } from "./Fraud";
 import "./review.css";
 
@@ -44,17 +46,6 @@ function RunHistory({ claimId }: { claimId: string }) {
   );
 }
 
-const REJECT_REASONS = [
-  "PAYMENT_NOT_RECEIVED",
-  "DUPLICATE_CONFIRMED",
-  "PAYMENT_FAILED_OR_REVERSED",
-  "WRONG_BENEFICIARY",
-  "AMOUNT_MISMATCH",
-  "CURRENCY_MISMATCH",
-  "TAMPERED_DOCUMENT",
-  "WRONG_OBLIGATION",
-  "OTHER",
-];
 
 function displayValue(f: Field): string {
   if (f.name === "amount" && f.normalised_value) return (Number(f.normalised_value) / 100).toFixed(2);
@@ -293,7 +284,7 @@ function CandidateCard({ c, selected, onSelect, index }: { c: Candidate; selecte
       )}
       <div className="gates">
         {c.gates.map((g) => (
-          <span key={g.name} className={`chip ${g.passed ? "pass" : "fail"}`} title={g.detail}>
+          <span key={g.name} className={`chip2 ${g.passed ? "tone-ok" : "tone-bad"}`} title={g.detail}>
             {g.passed ? "✓" : "✗"} {humanize(g.name)}
           </span>
         ))}
@@ -341,6 +332,7 @@ export default function ClaimReview() {
   const [reverseFor, setReverseFor] = useState<string | null>(null);
   const [reverseReason, setReverseReason] = useState("");
   const toast = useToast();
+  const undo = useUndo();
   const last4Ref = useRef<HTMLInputElement>(null);
 
   const q = useQuery({ queryKey: ["claim", id], queryFn: () => api<ReviewDetail>(`/review/claims/${id}`) });
@@ -361,10 +353,20 @@ export default function ClaimReview() {
       }),
     onSuccess: (r) => done(r.needs_second_approval ? "First approval recorded; a different approver must confirm." : `Confirmed: ${r.claim.state}`),
   });
-  const reject = useMutation({
-    mutationFn: () => post(`/review/claims/${id}/reject`, { reason: rejectReason, note: note || null }),
-    onSuccess: () => { setRejectOpen(false); done("Rejected"); },
-  });
+  // A reject tells the payer and closes the claim for good, and asking for more tells the payer too.
+  // So both wait a few seconds with an Undo button, and are only sent when the countdown ends.
+  // The values are copied now, so editing the form afterwards cannot change what is sent.
+  const rejectLater = () => {
+    const claimId = id;
+    const body = { reason: rejectReason, note: note || null };
+    setRejectOpen(false);
+    undo("Rejecting this claim", async () => {
+      await post(`/review/claims/${claimId}/reject`, body);
+      toast("ok", "Rejected. This cannot be undone now.");
+      qc.invalidateQueries({ queryKey: ["claim", claimId] });
+      qc.invalidateQueries({ queryKey: ["queue"] });
+    });
+  };
   const reprocess = useMutation({
     mutationFn: () => post(`/review/claims/${id}/reprocess`, { note: note || "Re-read requested", discard_corrections: discard }),
     onSuccess: () => { setReprocessOpen(false); setDiscard(false); qc.invalidateQueries({ queryKey: ["runs", id] }); done("Reading again. This page updates when it finishes."); },
@@ -373,21 +375,33 @@ export default function ClaimReview() {
     mutationFn: () => post(`/review/claims/${id}/release-hold`, { note: holdNote }),
     onSuccess: () => { setReleaseOpen(false); setHoldNote(""); done("Released to the review queue"); },
   });
-  const requestInfo = useMutation({
-    mutationFn: () => post(`/review/claims/${id}/request-info`, { message: infoMsg }),
-    onSuccess: () => done("Information requested from payer"),
-  });
+  const requestInfoLater = () => {
+    const claimId = id;
+    const message = infoMsg;
+    setInfoMsg("");
+    undo("Asking the payer for more information", async () => {
+      await post(`/review/claims/${claimId}/request-info`, { message });
+      toast("ok", "Information requested from payer");
+      qc.invalidateQueries({ queryKey: ["claim", claimId] });
+      qc.invalidateQueries({ queryKey: ["queue"] });
+    });
+  };
   const reverse = useMutation({
     mutationFn: (v: { allocationId: string; reason: string }) =>
       post(`/allocations/${v.allocationId}/reverse`, { reason: v.reason }),
     onSuccess: () => { setReverseFor(null); setReverseReason(""); done("Allocation reversed"); },
   });
 
-  const nextId = queue.data?.find((c) => c.claim_id !== id)?.claim_id;
+  // "next" walks the claims the reviewer ticked in the queue; otherwise the order they sorted it in
+  const selection = (useLocation().state as { selection?: string[] } | null)?.selection;
+  const nextId = selection
+    ? selection[selection.indexOf(id!) + 1]
+    : queue.data && sortClaims(queue.data, loadSort()).find((c) => c.claim_id !== id)?.claim_id;
+  const nextState = selection ? { selection } : undefined;
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.target as HTMLElement).tagName.match(/INPUT|TEXTAREA|SELECT/)) return;
-      if (e.key === "n" && nextId) nav(`/claims/${nextId}`);
+      if (e.key === "n" && nextId) nav(`/claims/${nextId}`, { state: nextState });
       else if (e.key === "c") { e.preventDefault(); last4Ref.current?.focus(); }
       else if (e.key === "r" && q.data && REVIEWABLE.includes(q.data.claim.state)) { e.preventDefault(); setRejectOpen(true); }
       else if (/^[1-9]$/.test(e.key) && q.data && Number(e.key) <= q.data.candidates.length) setSelected(Number(e.key) - 1);
@@ -402,7 +416,7 @@ export default function ClaimReview() {
   const d = q.data!;
   const c = d.claim;
   const reviewable = REVIEWABLE.includes(c.state);
-  const err = (confirm.error ?? reject.error ?? requestInfo.error ?? reverse.error) as Error | null;
+  const err = (confirm.error ?? reverse.error) as Error | null;
   const canReprocess = REPROCESSABLE.includes(c.state);
   const onHold = c.state === "DUPLICATE_HOLD";
 
@@ -420,8 +434,17 @@ export default function ClaimReview() {
       <div className="rv-topbar">
         <Link to="/queue">← Review queue</Link>
         <span className="rv-keys">
-          Shortcuts: 1-9 pick a credit · c to confirm · r to reject · n for the next claim
-          {nextId && <> · <Link to={`/claims/${nextId}`}>Next claim →</Link></>}
+          <ShortcutLegend
+            title="Review shortcuts"
+            shortcuts={[
+              ["1-9", "Pick a candidate credit"],
+              ["c", "Go to the confirm box (you still type the last 4 and press Confirm)"],
+              ["r", "Reject (you get a few seconds to undo)"],
+              ["n", "Next claim, in the order you sorted the queue"],
+              ["?", "Show this list"],
+            ]}
+          />
+          {nextId && <> · <Link to={`/claims/${nextId}`} state={nextState}>Next claim →</Link></>}
         </span>
       </div>
 
@@ -548,7 +571,7 @@ export default function ClaimReview() {
                 <div className="rv-action">
                   <h4>Ask the payer for more</h4>
                   <p className="rv-help">For a blurry photo or a missing detail. {REQUEST_INFO_NOTE}</p>
-                  <form className="inline" onSubmit={(e) => { e.preventDefault(); requestInfo.mutate(); }}>
+                  <form className="inline" onSubmit={(e) => { e.preventDefault(); requestInfoLater(); }}>
                     <input value={infoMsg} onChange={(e) => setInfoMsg(e.target.value)} placeholder="Message to payer" aria-label="Message to payer" />
                     <button className="ghost" disabled={infoMsg.length < 3}>Request info</button>
                   </form>
@@ -609,7 +632,7 @@ export default function ClaimReview() {
           </span>
           <button type="button" onClick={() => { goDecision(); setTimeout(() => last4Ref.current?.focus(), 350); }}>Confirm…</button>
           <button type="button" className="danger" onClick={() => setRejectOpen(true)}>Reject…</button>
-          {nextId && <Link className="btn secondary" to={`/claims/${nextId}`}>Next claim →</Link>}
+          {nextId && <Link className="btn secondary" to={`/claims/${nextId}`} state={nextState}>Next claim →</Link>}
         </div>
       )}
 
@@ -622,10 +645,10 @@ export default function ClaimReview() {
           <p className="small"><strong>The payer will be told:</strong></p>
           <blockquote className="payer-msg">{REJECT_PAYER_MESSAGE}</blockquote>
           <ul className="small">{REJECT_CONSEQUENCES.map((x) => <li key={x}>{x}</li>)}</ul>
-          {reject.error && <p className="error">{(reject.error as Error).message}</p>}
+          <p className="small">You get a few seconds to undo this. Once it is sent, a reject cannot be undone.</p>
           <div className="dialog-actions">
             <button type="button" className="ghost" onClick={() => setRejectOpen(false)}>Cancel</button>
-            <button type="button" className="danger" disabled={reject.isPending} onClick={() => reject.mutate()}>Reject claim</button>
+            <button type="button" className="danger" onClick={rejectLater}>Reject claim</button>
           </div>
         </Dialog>
       )}

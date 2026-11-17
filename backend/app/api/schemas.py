@@ -69,6 +69,9 @@ class ClaimOut(Out):
     approval_tier: str | None
     reason_codes: list[str]
     messages: list[str]
+    # one neutral key per message, same order, so a screen can translate it
+    # ("PROVISIONAL" is the access note)
+    message_keys: list[str] = []
     candidate_credit_id: uuid.UUID | None
     # fraud risk: filled only for reviewers and admins
     risk_score: int | None = None

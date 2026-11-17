@@ -79,11 +79,21 @@ statement CSV / manual credit ─► normalised credits ─► credit-first re-m
 
 Every proof-of-payment format people actually send:
 
-- Screenshots and photos: PNG, JPEG, WEBP and iPhone HEIC.
+- Photos, screenshots and scans: PNG, JPEG, WEBP, iPhone HEIC, AVIF, GIF (first frame), BMP, TIFF
+  (every page of a multi-page scan), JPEG 2000, Photoshop (.psd, the flattened picture) and SVG
+  (drawn to pixels, never run). Camera RAW (DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2) is read from
+  the full-size photo inside it; RAW files are often over the 10 MB limit, so export a JPEG then.
+  Illustrator (.ai) works when saved with PDF compatibility; old PostScript .ai/.eps are refused.
+  QR codes on a photo are decoded and shown to the reviewer as data (nothing is opened).
 - PDFs: **every page**. A PDF's own text layer is read as an exact, independent third reader.
-- Word documents (.docx): text, tables and embedded screenshots. Macro documents are refused.
+- Office documents: Word (.docx), Excel (.xlsx), PowerPoint (.pptx) and OpenDocument (.odt, .ods,
+  .odp): text, tables, cells and embedded pictures. Macro documents are refused, and an
+  office file raises the `EDITABLE_DOCUMENT` risk signal because a bank never issues receipts that way.
+- Web and text files: HTML (scripts dropped), RTF, e-books (.epub), plain text, Markdown, CSV.
 - Pasted text: the payment SMS or banking-app message pasted into the form (`text` field).
-- Forwarded emails (.eml): the body and every attachment (images, PDFs, Word).
+- Forwarded emails (.eml): the body and every attachment (any of the above).
+- Not accepted, with advice: old binary `.doc` / `.xls` / `.ppt` (save as PDF or the new format),
+  programs, archives, audio and video. Files are identified by their contents, never their name.
 - **Several proofs for one payment**: up to 5 files per claim (e.g. the bank-app screenshot
   and the SMS). They are read together; if two proofs disagree on the amount, date or
   reference, the claim goes to a reviewer with `PROOFS_DISAGREE`.
