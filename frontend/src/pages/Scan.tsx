@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { api, hasRole, money, pingBackend, post, type Claim, type Obligation } from "../api";
+import { api, hasRole, money, post, type Claim, type Obligation } from "../api";
+import { newKey } from "../lib/outbox";
+import { useClaimSender } from "../lib/useClaimSender";
 import { demoInfo, preparePayment, sampleFile } from "../demo";
 import { useI18n } from "../i18n";
 import { cropImage, NO_TRIM, rotateImage, shrinkImage, type Trim } from "../lib/imageEdit";
@@ -70,22 +72,23 @@ function formatCode(raw: string): string {
 }
 
 function OfflineBanner() {
-  const [online, setOnline] = useState(true);
+  // the browser tells us when the connection comes and goes: no polling, which would cost mobile data
+  const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   useEffect(() => {
-    let alive = true;
-    const check = () => void pingBackend().then((ok) => alive && setOnline(ok));
-    check();
-    const id = window.setInterval(check, 15000);
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
     return () => {
-      alive = false;
-      window.clearInterval(id);
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
     };
   }, []);
   if (online) return null;
   return (
     <div className="offline-banner" role="alert">
-      ⚠ Can't reach the validation service. Your upload will work again once it is back —
-      nothing is lost.
+      ⚠ No connection. You can still prepare your upload: it is saved on this phone and sent again
+      when you are back online.
     </div>
   );
 }
@@ -310,40 +313,53 @@ export default function Scan() {
     }
   }, [claim.data, t, toast]);
 
-  const submit = useMutation({
-    mutationFn: () => {
-      const fd = new FormData();
-      fd.set("obligation_id", obligation!.obligation_id);
-      fd.set("claimant_ref", claimantRef.trim());
-      fd.set("channel", channel);
-      files.forEach((f) => fd.append("file", f));
-      if (pasted.trim()) fd.set("text", pasted.trim());
-      if (declaredAmount.trim()) fd.set("declared_amount", declaredAmount.trim());
-      if (declaredReference.trim()) fd.set("declared_reference", declaredReference.trim());
-      return post<Claim>("/claims", fd);
-    },
-    onSuccess: (c) => {
-      setFormError(null);
-      setClaimId(c.claim_id);
-      wasProcessing.current = true;
-      const next = [
-        { claim_id: c.claim_id, code: code.trim().toUpperCase(), when: new Date().toISOString() },
-        ...recent.filter((r) => r.claim_id !== c.claim_id),
-      ];
-      setRecent(next);
-      saveRecent(next);
-      toast("info", "Receipt uploaded — checking it now.");
-      try {
-        if (typeof Notification !== "undefined" && Notification.permission === "default") void Notification.requestPermission();
-      } catch {
-        /* ignore */
-      }
-    },
-    onError: (e) => {
-      setFormError((e as Error).message);
-      toast("err", (e as Error).message);
-    },
+  // sends with progress; if the connection fails the upload waits on this phone and is sent again
+  // with the same key, so a retry can never create a second claim
+  const sender = useClaimSender((c, item) => {
+    setFormError(null);
+    setClaimId(c.claim_id);
+    wasProcessing.current = true;
+    const next = [
+      { claim_id: c.claim_id, code: item.label, when: new Date().toISOString() },
+      ...recent.filter((r) => r.claim_id !== c.claim_id),
+    ];
+    setRecent(next);
+    saveRecent(next);
+    toast("info", "Receipt uploaded — checking it now.");
+    try {
+      if (typeof Notification !== "undefined" && Notification.permission === "default") void Notification.requestPermission();
+    } catch {
+      /* ignore */
+    }
   });
+  useEffect(() => {
+    if (sender.error) {
+      setFormError(sender.error);
+      toast("err", sender.error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sender.error]);
+  const submit = {
+    isPending: sender.state.phase === "sending",
+    mutate: () => {
+      const fields: Record<string, string> = {
+        obligation_id: obligation!.obligation_id,
+        claimant_ref: claimantRef.trim(),
+        channel,
+      };
+      if (pasted.trim()) fields.text = pasted.trim();
+      if (declaredAmount.trim()) fields.declared_amount = declaredAmount.trim();
+      if (declaredReference.trim()) fields.declared_reference = declaredReference.trim();
+      void sender.send({
+        key: newKey(),
+        createdAt: Date.now(),
+        attempts: 0,
+        fields,
+        files: files.map((f) => ({ name: f.name, type: f.type, blob: f })),
+        label: code.trim().toUpperCase(),
+      });
+    },
+  };
 
   const readFiles = useMutation({
     mutationFn: async (list?: File[]) => {
@@ -779,6 +795,46 @@ export default function Scan() {
             <button type="submit" className="lg scan-submit" disabled={!canSubmit}>
               {submit.isPending ? t("form.submitting") : t("form.submit")}
             </button>
+            {sender.state.phase === "sending" && (
+              <div
+                className="upload-progress"
+                role="progressbar"
+                aria-label="Sending your upload"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(sender.state.progress * 100)}
+              >
+                <div className="upload-bar" style={{ width: `${Math.round(sender.state.progress * 100)}%` }} />
+                <span>Sending {Math.round(sender.state.progress * 100)}%</span>
+              </div>
+            )}
+            {sender.queued.length > 0 && (
+              <div className="outbox" role="status">
+                <b>Waiting to send ({sender.queued.length})</b>
+                <p className="muted small">
+                  Saved on this phone only. They are sent again by themselves when you are back
+                  online, and removed once sent.
+                </p>
+                <ul>
+                  {sender.queued.map((q) => (
+                    <li key={q.key}>
+                      <span>{q.label || "Payment"} · {q.files.length} file{q.files.length === 1 ? "" : "s"}</span>
+                      <button type="button" className="ghost small" onClick={() => void sender.discard(q.key)}>
+                        Discard
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="outbox-actions">
+                  <button type="button" className="secondary small" onClick={() => void sender.retryNow()}>
+                    Send now
+                  </button>
+                  <button type="button" className="ghost small" onClick={() => void sender.clearAll()}>
+                    Clear saved uploads
+                  </button>
+                </div>
+              </div>
+            )}
             {!canSubmit && !submit.isPending && (
               <p className="muted small scan-why">
                 {!hasProof

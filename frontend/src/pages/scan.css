@@ -65,3 +65,11 @@
 .crop-preview img { max-width: 100%; max-height: 45vh; }
 .crop-row { display: flex; align-items: center; gap: 8px; text-transform: capitalize; }
 .crop-row input { flex: 1; }
+
+.upload-progress { position: relative; height: 28px; margin-top: 10px; border-radius: 8px; background: var(--line); overflow: hidden; }
+.upload-bar { height: 100%; background: var(--accent); transition: width .2s linear; }
+.upload-progress span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--text); mix-blend-mode: normal; text-shadow: 0 0 3px var(--panel); }
+.outbox { margin-top: 12px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; }
+.outbox ul { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.outbox li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.outbox-actions { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -78,6 +78,8 @@ def create_claim(
     declared_currency: str | None,
     declared_reference: str | None,
     source_type: str = "upload",
+    client_key: str | None = None,
+    request_fingerprint: str | None = None,
 ) -> Claim:
     claim = Claim(
         claim_id=uuid.uuid4(),
@@ -91,6 +93,8 @@ def create_claim(
         declared_reference=declared_reference,
         state=ClaimState.RECEIVED,
         reason_codes=[],
+        client_key=client_key,
+        request_fingerprint=request_fingerprint,
     )
     session.add(claim)
     session.flush()
