@@ -77,9 +77,10 @@ class Settings(BaseSettings):
 
     # global kill switch for KYC auto-verification (app/kyc/auto.py); overrides every policy
     kyc_auto_disabled: bool = False
-    # face matching for KYC: onnx (needs POPS_KYC_FACE_MODEL_PATH) | fake (tests) | demo | none.
+    # face matching for KYC: onnx (needs POPS_KYC_FACE_MODEL_PATH) | insightface (the same ArcFace
+    # model, with the face aligned first: needs YuNet too) | fake (tests) | demo | none.
     # With none, or a missing model, nothing is auto-verified: a person decides (fail closed).
-    kyc_face_backend: Literal["onnx", "fake", "demo", "none"] = "onnx"
+    kyc_face_backend: Literal["onnx", "insightface", "fake", "demo", "none"] = "onnx"
     kyc_face_model_path: str = "./var/models/face-embedding.onnx"
     # face detector: a YuNet ONNX model (OpenCV Zoo); on OpenCV 4 the bundled Haar cascade is
     # used when this file is absent

@@ -121,3 +121,27 @@ See [`third-party-notices.md`](third-party-notices.md). In short: card-corner de
 Tesseract preprocessing follow MIT-licensed projects; the ID-vs-selfie matching approach follows
 DocFace; workflow and feature ideas (not code) come from OpenKYC and a commercial SDK's public
 description.
+
+
+## Face matching with InsightFace (optional)
+
+`POPS_KYC_FACE_BACKEND=insightface` uses an ArcFace ONNX model the way it was trained: each face is first
+warped so its five landmarks (eyes, nose, mouth corners, from the YuNet detector) land on fixed points in a
+112 x 112 picture, then embedded. The plain `onnx` backend crops a loose box instead, which scores lower on
+small, old ID photos. Both give a cosine score; the policy threshold `kyc_min_face_score` is a calibrated
+number, not a default (see `backend/tools/eval/face_eval.py`).
+
+| Setting | Value |
+| --- | --- |
+| `POPS_KYC_FACE_BACKEND` | `insightface` |
+| `POPS_KYC_FACE_MODEL_PATH` | e.g. `./var/models/w600k_r50.onnx` (from InsightFace's `buffalo_l` pack) |
+| `POPS_KYC_FACE_DETECTOR_PATH` | YuNet `face_detection_yunet_*.onnx` (OpenCV Zoo). **Required**: without it the backend refuses to start rather than match worse |
+
+**Licensing.** The InsightFace code is MIT, but its pretrained models are for **non-commercial research
+use only**. This project is non-commercial, so that fits; do not reuse the weights in a commercial product
+without a licence from InsightFace. Nothing is bundled: you download the files yourself.
+
+**Tested without the weights:** the alignment maths (a rotated, shrunk or moved face is warped back onto the
+template) and the fail-closed behaviour. **Not tested:** real accuracy, and that YuNet reports its landmarks
+in the order assumed (right eye, left eye, nose, right and left mouth corner, viewed from the image).
+Check both once on a few real photos before relying on it.
