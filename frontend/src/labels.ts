@@ -119,3 +119,18 @@ export const DOC_TYPES: Record<string, string> = {
   passport: "Passport",
   drivers_licence: "Driving licence",
 };
+
+/** One calm sentence for a payer while a person is involved. Never says why in a way that hints
+ *  at suspicion; the real reasons are for staff (see payerMessages.ts and the backend). */
+export function payerWaitNote(state: string): string | null {
+  switch (state.toUpperCase()) {
+    case "PENDING_REVIEW":
+    case "DUPLICATE_HOLD":
+    case "NEEDS_REVIEW":
+      return "A member of our finance team is taking a look at your payment. You don't need to do anything. We'll update this page.";
+    case "AWAITING_FINANCIAL_CONFIRMATION":
+      return "We have your receipt. We're waiting for the money to show up in our records, which can take a little while.";
+    default:
+      return null;
+  }
+}

@@ -12,7 +12,12 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3); } }
 
 html { scroll-behavior: smooth; }
-:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.skip-link { position: absolute; left: 8px; top: -48px; z-index: 100; padding: 10px 14px; background: var(--panel); color: var(--text); border: 2px solid var(--accent); border-radius: 8px; font-weight: 600; }
+.skip-link:focus { top: 8px; }
+main:focus { outline: none; }
+/* phones: thumb-sized targets */
+@media (pointer: coarse) { button, select, .tabs button, nav a { min-height: 44px; } button.small { padding: 8px 12px; } }
 @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
 
 /* ── shell ───────────────────────────────────────────── */
@@ -220,3 +225,6 @@ tbody tr:hover td { background: color-mix(in srgb, var(--accent) 4%, var(--panel
   .topbar .lang-switch { max-width: 96px; }
   .persona-btn .small, .persona-btn .persona-name { display: none; }
 }
+
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.wait-note { margin: 10px 0; padding: 10px 12px; border-radius: 8px; background: var(--panel-2, var(--panel)); border: 1px solid var(--line); }

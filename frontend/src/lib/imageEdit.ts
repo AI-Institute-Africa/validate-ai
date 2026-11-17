@@ -50,3 +50,45 @@ export async function cropImage(file: File, trim: Trim): Promise<File> {
   if (!blob) throw new Error("could not encode image");
   return new File([blob], file.name, { type, lastModified: Date.now() });
 }
+
+// ── shrink before upload ─────────────────────────────────────────────────────────────────────────
+// Phone photos are often 5-12 MB. On mobile data that is slow and costly, and the readers do not
+// need more than about 2000 px on the long edge. Small files and non-photos are left alone.
+
+export const SHRINK_MAX_EDGE = 2000;
+export const SHRINK_MIN_BYTES = 1_500_000;
+
+/** Size that fits inside `maxEdge` on the long side, keeping the aspect ratio. Never upscales. */
+export function fitWithin(width: number, height: number, maxEdge = SHRINK_MAX_EDGE) {
+  const long = Math.max(width, height);
+  if (long <= maxEdge) return { width, height, scaled: false };
+  const k = maxEdge / long;
+  return { width: Math.max(1, Math.round(width * k)), height: Math.max(1, Math.round(height * k)), scaled: true };
+}
+
+/** Whether a file is worth re-encoding: a large JPEG or PNG/WebP photo. */
+export function shouldShrink(file: { type: string; size: number }): boolean {
+  return /^image\/(jpeg|png|webp)$/.test(file.type) && file.size >= SHRINK_MIN_BYTES;
+}
+
+/** Re-encode a large photo as a smaller JPEG. Returns the original on any problem. */
+export async function shrinkImage(file: File): Promise<File> {
+  if (!shouldShrink(file)) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const fit = fitWithin(bitmap.width, bitmap.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = fit.width;
+    canvas.height = fit.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, fit.width, fit.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85));
+    if (!blob || blob.size >= file.size) return file; // never make it bigger
+    const name = file.name.replace(/\.(png|webp|jpe?g)$/i, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg", lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
@@ -10,24 +10,26 @@ import { ToastProvider, useToast } from "./toast";
 import { useTheme } from "./theme";
 import { Avatar } from "./ui";
 import Home from "./pages/Home";
-import Scan from "./pages/Scan";
-import Bulk from "./pages/Bulk";
-import Track from "./pages/Track";
-import ImageToText from "./pages/ImageToText";
-import Guardrails from "./pages/Guardrails";
-import Fraud from "./pages/Fraud";
-import Alerts from "./pages/Alerts";
-import Replay from "./pages/Replay";
-import Queue from "./pages/Queue";
-import ClaimReview from "./pages/ClaimReview";
-import Credits from "./pages/Credits";
-import Obligations from "./pages/Obligations";
-import Exposure from "./pages/Exposure";
-import AutoApproved from "./pages/AutoApproved";
-import Kyc from "./pages/Kyc";
-import KycReview from "./pages/KycReview";
 import "./styles.css";
 import "./ui.css";
+
+// Each page loads on demand, so a payer on a slow phone never downloads the admin console.
+const Scan = lazy(() => import("./pages/Scan"));
+const Bulk = lazy(() => import("./pages/Bulk"));
+const Track = lazy(() => import("./pages/Track"));
+const ImageToText = lazy(() => import("./pages/ImageToText"));
+const Guardrails = lazy(() => import("./pages/Guardrails"));
+const Fraud = lazy(() => import("./pages/Fraud"));
+const Alerts = lazy(() => import("./pages/Alerts"));
+const Replay = lazy(() => import("./pages/Replay"));
+const Queue = lazy(() => import("./pages/Queue"));
+const ClaimReview = lazy(() => import("./pages/ClaimReview"));
+const Credits = lazy(() => import("./pages/Credits"));
+const Obligations = lazy(() => import("./pages/Obligations"));
+const Exposure = lazy(() => import("./pages/Exposure"));
+const AutoApproved = lazy(() => import("./pages/AutoApproved"));
+const Kyc = lazy(() => import("./pages/Kyc"));
+const KycReview = lazy(() => import("./pages/KycReview"));
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
 
@@ -193,6 +195,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const demo = demoInfo();
   return (
     <div className="app">
+      <a className="skip-link" href="#main">Skip to content</a>
       {demo && (
         <div className="demo-bar" role="note">
           <b>DEMO</b>
@@ -242,16 +245,16 @@ function Shell({ children }: { children: React.ReactNode }) {
           <ThemeButton />
           <PersonaMenu onReset={confirmReset} />
         </header>
-        <main id="main">{children}</main>
+        <main id="main" tabIndex={-1}>{children}</main>
         <footer>
           <strong>Validate</strong> — know that a payment, or a person, is real. {demo ? "Demo build with synthetic data." : ""}
         </footer>
       </div>
       {reset.isPending && (
-        <div className="overlay" role="alertdialog" aria-live="polite">
+        <div className="overlay" role="alertdialog" aria-modal="true" aria-labelledby="reset-title" aria-live="polite">
           <div className="modal">
             <div className="spinner" />
-            <h2>Resetting the demo</h2>
+            <h2 id="reset-title">Resetting the demo</h2>
             <p className="muted">Clearing everything and replaying the sample stories. About 15 seconds.</p>
           </div>
         </div>
@@ -271,6 +274,7 @@ void ensureSession()
             <ToastProvider>
               <BrowserRouter>
                 <Shell>
+                  <Suspense fallback={<div className="spinner" role="status" aria-label="Loading" />}>
                   <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/verify" element={<Scan />} />
@@ -291,6 +295,7 @@ void ensureSession()
                     <Route path="/kyc/review" element={<KycReview />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
+                  </Suspense>
                 </Shell>
               </BrowserRouter>
             </ToastProvider>

@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { api, hasRole, money, pingBackend, post, type Claim, type Obligation } from "../api";
 import { demoInfo, preparePayment, sampleFile } from "../demo";
 import { useI18n } from "../i18n";
-import { cropImage, NO_TRIM, rotateImage, type Trim } from "../lib/imageEdit";
+import { cropImage, NO_TRIM, rotateImage, shrinkImage, type Trim } from "../lib/imageEdit";
 import { Dialog } from "../components/Dialog";
 import { validateFiles } from "../lib/validateFiles";
 import { Link } from "react-router-dom";
 import { useToast } from "../toast";
 import { EmptyState, Loading, PageHeader, Reasons, StateChip } from "../ui";
+import { payerWaitNote } from "../labels";
 import "./scan.css";
 
 type Recent = { claim_id: string; code: string; when: string };
@@ -155,7 +156,11 @@ function ResultCard({ claim, code, onRetry }: { claim: Claim; code: string; onRe
     red: t("tier.red"),
   };
   return (
-    <div className="card result" aria-live="polite">
+    <div className="card result">
+      {/* only this one line is announced to screen readers when the state changes */}
+      <p className="sr-only" role="status">
+        {done ? t("result.title") : t("result.checking")}: {prettyState(claim.state)}
+      </p>
       <div className="result-head">
         <div>
           <h2>{done ? t("result.title") : t("result.checking")}</h2>
@@ -188,6 +193,8 @@ function ResultCard({ claim, code, onRetry }: { claim: Claim; code: string; onRe
           will look at it by hand. It is never rejected automatically for this reason alone.
         </p>
       )}
+
+      {done && payerWaitNote(state) && <p className="wait-note" role="status">{payerWaitNote(state)}</p>}
 
       {/* payers only ever see the server's plain messages */}
       {claim.messages.length > 0 && (
@@ -356,8 +363,9 @@ export default function Scan() {
     onError: (e) => setFormError((e as Error).message),
   });
 
-  const pick = (list: ArrayLike<File> | null | undefined, replace = false) => {
-    const picked = Array.from(list ?? []);
+  const pick = async (list: ArrayLike<File> | null | undefined, replace = false) => {
+    // big phone photos are shrunk first: faster on mobile data, and the size limit is then rarely hit
+    const picked = await Promise.all(Array.from(list ?? []).map(shrinkImage));
     if (!picked.length) return;
     const checked = validateFiles(replace ? [] : files, picked, pasted);
     if (checked.files.length === (replace ? 0 : files.length)) {
@@ -426,8 +434,8 @@ export default function Scan() {
       await qc.invalidateQueries({ queryKey: ["obligations"] });
       return { variant, s, f };
     },
-    onSuccess: ({ variant, s, f }) => {
-      pick([f], true);
+    onSuccess: async ({ variant, s, f }) => {
+      await pick([f], true); // pick resets the form state; it must finish before we set the sample's
       setSampleId(variant);
       setSampleNote(s.note);
       setCode(formatCode(s.payment_code));
@@ -625,7 +633,7 @@ export default function Scan() {
                       </div>
                     ))}
                     <button type="button" className={fileVerified ? "secondary verified" : "secondary"} onClick={() => setFileVerified((v) => !v)}>
-                      {fileVerified ? "✓ Proof verified" : "Verify: preview and payment details are readable"}
+                      {fileVerified ? "✓ Ready to send" : "The photo is clear and readable"}
                     </button>
                   </>
                 ) : (
@@ -658,11 +666,6 @@ export default function Scan() {
                 <span className="glyph" aria-hidden>📷</span>
                 {t("capture.photo")}
                 <span className="muted small">{t("capture.photo.sub")}</span>
-              </button>
-              <button type="button" className="capture" onClick={() => cameraRef.current?.click()}>
-                <span className="glyph" aria-hidden>▤</span>
-                {t("capture.scan")}
-                <span className="muted small">{t("capture.scan.sub")}</span>
               </button>
               <button type="button" className="capture" onClick={() => uploadRef.current?.click()}>
                 <span className="glyph" aria-hidden>📁</span>

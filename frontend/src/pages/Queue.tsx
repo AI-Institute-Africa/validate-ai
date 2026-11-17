@@ -81,16 +81,30 @@ export default function Queue() {
   const rows = all?.filter((c) => bucketOf(c) === bucket);
 
   return (
-    <section className="rv">
+    <section className="rv" id="rv-panel">
       <PageHeader
         title="Review queue"
         sub="Claims waiting for a person. The oldest are first. Click a row to open the receipt, the matching bank credit and the decision."
       />
-      <div className="rv-tabs" role="tablist" aria-label="Triage">
-        <button type="button" role="tab" aria-selected={bucket === "needs_review"} className="rv-tab" onClick={() => setBucket("needs_review")}>
+      <div
+        className="rv-tabs"
+        role="tablist"
+        aria-label="Triage"
+        onKeyDown={(e) => {
+          // arrow keys move between the two tabs, as users of tab widgets expect
+          if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+            const next = bucket === "needs_review" ? "flagged" : "needs_review";
+            setBucket(next);
+            requestAnimationFrame(() =>
+              document.querySelector<HTMLButtonElement>(`[role=tab][data-bucket=${next}]`)?.focus(),
+            );
+          }
+        }}
+      >
+        <button type="button" role="tab" data-bucket="needs_review" aria-controls="rv-panel" tabIndex={bucket === "needs_review" ? 0 : -1} aria-selected={bucket === "needs_review"} className="rv-tab" onClick={() => setBucket("needs_review")}>
           Needs review <span className="rv-tabcount">{counts.needs_review}</span>
         </button>
-        <button type="button" role="tab" aria-selected={bucket === "flagged"} className="rv-tab flagged" onClick={() => setBucket("flagged")}>
+        <button type="button" role="tab" data-bucket="flagged" aria-controls="rv-panel" tabIndex={bucket === "flagged" ? 0 : -1} aria-selected={bucket === "flagged"} className="rv-tab flagged" onClick={() => setBucket("flagged")}>
           Flagged / high risk <span className="rv-tabcount">{counts.flagged}</span>
         </button>
         <Link className="rv-tab" to="/auto">Auto-verified (audit) →</Link>

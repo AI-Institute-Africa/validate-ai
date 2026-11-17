@@ -1,6 +1,6 @@
 // Tiny dictionary i18n for the payer-facing surface: English, Shona, Ndebele.
 // Any key missing in a language falls back to English. Admin pages stay in English.
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 import { translate, translationActive, type Lang } from "./lib/i18nGate";
 
@@ -164,7 +164,7 @@ export const EN: Record<string, string> = {
   "steps.quality": "Quality & readability check",
   "steps.reading": "Reading the receipt",
   "steps.matching": "Matching against bank credits",
-  "tier.green": "Confirmed signal",
+  "tier.green": "Strong signal",
   "tier.amber": "Needs a closer look",
   "tier.red": "High risk",
   "recent.title": "Recent checks",
@@ -229,6 +229,12 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     setLangState(l);
   };
   const t = (key: string) => translate(lang, key, DICTS, allowDrafts());
+  // screen readers pronounce by this: it must name the language actually shown (English while a
+  // draft translation is gated), not the one picked
+  const shown = translationActive(lang, allowDrafts()) ? lang : "en";
+  useEffect(() => {
+    document.documentElement.lang = shown;
+  }, [shown]);
   return <I18nCtx.Provider value={{ lang, setLang, t }}>{children}</I18nCtx.Provider>;
 }
 
