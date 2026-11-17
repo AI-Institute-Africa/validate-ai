@@ -34,6 +34,13 @@ Nothing is sent to an outside AI service. Other outbound calls are the ones you 
 your host system, WhatsApp (if used), email or chat alerts, and the daily RBZ exchange-rate fetch
 (`POPS_FX_ENABLED`). Allow only those at your firewall.
 
+## Trained detectors stay inside too (planned)
+
+The authenticity detectors (`docs/authenticity-detectors.md`) are ONNX files in `POPS_DETECT_MODEL_DIR`, mounted
+read-only next to the other models, and need no network at all. Training and retraining also run on your own
+machine (a laptop or a private GPU server) with data kept under `./var/`. Nothing is uploaded to train or to score. Face crops and
+embeddings are personal data: they follow the same retention window as the evidence and are purged with it.
+
 ## Roles for oversight
 
 Besides payer, reviewer, approver and administrator there is a read-only **auditor** role (`pops_role=auditor`).

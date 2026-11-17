@@ -67,6 +67,7 @@ from app.core.security import (
 )
 from app.credits import bulk
 from app.credits.statements import ImportError_, import_statement, profiles
+from app.detect.runner import ESCALATION
 from app.extraction import preprocess
 from app.extraction.service import build_readers, extract
 from app.extraction.transcription import TranscriptionUnavailable
@@ -116,7 +117,8 @@ Admin = Annotated[Principal, Depends(require(Role.ADMIN))]
 
 
 # never shown to submitters (Cognify, and through it payers): no accusation from a score
-INTERNAL_REASONS = {"SUSPECTED_FAKE", "AUTO_APPROVED"}
+# staff only: the payer is never shown that a fake, AI-generated or deepfake signal was raised
+INTERNAL_REASONS = {"SUSPECTED_FAKE", "AUTO_APPROVED", *ESCALATION.values()}
 
 
 def claim_out(c: Claim, internal: bool = False) -> ClaimOut:

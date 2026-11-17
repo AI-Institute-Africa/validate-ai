@@ -33,3 +33,21 @@ public DocFace base model was trained on a dataset with its own terms.
 The MIT licence requires that its copyright notice and permission notice accompany substantial
 portions of the software. Because no code was copied, none is required here; the licence text of
 each credited project is in its own repository.
+
+
+## Authenticity detectors: datasets and base models (none approved yet)
+
+The trained detectors in [`authenticity-detectors.md`](authenticity-detectors.md) need training and evaluation data and
+may start from a pretrained backbone. **Nothing below has been downloaded or approved.** The licences have not been
+checked: published sources for some of these disagree, and several research datasets forbid commercial use or
+redistribution. Before any use, the owner records the licence text, the date and a yes/no here, and the file's SHA-256.
+
+| Candidate | For | Licence | Approved | Use |
+| --- | --- | --- | --- | --- |
+| SIDTD (forged European IDs) | ID forgery evaluation | to be checked | no | evaluation only, never redistributed |
+| A public deepfake-face dataset (to be chosen) | face deepfake training / evaluation | to be checked | no | |
+| A public presentation-attack dataset (to be chosen) | screen and print replay | to be checked | no | |
+| A public document-forgery dataset (to be chosen) | receipt / ID forgery | to be checked | no | |
+| A small pretrained image backbone (to be chosen) | optional starting point | to be checked | no | SHA-256 pinned; training from scratch is the alternative |
+
+Weights and datasets are never committed to the repository, and no image from any of them is redistributed.

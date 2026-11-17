@@ -14,6 +14,13 @@
 > for development with synthetic data only. Record a model card for every version we run
 > (`docs/model-cards/TEMPLATE.md`); the version is stored on each verification run and decision.
 
+> **Authenticity detectors (planned).** Besides the reader, the platform will run small **trained detectors**
+> for fake and AI-generated receipts and IDs, deepfake and cloned faces, and near-duplicate receipts
+> ([`authenticity-detectors.md`](authenticity-detectors.md)). They follow the same rule: our own models, ONNX on CPU,
+> trained and run on the customer's own server or laptop, loaded from `POPS_DETECT_MODEL_DIR` (never a URL), their
+> SHA-256 and version recorded with every score. Starting weights are either trained from scratch or a backbone the
+> operator downloads once and pins by hash; nothing is called over an API. Each one gets a model card.
+
 The engine's primary reader is a vision-language model (VLM) served through the Ollama API
 (`backend/app/extraction/readers/ollama_vlm.py`). Everything model-specific is configuration:
 
