@@ -23,4 +23,10 @@ for what the review queue already does), id-verifier (JavaScript, mDL not yet re
 ## Later, if wanted
 InsightFace as an optional face backend (code MIT; its pretrained weights are for non-commercial
 research, which fits this project); SIDTD as an evaluation set for the tamper check (European IDs
-only; confirm its licence first); a trusted-payee check per organisation.
+only; confirm its licence first). A trusted-payee check per organisation is now built.
+
+## Planned: trained authenticity detectors
+The tamper check is hand-written and measured at about chance on synthetic forgeries. A set of locally trained
+detectors (forgery, AI-generated content, face deepfake and clone, near-duplicate) is designed in
+[`authenticity-detectors.md`](authenticity-detectors.md). Evaluation sets such as SIDTD remain candidates for
+*evaluation only*, and none will be downloaded until its licence is approved.

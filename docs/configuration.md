@@ -193,6 +193,22 @@ What admins receive:
   The service refuses to start if the model URL is outside this list, if `POPS_OLLAMA_API_KEY` is set, or if
   the browser look-up backend is on without `POPS_LOOKUP_BROWSER_ALLOWED=true`. See `docs/models.md`.
 
+## Authenticity detectors (planned)
+
+Trained detectors for fake and AI-generated receipts and IDs, deepfake faces and near-duplicates; see
+`docs/authenticity-detectors.md`. Not built yet; these are the settings the code will read.
+
+- `POPS_DETECT_MODE` (default `off`): `off`, `shadow` (record scores, change nothing) or `escalate` (a high score can
+  only send a claim to a person). The policy can narrow this, never widen it.
+- `POPS_DETECT_MODEL_DIR` (default `./var/models/detect`): the model files and `manifest.json` (file, version,
+  SHA-256, thresholds). A path outside it, or any URL, is refused in production; a file whose hash does not
+  match the manifest is not loaded.
+- policy `detect_enabled_kinds` (default all): `receipt`, `doc`, `face`, `duplicate`, `text`.
+- policy `detect_thresholds`: per-detector score at or above which it escalates; set from the model card's measured
+  false-flag rate, not guessed.
+- policy `fraud_weights` also accepts `NEAR_DUPLICATE_EMBEDDING`, `AI_GENERATED_SUSPECTED`, `DEEPFAKE_SUSPECTED`,
+  `SYNTHETIC_FACE_SUSPECTED`, `FORGED_POP_SUSPECTED` and `AI_TEXT_SUSPECTED` (0 switches one off).
+
 ## Pilot and audit
 
 - `GET /admin/pilot-scorecard?start=&end=` (admin): money confirmed per day, cases cleared by the rules, fakes and

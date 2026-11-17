@@ -154,6 +154,9 @@ score** from explainable signals:
 - ELA image forensics
 - the vision model's own observations
 - payer history and velocity
+- *(planned)* trained detectors for AI-generated and forged proofs, deepfake and cloned faces and
+  re-photographed duplicates, run locally with no outside AI and starting in shadow mode:
+  [`docs/authenticity-detectors.md`](docs/authenticity-detectors.md)
 
 Suspected fakes (score 60+) go to admins under **Suspected fakes**, through the console badge
 plus a webhook and/or email. They cannot be confirmed until an admin marks them *confirmed fake*
@@ -244,9 +247,11 @@ IDs, metrics are at `/metrics`, and Sentry/OpenTelemetry are optional.
 
 ## Models
 
-The Ollama reader works with Ollama Cloud (default) or a self-hosted Ollama. See
-[`docs/models.md`](docs/models.md) for the recommended free cloud vision models, the Phase 0
-benchmark script, and the open-weights models to fine-tune for v2.
+The Ollama reader defaults to a **self-hosted** Ollama (`http://ollama:11434`); production refuses to start
+with an outside AI service or a hosted key. Ollama Cloud is for development with synthetic data only. See
+[`docs/models.md`](docs/models.md) for the benchmark script and the open-weights models to download and
+fine-tune, and [`docs/authenticity-detectors.md`](docs/authenticity-detectors.md) for the planned locally trained
+fake, deepfake and duplicate detectors.
 
 ### Local Donut live demo
 

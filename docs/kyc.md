@@ -96,7 +96,9 @@ the approver role. Reviewing images is audited (`kyc.evidence_viewed`).
   (including ID photos of the kind you really see), and set them from the measured overturn rate.
 - **Liveness is passive heuristics v1** (screen-replay pattern, glare, tiny or soft faces, a selfie
   copied from the ID photo). It stops the cheap attacks only; it is not active liveness or depth
-  sensing, and the interface (`LivenessChecker`) is there so a stronger model can replace it.
+  sensing, and the interface (`LivenessChecker`) is there so a stronger model can replace it. A trained
+  deepfake and presentation-attack detector is planned (see the section below and
+  [`authenticity-detectors.md`](authenticity-detectors.md)).
 - The synthetic fixtures in `app/devtools.py` (`make_id_card`, `make_selfie`) and `fake` backends exist
   for tests and demos. `POPS_KYC_FACE_BACKEND=fake` is refused in production.
 
@@ -146,6 +148,23 @@ template) and the fail-closed behaviour. **Not tested:** real accuracy, and that
 in the order assumed (right eye, left eye, nose, right and left mouth corner, viewed from the image).
 Check both once on a few real photos before relying on it.
 
+
+## Deepfakes, AI clones and presentation attacks (planned)
+
+Today liveness is the passive heuristic above and **there is no deepfake, synthetic-face or presentation-attack
+model**. A face-swapped selfie, an AI-generated face or a high-quality screen replay can pass it.
+
+The face detector in [`authenticity-detectors.md`](authenticity-detectors.md) will plug into the same
+`LivenessChecker` seam as an additional signal, trained on our own data and run locally. It reads the aligned face
+crop with noise-residual and frequency channels, and combines with the selfie-to-ID embedding drift the face matcher
+already computes. It reports `DEEPFAKE_SUSPECTED` or `SYNTHETIC_FACE_SUSPECTED`, which send a verification to
+`NEEDS_REVIEW`; it can never move one to `VERIFIED`, and an unavailable model is recorded as skipped, not
+as a pass. Auto-verify requires the check to have run once the detector is in `escalate` mode.
+
+**Per-group fairness is a gate.** A face detector may only escalate after its false-flag rates have been measured by
+skin tone, age, lighting and phone class on this deployment's own data, with enough samples in each group to
+trust the number. Until then it runs in `shadow` mode. The document-forgery and AI-generated-ID detectors work on the
+card image the same way and feed the existing `DOC_TAMPER_SUSPECTED` path.
 
 ## National ID numbers: what can and cannot be checked offline
 

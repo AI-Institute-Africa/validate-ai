@@ -15,7 +15,7 @@ All of these must hold at the moment the claim becomes financially confirmed:
 | Approval tier is Green (every hard gate passed, no flags) | Same gates a reviewer cannot skip |
 | Evidence tier at least `auto_approve_min_tier` (E2 alert, or E3 statement) | A receipt alone (E1) is never enough |
 | The credit is not a manual (attested) credit | One person's attestation needs a second person |
-| Fake-proof score at most `auto_approve_max_risk` (default 15) and no open fraud alert | Anything suspicious goes to people |
+| Fake-proof score at most `auto_approve_max_risk` (default 15) and no open fraud alert | Anything suspicious goes to people. A trained authenticity detector (when planned `escalate` mode is on) adds its signal to this score; in `shadow` mode it changes nothing. A detector can only make approval harder, never easier |
 | Amount at most `auto_approve_max_minor[currency]`, and not above the second-approver limit | Small amounts only; a currency with no cap is never approved |
 | The payment settles the invoice **exactly** | Partial and over-payments need judgement |
 | No reviewer has already started on it | A person who looked keeps ownership |
