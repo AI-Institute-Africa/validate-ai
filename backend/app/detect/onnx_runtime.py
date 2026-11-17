@@ -20,7 +20,8 @@ class ModelUnavailable(RuntimeError):
 
 
 def _rgb(img: Image.Image, size: int) -> np.ndarray:
-    arr = np.asarray(img.convert("RGB").resize((size, size), Image.BILINEAR), dtype=np.float32)
+    small = img.convert("RGB").resize((size, size), Image.Resampling.BILINEAR)
+    arr = np.asarray(small, dtype=np.float32)
     return arr.transpose(2, 0, 1) / 255.0  # 3 x H x W
 
 
