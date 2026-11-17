@@ -5,6 +5,7 @@ import { hasRole, switchPersona } from "./api";
 import { personaForRole } from "./personas";
 import { reasonText, stateInfo, stateText, type Tone } from "./labels";
 import { useI18n } from "./i18n";
+import { Icon } from "./components/Icon";
 
 export function Chip({ tone = "neutral", children, title }: { tone?: Tone; children: ReactNode; title?: string }) {
   return (
@@ -38,11 +39,14 @@ export function PageHeader({ title, sub, actions }: { title: string; sub?: React
   );
 }
 
+// older screens pass an emoji; they are drawn as the matching line icon instead
+const EMPTY_ICONS: Record<string, string> = { "✓": "check", "🔔": "bell", "⚡": "bolt", "🔒": "lock", "🏦": "bank", "🛡": "shield", "🔍": "search", "📄": "file", "🧾": "receipt" };
+
 export function EmptyState({ icon = "✓", title, children, action }: { icon?: string; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="card empty-state">
       <div className="empty-glyph" aria-hidden>
-        {icon}
+        <Icon name={EMPTY_ICONS[icon] ?? icon} size={26} />
       </div>
       <h2>{title}</h2>
       {children && <p className="muted">{children}</p>}

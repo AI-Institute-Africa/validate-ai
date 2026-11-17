@@ -1,66 +1,80 @@
-/* Validate design tokens: the one place for colours, sizes and shadows.
+/* Validate design tokens: the one place for colours, type, sizes and shadows.
    Light is the default. Dark applies when the OS asks for it (before the app loads) or when the theme
-   switch sets data-theme (see theme.ts). Change a value here and every page follows. */
+   switch sets data-theme (see theme.ts). Change a value here and every page follows.
+
+   Look: warm paper, ink text, one deep-green accent, a serif for headings. Flat surfaces with hairlines;
+   colour is kept for meaning (green fine, amber look, red stop). */
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/source-serif-4/wght.css";
+
 :root {
-  --bg: #f8fafc;
-  --panel: #ffffff;
-  --text: #0f172a;
-  --muted: #64748b;
-  --line: #e2e8f0;
-  --accent: #2563eb;
-  --accent-strong: #1d4ed8;
-  --grad: linear-gradient(135deg, #2563eb, #4338ca);
-  --ok: #16a34a;
-  --ok-bg: #f0fdf4;
-  --warn: #d97706;
-  --warn-bg: #fffbeb;
-  --bad: #dc2626;
-  --bad-bg: #fef2f2;
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Source Serif 4 Variable", "Iowan Old Style", Georgia, serif;
+  --bg: #f6f4ef;
+  --panel: #fffefb;
+  --text: #1b2420;
+  --muted: #646b66;
+  --line: #e4e0d6;
+  --accent: #0e6b58;
+  --accent-strong: #0a5445;
+  --on-accent: #ffffff;
+  --grad: var(--accent); /* old name, now flat: no gradients */
+  --ok: #1d7a4a;
+  --ok-bg: #e7f2ea;
+  --warn: #965a0e;
+  --warn-bg: #f7edd7;
+  --bad: #ab3a2e;
+  --bad-bg: #f7e4e0;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f172a;
-    --panel: #1e293b;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
-    --line: #334155;
-    --accent: #60a5fa;
-    --accent-strong: #93bbfd;
-    --ok: #4ade80;
-    --ok-bg: #143522;
-    --warn: #fbbf24;
-    --warn-bg: #3b2f0d;
-    --bad: #f87171;
-    --bad-bg: #3f1d1b;
+    --bg: #0f1411;
+    --panel: #161c18;
+    --text: #e9eeea;
+    --muted: #9aa59e;
+    --line: #27302a;
+    --accent: #52c3a4;
+    --accent-strong: #7fd8bf;
+    --on-accent: #0b1511;
+    --ok: #5fcf93;
+    --ok-bg: #12301f;
+    --warn: #e0b25a;
+    --warn-bg: #33260c;
+    --bad: #ef8478;
+    --bad-bg: #3a1b17;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f172a;
-  --panel: #1e293b;
-  --text: #e2e8f0;
-  --muted: #94a3b8;
-  --line: #334155;
-  --accent: #60a5fa;
-  --accent-strong: #93bbfd;
-  --ok: #4ade80;
-  --ok-bg: #143522;
-  --warn: #fbbf24;
-  --warn-bg: #3b2f0d;
-  --bad: #f87171;
-  --bad-bg: #3f1d1b;
+  --bg: #0f1411;
+  --panel: #161c18;
+  --text: #e9eeea;
+  --muted: #9aa59e;
+  --line: #27302a;
+  --accent: #52c3a4;
+  --accent-strong: #7fd8bf;
+  --on-accent: #0b1511;
+  --ok: #5fcf93;
+  --ok-bg: #12301f;
+  --warn: #e0b25a;
+  --warn-bg: #33260c;
+  --bad: #ef8478;
+  --bad-bg: #3a1b17;
   color-scheme: dark;
 }
 
-/* sizes and shadows */
+/* sizes, shadows and motion */
 :root {
-  --radius: 14px;
-  --shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 14px rgba(15, 23, 42, 0.05);
-  --shadow-lg: 0 10px 34px rgba(15, 23, 42, 0.14);
-  --sidebar: 244px;
-  --topbar: 58px;
-  --demo-bar: 34px;
+  --radius: 8px;
+  --shadow: none;
+  --shadow-lg: 0 12px 32px rgba(27, 36, 32, 0.14);
+  --sidebar: 236px;
+  --topbar: 54px;
+  --demo-bar: 30px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --quick: 140ms;
+  --calm: 320ms;
 }
-:root[data-theme="dark"] { --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3); } }
+:root[data-theme="dark"] { --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5); } }

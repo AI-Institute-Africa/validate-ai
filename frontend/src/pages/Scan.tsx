@@ -11,6 +11,7 @@ import { ACCEPT } from "../lib/fileTypes";
 import { validateFiles } from "../lib/validateFiles";
 import { Link } from "react-router-dom";
 import { useToast } from "../toast";
+import { Icon } from "../components/Icon";
 import { EmptyState, Loading, PageHeader, Reasons, StateChip } from "../ui";
 import { payerMessages, payerWaitKey, stateText } from "../labels";
 import "./scan.css";
@@ -89,7 +90,7 @@ function OfflineBanner() {
   if (online) return null;
   return (
     <div className="offline-banner" role="alert">
-      ⚠ {t("offline.banner")}
+      {t("offline.banner")}
     </div>
   );
 }
@@ -142,7 +143,7 @@ function Stepper({ current, done }: { current: 1 | 2 | 3; done: [boolean, boolea
         const cls = done[i] ? "done" : n === current ? "current" : "";
         return (
           <li key={label} className={cls} aria-current={n === current ? "step" : undefined}>
-            <span className="num" aria-hidden>{done[i] ? "✓" : n}</span>
+            <span className="num" aria-hidden>{done[i] ? <Icon name="check" size={12} /> : n}</span>
             <span className="lbl">{label}</span>
           </li>
         );
@@ -194,7 +195,7 @@ function ResultCard({ claim, code, onRetry }: { claim: Claim; code: string; onRe
 
       {claim.reason_codes.includes("TAMPER_SUSPECTED") && (
         <p className="risk-flag" role="status">
-          <span aria-hidden>⚑</span> This receipt shows signs of editing, so a finance reviewer
+          <Icon name="shield" size={14} /> This receipt shows signs of editing, so a finance reviewer
           will look at it by hand. It is never rejected automatically for this reason alone.
         </p>
       )}
@@ -244,7 +245,7 @@ function ResultCard({ claim, code, onRetry }: { claim: Claim; code: string; onRe
             </button>
           )}
           <button type="button" className="ghost small" onClick={() => downloadSummary(claim, code, t)}>
-            ⬇ {t("result.download")}
+            <Icon name="download" size={13} /> {t("result.download")}
           </button>
         </div>
       )}
@@ -598,30 +599,30 @@ export default function Scan() {
                       cameraRef.current?.click();
                     }}
                   >
-                    ↻ {t("file.retake")}
+                    <Icon name="refresh" size={13} /> {t("file.retake")}
                   </button>
                   {file.type.startsWith("image/") && file.type !== "image/heic" && (
                     <button type="button" className="ghost small" onClick={() => void rotateFirst()}>
-                      ⟳ {t("file.rotate")}
+                      <Icon name="rotate" size={13} /> {t("file.rotate")}
                     </button>
                   )}
                   {previewUrl && file.type !== "image/heic" && (
                     <button type="button" className="ghost small" onClick={() => { setTrim(NO_TRIM); setCropOpen(true); }}>
-                      ✂ {t("file.crop")}
+                      <Icon name="crop" size={13} /> {t("file.crop")}
                     </button>
                   )}
                   <button type="button" className="ghost small" onClick={() => { replaceUploadRef.current = true; uploadRef.current?.click(); }}>
                     {t("file.reupload")}
                   </button>
                   <button type="button" className="ghost small" onClick={clearFile} aria-label={t("file.remove")}>
-                    ✕
+                    <Icon name="close" size={13} />
                   </button>
                 </div>
               </div>
             ) : (
               <div className="scan-drop-empty">
                 <div className="drop-icon" aria-hidden>
-                  <span className="drop-glyph">⇪</span>
+                  <span className="drop-glyph"><Icon name="upload" size={22} /></span>
                 </div>
                 <p>
                   <strong>{t("drop.drag")}</strong> {t("drop.or")}
@@ -655,7 +656,7 @@ export default function Scan() {
                       </div>
                     ))}
                     <button type="button" className={fileVerified ? "secondary verified" : "secondary"} onClick={() => setFileVerified((v) => !v)}>
-                      {fileVerified ? `✓ ${t("form.ready")}` : t("form.readable")}
+                      {fileVerified ? <><Icon name="check" size={14} /> {t("form.ready")}</> : t("form.readable")}
                     </button>
                   </>
                 ) : (
@@ -685,12 +686,12 @@ export default function Scan() {
 
             <div className="capture-row">
               <button type="button" className="capture" onClick={() => cameraRef.current?.click()}>
-                <span className="glyph" aria-hidden>📷</span>
+                <span className="glyph"><Icon name="camera" size={22} /></span>
                 {t("capture.photo")}
                 <span className="muted small">{t("capture.photo.sub")}</span>
               </button>
               <button type="button" className="capture" onClick={() => uploadRef.current?.click()}>
-                <span className="glyph" aria-hidden>📁</span>
+                <span className="glyph"><Icon name="upload" size={22} /></span>
                 {t("capture.upload")}
                 <span className="muted small">{t("capture.upload.sub")}</span>
               </button>
