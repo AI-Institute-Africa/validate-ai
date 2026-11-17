@@ -2,6 +2,7 @@
 
 import io
 import random
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -77,7 +78,7 @@ def test_a_usd_invoice_paid_in_zig_shows_the_official_rate_and_is_not_settled(ap
     assert "RATE_DEVIATION" not in r.reasons  # ZWG 1,090.03 is USD 40.00 at the sample rate
     packet = api.call("reviewer", "GET", f"/review/claims/{r.ref_id}/audit-packet")
     fx = packet["official_rate"]
-    assert fx["ask"] == S.DEMO_RATE and fx["converted_minor"] == 4000
+    assert Decimal(fx["ask"]) == Decimal(S.DEMO_RATE) and fx["converted_minor"] == 4000
     # nothing was allocated: a mixed-currency payment never settles by itself
     detail = api.call("reviewer", "GET", f"/review/claims/{r.ref_id}")
     assert detail["allocations"] == []

@@ -28,6 +28,8 @@ POLICY = {
     "auto_approve_enabled": True,
     "auto_approve_channels": ["ecocash", "innbucks"],
     "auto_approve_max_minor": {"USD": 20_000, "ZWG": 600_000},
+    # a currency with no limit here always needs a second approver (the engine fails closed)
+    "second_approver_above_minor": {"USD": 50_000, "ZWG": 1_500_000},
     # an invoice paid in the other currency is never settled by itself: with the official rate on
     # file it goes to a person, with the converted amount shown
     "fx_cross_currency_enabled": True,
@@ -38,7 +40,7 @@ POLICY = {
     "kyc_min_face_score": 0.6,
     "kyc_audit_pct": 25,
 }
-POLICY_VERSION = "demo-v2"
+POLICY_VERSION = "demo-v3"
 
 
 class DemoError(RuntimeError):
