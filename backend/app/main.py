@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.alerts import router as alerts_router
+from app.api.analytics import router as analytics_router
 from app.api.fraud import router as fraud_router
 from app.api.fx import router as fx_router
 from app.api.guardrails import router as guardrails_router
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
     app.include_router(guardrails_router)
     app.include_router(fraud_router)
     app.include_router(fx_router)
+    app.include_router(analytics_router)
     app.include_router(provisional_router)
     app.include_router(alerts_router)
     app.include_router(whatsapp_router)

@@ -142,6 +142,12 @@ class PolicyConfig(BaseModel):
         default=4, ge=0, le=14
     )  # longest a carried-forward rate may be
 
+    # pilot scorecard: minutes of staff time one manual check is assumed to cost (BRD: about 2)
+    pilot_minutes_per_manual_check: int = Field(default=2, ge=0, le=120)
+    # reviewer corrections may be exported as training labels only with consent on record
+    training_export_consent: bool = False
+    training_consent_ref: str | None = Field(default=None, max_length=200)
+
     # tamper forensics (blueprint 8, layer 6): a risk flag only. A hit routes the claim to a
     # reviewer; it can never approve, reject or allocate on its own.
     tamper_enabled: bool = True

@@ -471,6 +471,7 @@ export default function ClaimReview() {
     <section className="rv">
       <div className="rv-topbar">
         <Link to="/queue">← Review queue</Link>
+        <Link className="small" to={`/claims/${id}/packet`}>Audit packet</Link>
         <span className="rv-keys">
           <ShortcutLegend
             title="Review shortcuts"

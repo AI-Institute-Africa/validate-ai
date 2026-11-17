@@ -24,6 +24,8 @@ const Fraud = lazy(() => import("./pages/Fraud"));
 const Alerts = lazy(() => import("./pages/Alerts"));
 const Replay = lazy(() => import("./pages/Replay"));
 const Fx = lazy(() => import("./pages/Fx"));
+const Scorecard = lazy(() => import("./pages/Scorecard"));
+const Packet = lazy(() => import("./pages/Packet"));
 const Queue = lazy(() => import("./pages/Queue"));
 const ClaimReview = lazy(() => import("./pages/ClaimReview"));
 const Credits = lazy(() => import("./pages/Credits"));
@@ -98,6 +100,7 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
         { to: "/guardrails", icon: "🚧", label: t("nav.guardrails"), min: "admin" },
         { to: "/replay", icon: "🧪", label: "Replay & accuracy", min: "admin" },
         { to: "/fx", icon: "💱", label: "Exchange rate", min: "admin" },
+        { to: "/scorecard", icon: "📈", label: "Pilot scorecard", min: "admin" },
       ],
     },
   ];
@@ -118,6 +121,7 @@ const TITLES: [string, string][] = [
   ["/exposure", "Exposure"],
   ["/guardrails", "Guardrails"],
   ["/fx", "Exchange rate"],
+  ["/scorecard", "Pilot scorecard"],
   ["/replay", "Replay & accuracy"],
 ];
 
@@ -300,6 +304,8 @@ void ensureSession()
                     <Route path="/fraud" element={<Fraud />} />
                     <Route path="/guardrails" element={<Guardrails />} />
                     <Route path="/fx" element={<Fx />} />
+                    <Route path="/scorecard" element={<Scorecard />} />
+                    <Route path="/claims/:id/packet" element={<Packet />} />
                     <Route path="/alerts" element={<Alerts />} />
                     <Route path="/replay" element={<Replay />} />
                     <Route path="/kyc" element={<Kyc />} />

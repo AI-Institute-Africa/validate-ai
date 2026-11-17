@@ -192,3 +192,13 @@ What admins receive:
 - `POPS_AI_ALLOWED_HOSTS` (default empty): hosts a model call may reach in production besides private ones.
   The service refuses to start if the model URL is outside this list, if `POPS_OLLAMA_API_KEY` is set, or if
   the browser look-up backend is on without `POPS_LOOKUP_BROWSER_ALLOWED=true`. See `docs/models.md`.
+
+## Pilot and audit
+
+- `GET /admin/pilot-scorecard?start=&end=` (admin): money confirmed per day, cases cleared by the rules, fakes and
+  duplicates caught, median time to decision, and an **estimate** of staff time saved. The estimate is automatic
+  approvals times the policy's `pilot_minutes_per_manual_check` (default 2).
+- `GET /review/claims/{id}/audit-packet` (reviewer): one claim's decisions, rule and model versions, evidence
+  fingerprints (no images), what was read and corrected, money moved, the official rate used and the audit events.
+  Each export is audited (`audit_packet.exported`). The console has a printable view at `/claims/{id}/packet`.
+- Training export of reviewer corrections: see `docs/training-data.md`.
