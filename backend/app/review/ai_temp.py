@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-import httpx
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError
@@ -21,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.claims.facts import build_facts
 from app.claims.service import record_decision
+from app.core import ai_http
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.fraud import risk
@@ -199,7 +199,7 @@ def _model_judge(context: dict[str, Any]) -> tuple[bool, float, list[str], bool]
     }
     headers = {"Authorization": f"Bearer {s.ollama_api_key}"} if s.ollama_api_key else {}
     try:
-        resp = httpx.post(
+        resp = ai_http.post(
             f"{s.ollama_url.rstrip('/')}/api/chat", json=body, headers=headers, timeout=60.0
         )
         resp.raise_for_status()

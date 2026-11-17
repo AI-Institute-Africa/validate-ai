@@ -19,6 +19,7 @@ import numpy as np
 from PIL import Image
 from pydantic import ValidationError
 
+from app.core import ai_http
 from app.core.config import get_settings
 from app.extraction import preprocess
 from app.extraction.readers.base import Reader, ReaderUnavailable
@@ -77,7 +78,7 @@ class IdVLMReader:
             ],
         }
         try:
-            resp = httpx.post(
+            resp = ai_http.post(
                 f"{self.url}/api/chat", json=body, headers=self.headers, timeout=self.timeout
             )
             resp.raise_for_status()

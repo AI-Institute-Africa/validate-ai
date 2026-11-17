@@ -20,7 +20,7 @@ const REVIEWABLE = ["DOCUMENT_VERIFIED", "AWAITING_FINANCIAL_CONFIRMATION", "FIN
 // Mirrors REPROCESSABLE in backend/app/claims/states.py.
 const REPROCESSABLE = ["DOCUMENT_VERIFIED", "AWAITING_FINANCIAL_CONFIRMATION", "PENDING_REVIEW"];
 
-type Run = { run_id: string; created_at: string; pipeline_version: string; policy_version: string; outcome: string; flags: string[]; readers: string[]; reader_failures: Record<string, string> };
+type Run = { run_id: string; created_at: string; pipeline_version: string; policy_version: string; outcome: string; flags: string[]; readers: string[]; reader_failures: Record<string, string>; model_versions?: Record<string, unknown> };
 
 function RunHistory({ claimId }: { claimId: string }) {
   const q = useQuery({ queryKey: ["runs", claimId], queryFn: () => api<Run[]>(`/review/claims/${claimId}/runs`) });
@@ -35,6 +35,11 @@ function RunHistory({ claimId }: { claimId: string }) {
             <div className="what">{i === 0 ? "Latest run" : `Run ${q.data!.length - i}`}: {humanize(r.outcome)}</div>
             <div className="when">{new Date(r.created_at).toLocaleString()} · pipeline {r.pipeline_version} · policy {r.policy_version}</div>
             <div className="small muted">Readers: {r.readers.length ? r.readers.join(", ") : "none ran"}</div>
+            {r.model_versions && Object.keys(r.model_versions).length > 0 && (
+              <div className="small muted">
+                Models: {Object.entries(r.model_versions).filter(([k]) => k !== "guardrails").map(([k, v]) => `${k} ${String(v)}`).join(" · ")}
+              </div>
+            )}
             {Object.entries(r.reader_failures).map(([name, why]) => (
               <div key={name} className="warn-text small">{name} could not run: {why}</div>
             ))}

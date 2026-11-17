@@ -1,5 +1,19 @@
 # Vision models for the POPs reader
 
+> **Production policy: no outside AI services.** Receipts, ID photos, faces and claim details are
+> never sent to a third-party AI service. In production (`POPS_ENV` other than `dev` or `test`) the
+> service refuses to start if `POPS_OLLAMA_URL` is not a private host (or listed in
+> `POPS_AI_ALLOWED_HOSTS`), if `POPS_OLLAMA_API_KEY` is set, or if the browser look-up backend is on
+> without `POPS_LOOKUP_BROWSER_ALLOWED=true`. Every model call goes through `app/core/ai_http.py`,
+> which refuses a non-allowed host before anything is sent; a refusal is treated like a failed model
+> call, so the case falls to a person. `GET /admin/ai-status` lists each endpoint and whether it is
+> allowed. Face matching and liveness run locally and never use this path.
+>
+> **Route we use in production: download, then fine-tune.** Run an open-weight model on our own
+> servers, benchmark it on consented local receipts, then fine-tune it (v2 below). Cloud models are
+> for development with synthetic data only. Record a model card for every version we run
+> (`docs/model-cards/TEMPLATE.md`); the version is stored on each verification run and decision.
+
 The engine's primary reader is a vision-language model (VLM) served through the Ollama API
 (`backend/app/extraction/readers/ollama_vlm.py`). Everything model-specific is configuration:
 

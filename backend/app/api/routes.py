@@ -1222,6 +1222,9 @@ def verification_runs(claim_id: uuid.UUID, db: DB, p: Reviewer) -> list[dict]:
                 "flags": r.flags,
                 "readers": extraction.get("readers", []),
                 "reader_failures": extraction.get("failures", {}),
+                "model_versions": {
+                    k: v for k, v in (r.model_versions or {}).items() if k not in ("failures",)
+                },
             }
         )
     return out

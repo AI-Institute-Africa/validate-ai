@@ -364,6 +364,7 @@ def process_claim(
             "run_id": str(run.run_id),
             "risk": {"score": assessment.score, "level": assessment.level},
             "evidence_sha256": [e.sha256 for e in evs],
+            "models": {k: v for k, v in (run.model_versions or {}).items() if k != "failures"},
             "guardrails": guardrail_log,
             "facts": {
                 "amount_minor": facts.amount_minor,
