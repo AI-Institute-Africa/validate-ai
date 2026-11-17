@@ -73,7 +73,7 @@ Tokens are kept in `sessionStorage`, never `localStorage`.
 | --- | --- |
 | `POPS_VLM_BACKEND`, `POPS_OLLAMA_URL`, `POPS_OLLAMA_API_KEY`, `POPS_OLLAMA_MODEL` | Vision reader (see `docs/models.md`). |
 | `POPS_OCR_BACKEND`, `POPS_OCR_LANGUAGES` | Tesseract second reader (`eng` by default). |
-| `POPS_PROVIDER_TEMPLATES_FILE` | JSON list that adds or overrides provider layouts, without a code change. |
+| `POPS_PROVIDER_TEMPLATES_FILE` | JSON list that adds or overrides provider layouts, without a code change. Example: `sample_data/zw/provider_templates.example.json`. |
 | `POPS_STATEMENT_PROFILES_FILE` | JSON list that adds or overrides bank statement layouts. The same profile reads a CSV or a digital PDF statement (column names matched case-insensitively in the PDF's table header). |
 | `POPS_STATUS_SYNONYMS_FILE` | JSON object of extra payment-status words, e.g. in Shona or isiNdebele: `{"word": "success"}` (values: `success`, `pending`, `failed`, `reversed`). |
 
@@ -112,7 +112,7 @@ optional `POPS_WHATSAPP_ORG_ID` and `POPS_WHATSAPP_GRAPH_URL`.
 ## Alerts
 
 See [`alerts.md`](alerts.md): `POPS_ALERT_IMAP_HOST/USER/PASSWORD/FOLDER/SOURCE_ID`,
-`POPS_ALERT_SOURCE_STALE_MINUTES` (default 30), `POPS_ALERT_TEMPLATES_FILE`, and
+`POPS_ALERT_SOURCE_STALE_MINUTES` (default 30), `POPS_ALERT_TEMPLATES_FILE` (example: `sample_data/zw/alert_templates.example.json`; the built-in InnBucks, OneMoney and O'mari templates are unconfirmed guesses), and
 `POPS_RATE_LIMIT_ALERTS_PER_MINUTE` (default 120 per source).
 
 ## Phase-4 advisory features
@@ -179,3 +179,39 @@ What admins receive:
 ## Alerts
 
 - `POPS_ALERT_REQUIRE_SIGNATURE` (default `false`): refuse unsigned alert requests. See `docs/alerts.md`.
+
+## Official exchange rate
+
+- `POPS_FX_ENABLED` (default `false`): fetch the RBZ ZWG/USD ask rate on weekdays. See `docs/fx-rates.md`.
+- `POPS_FX_FETCH_HOURS` (default `5-16`, UTC cron syntax): hours on weekdays the job tries until the file is found.
+- `POPS_FX_MAX_DAILY_MOVE_PCT` (default `25`): a rate further than this from the previous day is refused.
+
+## Models: no outside AI services
+
+- `POPS_OLLAMA_URL` now defaults to the self-hosted `http://ollama:11434`.
+- `POPS_AI_ALLOWED_HOSTS` (default empty): hosts a model call may reach in production besides private ones.
+  The service refuses to start if the model URL is outside this list, if `POPS_OLLAMA_API_KEY` is set, or if
+  the browser look-up backend is on without `POPS_LOOKUP_BROWSER_ALLOWED=true`. See `docs/models.md`.
+
+## Pilot and audit
+
+- `GET /admin/pilot-scorecard?start=&end=` (admin): money confirmed per day, cases cleared by the rules, fakes and
+  duplicates caught, median time to decision, and an **estimate** of staff time saved. The estimate is automatic
+  approvals times the policy's `pilot_minutes_per_manual_check` (default 2).
+- `GET /review/claims/{id}/audit-packet` (reviewer): one claim's decisions, rule and model versions, evidence
+  fingerprints (no images), what was read and corrected, money moved, the official rate used and the audit events.
+  Each export is audited (`audit_packet.exported`). The console has a printable view at `/claims/{id}/packet`.
+- Training export of reviewer corrections: see `docs/training-data.md`.
+
+## Compliance
+
+- `POPS_DATA_REGION` (required in production): where this deployment's data is hosted. Shown on the Compliance
+  screen and in audit packets.
+- `POPS_DOCS_ENABLED` (default on in development, off in production): the interactive API pages.
+- Policy `evidence_retention_days`, `alert_body_retention_days` (default none = keep; minimum 30 days when set):
+  a daily job removes finished claims' files and raw alert text after the window and keeps the rows and
+  fingerprints.
+- Auditor role (`auditor`): read-only access to case records, the audit trail, audit packets and the allocation
+  export. Evidence links are issued to a person; opening a case and fetching an original are audited.
+- Incidents: `docs/breach-response.md`. Private deployment: `docs/private-deployment.md`.
+- Webhooks to the host system now carry `"v": 1` in the body.

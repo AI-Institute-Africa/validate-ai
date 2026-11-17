@@ -58,6 +58,26 @@ BUILTIN_TEMPLATES: list[AlertTemplate] = [
         r".*?(?:approval code|txn id|trans(?:action)? id|ref(?:erence)?)[:\s]*"
         r"(?P<reference>[A-Z0-9.]{6,30})",
     ),
+    # Placeholders for the other Zimbabwean wallets, modelled on the EcoCash wording. They have NOT
+    # been checked against real alerts; confirm each with sample messages (see sample_data/zw/) and
+    # override through POPS_ALERT_TEMPLATES_FILE before relying on it.
+    *[
+        AlertTemplate(
+            name=f"{provider.lower()}_merchant",
+            provider=provider,
+            sender_pattern=sender,
+            pattern=r"(?:received|payment of)\s+(?P<currency>USD|ZWG|ZiG|\$)\s?"
+            r"(?P<amount>[\d,]+\.\d{2})\s+from\s+(?P<payer>[A-Za-z .'-]+?)\s*"
+            r"(?:\(?(?P<phone>\+?\d{9,12})\)?)?[.,]"
+            r".*?(?:txn id|trans(?:action)? id|ref(?:erence)?)[:\s]*"
+            r"(?P<reference>[A-Z0-9.]{6,30})",
+        )
+        for provider, sender in (
+            ("INNBUCKS", r"innbucks"),
+            ("ONEMONEY", r"onemoney|one money"),
+            ("OMARI", r"omari|o'mari"),
+        )
+    ],
     AlertTemplate(
         name="bank_credit",
         provider="BANK",

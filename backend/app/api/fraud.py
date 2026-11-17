@@ -47,7 +47,7 @@ class ResolveIn(BaseModel):
     note: str = Field(min_length=3, max_length=2000)
 
 
-def _out(db: Session, a: FraudAlert) -> AlertOut:
+def _out(db: Session, a: FraudAlert, user_id: uuid.UUID | None = None) -> AlertOut:
     claim = db.get(Claim, a.claim_id)
     assert claim is not None
     ob = db.get(Obligation, claim.obligation_id)
@@ -58,7 +58,7 @@ def _out(db: Session, a: FraudAlert) -> AlertOut:
     def url(variant: str) -> str | None:
         if ev is None or (variant == "forensics" and not ev.forensics_key):
             return None
-        sig = sign_evidence(ev.evidence_id)
+        sig = sign_evidence(ev.evidence_id, user_id=user_id)
         return f"/evidence/{ev.evidence_id}/content?variant={variant}&sig={sig}"
 
     return AlertOut(
@@ -94,7 +94,7 @@ def list_alerts(
     if level:
         q = q.where(FraudAlert.level == level)
     rows = db.scalars(q.order_by(FraudAlert.score.desc(), FraudAlert.created_at).limit(limit))
-    return [_out(db, a) for a in rows]
+    return [_out(db, a, p.user_id) for a in rows]
 
 
 @router.get("/alerts/summary")
@@ -121,4 +121,4 @@ def resolve(alert_id: uuid.UUID, body: ResolveIn, db: DB, p: Admin) -> AlertOut:
         db.rollback()
         raise HTTPException(exc.status, {"code": exc.code, "message": str(exc)}) from exc
     db.commit()
-    return _out(db, alert)
+    return _out(db, alert, p.user_id)

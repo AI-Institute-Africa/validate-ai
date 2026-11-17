@@ -5,9 +5,11 @@ Layout of the labelled set (never used for training; see blueprint 12.2):
                          "currency": "USD", "transaction_id": "...", "date": "...", ...}
     <dir>/<files>        the POP images or PDFs
 
-    python scripts/benchmark_reader.py <dir> qwen3-vl:235b gemma3:27b qwen2.5vl:7b
+    python scripts/benchmark_reader.py <dir> qwen2.5vl:7b [more models] [--card CARD.md]
 
 Scores are per field, exact match after the engine's own normalisation, plus latency.
+--card appends an accuracy-by-template table (by each label's "provider" or "template") to a file,
+for a model card.
 """
 
 import json
@@ -24,13 +26,14 @@ from app.intake.files import prepare
 CRITICAL = ("amount", "transaction_id", "date", "currency", "beneficiary", "status")
 
 
-def main(folder: str, models: list[str]) -> None:
+def main(folder: str, models: list[str], card: str | None = None) -> None:
     root = Path(folder)
     labels = [json.loads(line) for line in (root / "labels.jsonl").read_text().splitlines() if line]
     for model in models:
         reader = OllamaVLMReader(model=model)
         hits: dict[str, int] = defaultdict(int)
         seen: dict[str, int] = defaultdict(int)
+        by_tpl: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(lambda: [0, 0]))
         failures, latency = 0, []
         for item in labels:
             raw = (root / item["file"]).read_bytes()
@@ -47,14 +50,19 @@ def main(folder: str, models: list[str]) -> None:
                 if name not in item:
                     continue
                 seen[name] += 1
+                cell = by_tpl[str(item.get("provider") or item.get("template") or "unknown")][name]
+                cell[1] += 1
                 want = normalise_field(name, item[name], currency)
                 have = got.get(name)
                 if have and normalise_field(name, have.raw, currency) == want:
                     hits[name] += 1
+                    cell[0] += 1
         print(f"\n== {model}  ({len(labels)} docs, {failures} failures)")
         for name in CRITICAL:
             if seen[name]:
                 print(f"  {name:15s} {hits[name] / seen[name]:6.1%}  ({hits[name]}/{seen[name]})")
+        if card:
+            _write_card(card, model, by_tpl)
         if latency:
             latency.sort()
             print(
@@ -63,7 +71,27 @@ def main(folder: str, models: list[str]) -> None:
             )
 
 
+def _write_card(path: str, model: str, by_tpl: dict[str, dict[str, list[int]]]) -> None:
+    """Append the accuracy-by-template table for docs/model-cards/TEMPLATE.md."""
+    cols = ("amount", "transaction_id", "date", "currency")
+    lines = [f"\n## Accuracy: {model}\n", "| Template | Documents | " + " | ".join(cols) + " |"]
+    lines.append("| --- | --- | " + " | ".join("---" for _ in cols) + " |")
+    for tpl in sorted(by_tpl):
+        cells = by_tpl[tpl]
+        docs = max((c[1] for c in cells.values()), default=0)
+        vals = [f"{cells[c][0] / cells[c][1]:.0%}" if cells[c][1] else "-" for c in cols]
+        lines.append(f"| {tpl} | {docs} | " + " | ".join(vals) + " |")
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
+    args = sys.argv[1:]
+    card_path = None
+    if "--card" in args:
+        i = args.index("--card")
+        card_path = args[i + 1] if i + 1 < len(args) else None
+        del args[i : i + 2]
+    if len(args) < 2:
         sys.exit(__doc__)
-    main(sys.argv[1], sys.argv[2:])
+    main(args[0], args[1:], card_path)

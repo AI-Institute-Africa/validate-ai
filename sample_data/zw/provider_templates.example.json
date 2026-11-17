@@ -1,0 +1,14 @@
+[
+  {
+    "provider": "OMARI",
+    "document_type": "mobile_money_receipt",
+    "keywords": [
+      "omari",
+      "o'mari",
+      "o-mari"
+    ],
+    "txn_patterns": [
+      "\\b(OM\\d{10})\\b"
+    ]
+  }
+]

@@ -40,6 +40,7 @@ BUILTIN_TEMPLATES: list[ProviderTemplate] = [
     ),
     ProviderTemplate("ONEMONEY", "mobile_money_receipt", ["onemoney", "one money"]),
     ProviderTemplate("INNBUCKS", "mobile_money_receipt", ["innbucks"]),
+    ProviderTemplate("OMARI", "mobile_money_receipt", ["omari", "o'mari", "o-mari"]),
     ProviderTemplate("MPESA", "mobile_money_receipt", ["mpesa", "m-pesa", "safaricom"]),
     ProviderTemplate(
         "AIRTELMONEY", "mobile_money_receipt", ["airtel money", "airtelmoney", "airtel"]

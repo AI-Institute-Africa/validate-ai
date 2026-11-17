@@ -25,6 +25,10 @@ const Guardrails = lazy(() => import("./pages/Guardrails"));
 const Fraud = lazy(() => import("./pages/Fraud"));
 const Alerts = lazy(() => import("./pages/Alerts"));
 const Replay = lazy(() => import("./pages/Replay"));
+const Fx = lazy(() => import("./pages/Fx"));
+const Scorecard = lazy(() => import("./pages/Scorecard"));
+const Compliance = lazy(() => import("./pages/Compliance"));
+const Packet = lazy(() => import("./pages/Packet"));
 const Queue = lazy(() => import("./pages/Queue"));
 const ClaimReview = lazy(() => import("./pages/ClaimReview"));
 const Credits = lazy(() => import("./pages/Credits"));
@@ -98,6 +102,9 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
         { to: "/exposure", icon: "chart", label: "Exposure", min: "admin" },
         { to: "/guardrails", icon: "sliders", label: t("nav.guardrails"), min: "admin" },
         { to: "/replay", icon: "flask", label: "Replay & accuracy", min: "admin" },
+        { to: "/fx", icon: "refresh", label: "Exchange rate", min: "admin" },
+        { to: "/scorecard", icon: "chart", label: "Pilot scorecard", min: "admin" },
+        { to: "/compliance", icon: "lock", label: "Compliance", min: "admin" },
       ],
     },
   ];
@@ -117,6 +124,9 @@ const TITLES: [string, string][] = [
   ["/alerts", "Payment alerts"],
   ["/exposure", "Exposure"],
   ["/guardrails", "Guardrails"],
+  ["/fx", "Exchange rate"],
+  ["/scorecard", "Pilot scorecard"],
+  ["/compliance", "Compliance"],
   ["/replay", "Replay & accuracy"],
 ];
 
@@ -293,6 +303,10 @@ void ensureSession()
                     <Route path="/auto" element={<AutoApproved />} />
                     <Route path="/fraud" element={<Fraud />} />
                     <Route path="/guardrails" element={<Guardrails />} />
+                    <Route path="/fx" element={<Fx />} />
+                    <Route path="/scorecard" element={<Scorecard />} />
+                    <Route path="/compliance" element={<Compliance />} />
+                    <Route path="/claims/:id/packet" element={<Packet />} />
                     <Route path="/alerts" element={<Alerts />} />
                     <Route path="/replay" element={<Replay />} />
                     <Route path="/kyc" element={<Kyc />} />

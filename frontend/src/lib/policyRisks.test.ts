@@ -38,4 +38,10 @@ describe("describePolicyRisks", () => {
     expect(keys({ max_low_confidence_fields: 2 }, { max_low_confidence_fields: 4 })).toEqual(["max_low_confidence_fields"]);
     expect(keys({}, { max_low_confidence_fields: 2 })).toEqual([]);
   });
+  it("flags the cross-currency settings only when switched on or loosened", () => {
+    expect(keys({}, { fx_cross_currency_enabled: true })).toEqual(["fx_cross_currency_enabled"]);
+    expect(keys({ fx_cross_currency_enabled: true }, { fx_cross_currency_enabled: false })).toEqual([]);
+    expect(keys({}, { fx_tolerance_bps: 500 })).toEqual(["fx_tolerance_bps"]);
+    expect(keys({}, { fx_tolerance_bps: 100 })).toEqual([]);
+  });
 });

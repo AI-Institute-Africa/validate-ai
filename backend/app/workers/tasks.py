@@ -29,6 +29,17 @@ celery_app.conf.update(
             "task": "pops.kyc_purge_evidence",
             "schedule": crontab(hour=3, minute=30),
         },
+        "purge-payment-data": {
+            "task": "pops.purge_payment_data",
+            "schedule": crontab(hour=3, minute=45),
+        },
+        "incident-reminders": {"task": "pops.incident_reminders", "schedule": 600.0},
+        "fx-fetch": {
+            "task": "pops.fx_fetch",
+            "schedule": crontab(
+                minute=15, hour=get_settings().fx_fetch_hours, day_of_week="mon-fri"
+            ),
+        },
         "exposure-report": {
             "task": "pops.exposure_report",
             "schedule": crontab(hour=6, minute=0),
@@ -149,6 +160,43 @@ def kyc_purge_evidence_task() -> int:
 
     with session_scope() as session:
         return kyc_service.purge_evidence(session)
+
+
+@celery_app.task(name="pops.purge_payment_data")
+def purge_payment_data_task() -> dict[str, int]:
+    from app.compliance import retention
+
+    with session_scope() as session:
+        return retention.purge_payment_data(session)
+
+
+@celery_app.task(name="pops.incident_reminders")
+def incident_reminders_task() -> int:
+    from app.compliance import incidents
+
+    with session_scope() as session:
+        return incidents.send_reminders(session)
+
+
+@celery_app.task(name="pops.fx_fetch")
+def fx_fetch_task() -> str:
+    """Weekday job: fetch today's RBZ rate. Runs hourly until the file is found."""
+    from datetime import UTC, datetime
+
+    from app.fx import service as fx_service
+
+    s = get_settings()
+    if not s.fx_enabled:
+        return "disabled"
+    now = datetime.now(UTC)
+    last_hour = int(s.fx_fetch_hours.split("-")[-1].split(",")[-1])
+    with session_scope() as session:
+        return fx_service.run_daily(
+            session,
+            now.date(),
+            max_move_pct=s.fx_max_daily_move_pct,
+            last_attempt=now.hour >= last_hour,
+        )
 
 
 def dispatch_kyc(kyc_id: uuid.UUID) -> None:

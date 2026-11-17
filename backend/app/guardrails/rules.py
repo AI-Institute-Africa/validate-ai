@@ -11,12 +11,12 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
-from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.ai_http import is_private_host
 from app.core.audit import audit
 from app.extraction.agreement import FinalField
 from app.extraction.schema import FIELD_NAMES
@@ -316,13 +316,7 @@ def reason_code(rule: GuardrailRule) -> str:
 
 
 def is_external(url: str) -> bool:
-    host = (urlparse(url).hostname or "").lower()
-    return not (
-        host in ("localhost", "127.0.0.1", "::1", "ollama")
-        or host.endswith(".local")
-        or host.endswith(".internal")
-        or re.match(r"^(10|192\.168|172\.(1[6-9]|2\d|3[01]))\.", host) is not None
-    )
+    return not is_private_host(url)
 
 
 @dataclass

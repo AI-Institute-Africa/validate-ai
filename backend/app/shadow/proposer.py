@@ -15,7 +15,6 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
 from pydantic import BaseModel, ValidationError
 from pydantic import Field as PydanticField
 from sqlalchemy import select
@@ -23,6 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.claims.facts import build_facts
+from app.core import ai_http
 from app.core import observability as obs
 from app.core.config import get_settings
 from app.guardrails.rules import active_rules, plan_readers
@@ -188,7 +188,7 @@ def ai_proposal(
         ],
     }
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-    resp = httpx.post(f"{url.rstrip('/')}/api/chat", json=body, headers=headers, timeout=timeout)
+    resp = ai_http.post(f"{url.rstrip('/')}/api/chat", json=body, headers=headers, timeout=timeout)
     resp.raise_for_status()
     parsed = ProposalJSON.model_validate(json.loads(resp.json()["message"]["content"]))
     if parsed.outcome not in OUTCOMES:
