@@ -241,3 +241,5 @@
   .rv-summary > .rv-sum-top, .rv-summary > .rv-facts { grid-column: 1 / -1; }
   .rv-summary > .rv-sum-why, .rv-summary > .rv-next { margin-top: 0; align-self: start; }
 }
+
+.rv-fx { margin: 6px 0 10px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--panel); }

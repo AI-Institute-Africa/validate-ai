@@ -5,6 +5,7 @@ import { API, api, Candidate, Claim, Field, hasRole, money, post, ReviewDetail }
 import { humanize, stateInfo } from "../labels";
 import { useToast, useUndo } from "../toast";
 import { Dialog } from "../components/Dialog";
+import { convertMinor, gapBps, isCrossCurrency } from "../lib/fx";
 import { compareRows, lowConfidenceCount, type CompareStatus } from "../lib/comparison";
 import { REJECT_CONSEQUENCES, REJECT_PAYER_MESSAGE, REJECT_REASONS, REQUEST_INFO_NOTE } from "../lib/payerMessages";
 import { cssFilter, DEFAULT_VIEW, isDefault, rotateBy, setLevel, zoomBy } from "../lib/viewer";
@@ -168,6 +169,37 @@ const CMP_LABEL: Record<CompareStatus, string> = {
   note: "Check",
 };
 
+type FxRate = { ask: string; method: string; source_url: string | null; carried_forward_from: string | null };
+
+/** For a claim paid in a different currency from its invoice: the official rate and the conversion. */
+function OfficialRate({ detail }: { detail: ReviewDetail }) {
+  const pay = detail.claim.declared_currency;
+  const inv = detail.obligation.currency;
+  const cross = isCrossCurrency(pay, inv);
+  const day = detail.claim.created_at.slice(0, 10);
+  const q = useQuery({ queryKey: ["fx-rate", day], queryFn: () => api<FxRate>(`/fx/rates?on=${day}`), enabled: cross, retry: false });
+  if (!cross) return null;
+  if (q.isError) {
+    return <p className="warn-text small">Paid in {pay}, invoice in {inv}. No official rate is stored for {day}, so nothing can be converted. A person decides.</p>;
+  }
+  if (!q.data) return null;
+  const ask = Number(q.data.ask);
+  const declared = detail.claim.declared_amount_minor;
+  const converted = declared == null || !pay ? null : convertMinor(declared, pay, inv, ask);
+  const gap = converted == null ? null : gapBps(converted, detail.obligation.amount_minor);
+  return (
+    <div className="rv-fx small">
+      <strong>Official rate:</strong> {ask.toFixed(4)} ZWG per 1 USD
+      {q.data.carried_forward_from ? ` (carried forward from ${q.data.carried_forward_from})` : ""}
+      {q.data.method === "manual" ? " (entered by hand)" : ""}.
+      {converted != null && (
+        <> Declared {money(declared, pay)} is about {money(converted, inv)} at that rate, {gap === 0 ? "equal to" : `${((gap ?? 0) / 100).toFixed(1)}% away from`} the invoice ({money(detail.obligation.amount_minor, inv)}).</>
+      )}{" "}
+      The money still has to arrive in the invoice's currency to be confirmed.
+    </div>
+  );
+}
+
 function Comparison({ detail, selected }: { detail: ReviewDetail; selected: number }) {
   const credit = detail.candidates[selected]?.credit ?? null;
   const { rows, notPerformed } = compareRows(detail.fields, detail.claim, credit);
@@ -175,6 +207,7 @@ function Comparison({ detail, selected }: { detail: ReviewDetail; selected: numb
     <div className="card">
       <h3>Receipt against the record</h3>
       <p className="rv-help">A mismatch is a reason to look closer, never a verdict. “Not compared” means that check was not done.</p>
+      <OfficialRate detail={detail} />
       <table className="rv-compare">
         <thead><tr><th>Value</th><th>On the receipt</th><th>Expected</th><th /></tr></thead>
         <tbody>

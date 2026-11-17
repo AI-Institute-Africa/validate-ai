@@ -23,6 +23,7 @@ const Guardrails = lazy(() => import("./pages/Guardrails"));
 const Fraud = lazy(() => import("./pages/Fraud"));
 const Alerts = lazy(() => import("./pages/Alerts"));
 const Replay = lazy(() => import("./pages/Replay"));
+const Fx = lazy(() => import("./pages/Fx"));
 const Queue = lazy(() => import("./pages/Queue"));
 const ClaimReview = lazy(() => import("./pages/ClaimReview"));
 const Credits = lazy(() => import("./pages/Credits"));
@@ -96,6 +97,7 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
         { to: "/exposure", icon: "📊", label: "Exposure", min: "admin" },
         { to: "/guardrails", icon: "🚧", label: t("nav.guardrails"), min: "admin" },
         { to: "/replay", icon: "🧪", label: "Replay & accuracy", min: "admin" },
+        { to: "/fx", icon: "💱", label: "Exchange rate", min: "admin" },
       ],
     },
   ];
@@ -115,6 +117,7 @@ const TITLES: [string, string][] = [
   ["/alerts", "Payment alerts"],
   ["/exposure", "Exposure"],
   ["/guardrails", "Guardrails"],
+  ["/fx", "Exchange rate"],
   ["/replay", "Replay & accuracy"],
 ];
 
@@ -296,6 +299,7 @@ void ensureSession()
                     <Route path="/auto" element={<AutoApproved />} />
                     <Route path="/fraud" element={<Fraud />} />
                     <Route path="/guardrails" element={<Guardrails />} />
+                    <Route path="/fx" element={<Fx />} />
                     <Route path="/alerts" element={<Alerts />} />
                     <Route path="/replay" element={<Replay />} />
                     <Route path="/kyc" element={<Kyc />} />

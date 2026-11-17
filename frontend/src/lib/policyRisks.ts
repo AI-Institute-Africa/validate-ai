@@ -29,6 +29,8 @@ export const DEFAULTS: Cfg = {
   phash_duplicate_distance: 6,
   single_reader_min_confidence: 0.97,
   max_low_confidence_fields: null,
+  fx_cross_currency_enabled: false,
+  fx_tolerance_bps: 300,
   tamper_enabled: true,
   tamper_review_score: 0.6,
   second_approver_above_minor: { USD: 50000 },
@@ -91,6 +93,11 @@ const RULES: Record<string, Rule> = {
       : typeof b === "number" && typeof a === "number" && a > b
         ? { severity: "warning", text: `Receipts may now have up to ${a} shaky fields before a person is asked.` }
         : null,
+  fx_cross_currency_enabled: (b, a) =>
+    a === true && b !== true
+      ? { severity: "warning", text: "Claims paid in a different currency from their invoice will now be explained at the official rate and sent to a person. Nothing is approved or allocated across currencies." }
+      : null,
+  fx_tolerance_bps: raised("warning", (n) => `A cross-currency payment may now be up to ${(n / 100).toFixed(1)}% away from the invoice at the official rate before it is flagged.`),
   tamper_enabled: turnedOff("danger", "Turns OFF image-tampering forensics. Edited receipts will no longer be flagged."),
   tamper_review_score: raised("warning", (n) => `Image tampering is flagged less often (threshold ${n}).`),
   second_approver_above_minor: capsRaised("warning", (c) => `A second approver is only required above a higher amount for ${c.join(", ")}.`),

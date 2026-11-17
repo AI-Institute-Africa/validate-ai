@@ -179,3 +179,16 @@ What admins receive:
 ## Alerts
 
 - `POPS_ALERT_REQUIRE_SIGNATURE` (default `false`): refuse unsigned alert requests. See `docs/alerts.md`.
+
+## Official exchange rate
+
+- `POPS_FX_ENABLED` (default `false`): fetch the RBZ ZWG/USD ask rate on weekdays. See `docs/fx-rates.md`.
+- `POPS_FX_FETCH_HOURS` (default `5-16`, UTC cron syntax): hours on weekdays the job tries until the file is found.
+- `POPS_FX_MAX_DAILY_MOVE_PCT` (default `25`): a rate further than this from the previous day is refused.
+
+## Models: no outside AI services
+
+- `POPS_OLLAMA_URL` now defaults to the self-hosted `http://ollama:11434`.
+- `POPS_AI_ALLOWED_HOSTS` (default empty): hosts a model call may reach in production besides private ones.
+  The service refuses to start if the model URL is outside this list, if `POPS_OLLAMA_API_KEY` is set, or if
+  the browser look-up backend is on without `POPS_LOOKUP_BROWSER_ALLOWED=true`. See `docs/models.md`.
