@@ -32,6 +32,11 @@ services:
   # malware scanning for every upload; first start downloads signatures (a few minutes)
   clamav:
     image: clamav/clamav:1.4
+    # camera RAW files can be 80 MB: clamd must be willing to scan that much in one go
+    environment:
+      CLAMD_CONF_StreamMaxLength: 100M
+      CLAMD_CONF_MaxFileSize: 100M
+      CLAMD_CONF_MaxScanSize: 200M
     volumes: [clamdb:/var/lib/clamav]
 
   api:

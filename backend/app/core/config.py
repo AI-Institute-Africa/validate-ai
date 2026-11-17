@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     s3_secret_key: str | None = None
 
     max_upload_bytes: int = 10 * 1024 * 1024
+    # camera RAW files are large by nature (20-80 MB); only they may exceed max_upload_bytes
+    max_raw_upload_bytes: int = 80 * 1024 * 1024
+    # everything one request may carry, so a few big files cannot exhaust memory
+    max_claim_upload_bytes: int = 120 * 1024 * 1024
 
     # malware scanning via clamd (INSTREAM). Required in prod.
     clamav_host: str | None = None

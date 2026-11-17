@@ -39,3 +39,6 @@ export const ACCEPT = ["image/*", ...EXTENSIONS.map((e) => `.${e}`), ...DOCUMENT
 
 /** Old binary Office files cannot be read safely: tell the payer what to do instead. */
 export const LEGACY_EXT = /\.(doc|xls|ppt)$/i;
+
+/** Camera RAW: the only files allowed to be larger than 10 MB. */
+export const RAW_EXT = /\.(dng|cr2|cr3|nef|arw|raf|orf|rw2)$/i;
