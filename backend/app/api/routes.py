@@ -51,7 +51,7 @@ from app.claims.service import explain, explain_keys
 from app.claims.states import OUTCOME, REVIEWABLE
 from app.core import observability as obs
 from app.core import ratelimit
-from app.core.audit import audit
+from app.core.audit import audit, audit_once
 from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.money import MoneyError, normalise_currency, parse_minor
@@ -59,10 +59,11 @@ from app.core.security import (
     Principal,
     Role,
     current_principal,
+    evidence_subject,
     issue_token,
     require,
+    require_audit_read,
     sign_evidence,
-    verify_evidence_signature,
 )
 from app.credits import bulk
 from app.credits.statements import ImportError_, import_statement, profiles
@@ -109,6 +110,7 @@ router = APIRouter()
 DB = Annotated[Session, Depends(get_session)]
 Any_ = Annotated[Principal, Depends(current_principal)]
 Reviewer = Annotated[Principal, Depends(require(Role.REVIEWER))]
+AuditRead = Annotated[Principal, Depends(require_audit_read)]
 Approver = Annotated[Principal, Depends(require_cleared(Role.APPROVER))]
 Admin = Annotated[Principal, Depends(require(Role.ADMIN))]
 
@@ -592,6 +594,10 @@ async def submit_claim(
     declared_amount: Annotated[str | None, Form()] = None,
     declared_currency: Annotated[str | None, Form()] = None,
     declared_reference: Annotated[str | None, Form()] = None,
+    # which privacy notice the payer saw before sending (recorded with the claim)
+    consent_version: Annotated[
+        str | None, Form(max_length=20, pattern=r"^[A-Za-z0-9._-]+$")
+    ] = None,
     # a retried upload (flaky connection) sends the same key and gets the same claim back
     idempotency_key: Annotated[str | None, Header(max_length=80)] = None,
 ) -> ClaimOut:
@@ -638,6 +644,7 @@ async def submit_claim(
             declared_reference=declared_reference,
             client_key=idempotency_key,
             request_fingerprint=fingerprint if idempotency_key else None,
+            consent_version=consent_version,
         )
     except RejectedFile as exc:
         obs.UPLOADS_REJECTED.labels(exc.code).inc()
@@ -738,11 +745,26 @@ def evidence_content(
     variant: str = Query("preview", pattern="^(preview|original|forensics)$"),
 ) -> Response:
     """Short-lived signed URL; usable from <img> tags without a bearer token."""
-    if not verify_evidence_signature(evidence_id, sig):
+    who = evidence_subject(evidence_id, sig)
+    if who is None:
         raise HTTPException(403, "link expired or invalid")
     ev = db.get(Evidence, evidence_id)
     if ev is None:
         raise HTTPException(404)
+    if ev.purged_at is not None:
+        raise HTTPException(410, "the file was removed under the retention policy")
+    if variant in ("original", "forensics"):
+        # the sensitive downloads are always recorded, with the person the link was issued to
+        audit(
+            db,
+            actor="user:" + who if who != "-" else "unbound-link",
+            action="evidence.fetched",
+            entity_type="evidence",
+            entity_id=evidence_id,
+            org_id=ev.org_id,
+            after={"variant": variant},
+        )
+        db.commit()
     if variant == "forensics" and ev.forensics_key:
         key, ctype = ev.forensics_key, "image/png"
     elif variant == "preview" and ev.preview_key:
@@ -1020,9 +1042,24 @@ def review_queue(
     return [claim_out(c, True) for c in db.scalars(q.order_by(Claim.created_at).limit(limit))]
 
 
+def _evidence_url(evidence_id: uuid.UUID, variant: str, p: Principal) -> str:
+    sig = sign_evidence(evidence_id, user_id=p.user_id)
+    return f"/evidence/{evidence_id}/content?variant={variant}&sig={sig}"
+
+
 @router.get("/review/claims/{claim_id}", response_model=ReviewDetailOut, tags=["review"])
-def review_detail(claim_id: uuid.UUID, db: DB, p: Reviewer) -> ReviewDetailOut:
+def review_detail(claim_id: uuid.UUID, db: DB, p: AuditRead) -> ReviewDetailOut:
     claim = _claim(db, p, claim_id)
+    # opening a case shows its evidence: record who looked (once per quarter hour per person)
+    if audit_once(
+        db,
+        actor=p.actor,
+        action="evidence.viewed",
+        entity_type="claim",
+        entity_id=claim_id,
+        org_id=p.org_id,
+    ):
+        db.commit()
     obligation = _obligation(db, p, claim.obligation_id)
     policy = load_policy(db, claim.org_id)
     facts, _ = build_facts(db, claim, obligation)
@@ -1080,13 +1117,10 @@ def review_detail(claim_id: uuid.UUID, db: DB, p: Reviewer) -> ReviewDetailOut:
                 sha256=e.sha256,
                 meta=e.meta,
                 received_at=e.received_at,
-                preview_url=f"/evidence/{e.evidence_id}/content?variant=preview&sig={sign_evidence(e.evidence_id)}",
-                original_url=f"/evidence/{e.evidence_id}/content?variant=original&sig={sign_evidence(e.evidence_id)}",
+                preview_url=_evidence_url(e.evidence_id, "preview", p),
+                original_url=_evidence_url(e.evidence_id, "original", p),
                 forensics_url=(
-                    f"/evidence/{e.evidence_id}/content?variant=forensics"
-                    f"&sig={sign_evidence(e.evidence_id)}"
-                    if e.forensics_key
-                    else None
+                    _evidence_url(e.evidence_id, "forensics", p) if e.forensics_key else None
                 ),
             )
             for e in evidence
@@ -1197,7 +1231,7 @@ def release_hold(claim_id: uuid.UUID, body: ReleaseHoldIn, db: DB, p: Reviewer) 
 
 
 @router.get("/review/claims/{claim_id}/runs", tags=["review"])
-def verification_runs(claim_id: uuid.UUID, db: DB, p: Reviewer) -> list[dict]:
+def verification_runs(claim_id: uuid.UUID, db: DB, p: AuditRead) -> list[dict]:
     """Every pipeline run for a claim, newest first: what ran, what it concluded, what failed."""
     claim = db.scalars(
         select(Claim).where(Claim.claim_id == claim_id, Claim.org_id == p.org_id)
@@ -1244,7 +1278,7 @@ def correct_field(claim_id: uuid.UUID, body: CorrectFieldIn, db: DB, p: Reviewer
 @router.get("/allocations/export", tags=["ledger"])
 def export_allocations(
     db: DB,
-    p: Reviewer,
+    p: AuditRead,
     since: date | None = None,
     until: date | None = None,
     kind: Annotated[str | None, Query(pattern="^(allocation|reversal)$")] = None,
@@ -1292,7 +1326,7 @@ def reverse_allocation(
 
 
 @router.get("/audit", tags=["audit"])
-def audit_trail(db: DB, p: Reviewer, entity_id: str, limit: int = Query(200, le=1000)) -> list:
+def audit_trail(db: DB, p: AuditRead, entity_id: str, limit: int = Query(200, le=1000)) -> list:
     rows = db.scalars(
         select(AuditEvent)
         .where(AuditEvent.org_id == p.org_id, AuditEvent.entity_id == entity_id)

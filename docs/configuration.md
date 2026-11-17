@@ -202,3 +202,16 @@ What admins receive:
   fingerprints (no images), what was read and corrected, money moved, the official rate used and the audit events.
   Each export is audited (`audit_packet.exported`). The console has a printable view at `/claims/{id}/packet`.
 - Training export of reviewer corrections: see `docs/training-data.md`.
+
+## Compliance
+
+- `POPS_DATA_REGION` (required in production): where this deployment's data is hosted. Shown on the Compliance
+  screen and in audit packets.
+- `POPS_DOCS_ENABLED` (default on in development, off in production): the interactive API pages.
+- Policy `evidence_retention_days`, `alert_body_retention_days` (default none = keep; minimum 30 days when set):
+  a daily job removes finished claims' files and raw alert text after the window and keeps the rows and
+  fingerprints.
+- Auditor role (`auditor`): read-only access to case records, the audit trail, audit packets and the allocation
+  export. Evidence links are issued to a person; opening a case and fetching an original are audited.
+- Incidents: `docs/breach-response.md`. Private deployment: `docs/private-deployment.md`.
+- Webhooks to the host system now carry `"v": 1` in the body.

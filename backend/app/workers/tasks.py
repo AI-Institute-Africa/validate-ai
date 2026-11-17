@@ -29,6 +29,11 @@ celery_app.conf.update(
             "task": "pops.kyc_purge_evidence",
             "schedule": crontab(hour=3, minute=30),
         },
+        "purge-payment-data": {
+            "task": "pops.purge_payment_data",
+            "schedule": crontab(hour=3, minute=45),
+        },
+        "incident-reminders": {"task": "pops.incident_reminders", "schedule": 600.0},
         "fx-fetch": {
             "task": "pops.fx_fetch",
             "schedule": crontab(
@@ -155,6 +160,22 @@ def kyc_purge_evidence_task() -> int:
 
     with session_scope() as session:
         return kyc_service.purge_evidence(session)
+
+
+@celery_app.task(name="pops.purge_payment_data")
+def purge_payment_data_task() -> dict[str, int]:
+    from app.compliance import retention
+
+    with session_scope() as session:
+        return retention.purge_payment_data(session)
+
+
+@celery_app.task(name="pops.incident_reminders")
+def incident_reminders_task() -> int:
+    from app.compliance import incidents
+
+    with session_scope() as session:
+        return incidents.send_reminders(session)
 
 
 @celery_app.task(name="pops.fx_fetch")

@@ -153,6 +153,7 @@ class Claim(Base):
     approval_tier: Mapped[str | None] = mapped_column(String(5))
     reason_codes: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     candidate_credit_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("credits.credit_id"))
+    consent_version: Mapped[str | None] = mapped_column(String(20))  # privacy notice the payer saw
     # fraud risk (app/fraud): a flag for humans, never an approval input
     risk_score: Mapped[int | None] = mapped_column(Integer)
     risk_level: Mapped[str | None] = mapped_column(String(10))
@@ -194,6 +195,7 @@ class Evidence(Base):
     claim_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("claims.claim_id"), nullable=False)
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organisations.org_id"), nullable=False)
     object_key: Mapped[str] = mapped_column(String(300), nullable=False)
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # files removed
     preview_key: Mapped[str | None] = mapped_column(String(300))  # rendered PNG for viewer
     forensics_key: Mapped[str | None] = mapped_column(String(300))  # ELA heatmap for admins
     content_type: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -652,6 +654,7 @@ class AlertMessage(Base):
     subject: Mapped[str | None] = mapped_column(String(300))
     body: Mapped[str] = mapped_column(Text, nullable=False)
     body_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # text removed
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # credited | duplicate | ignored | rejected | unparsed | conflict
     status: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -704,3 +707,33 @@ class FxFetchLog(Base):
     detail: Mapped[str | None] = mapped_column(Text)
     method: Mapped[str | None] = mapped_column(String(10))
     attempted_at: Mapped[datetime] = _created()
+
+
+class Incident(Base):
+    """A personal-data incident (for example a breach) and its reporting clock.
+
+    The reporting duty is 24 hours from detection according to the BRD (to be confirmed with
+    counsel): `due_at` is detection plus 24 hours, and reminders go to admins until it is reported.
+    """
+
+    __tablename__ = "incidents"
+    incident_id: Mapped[uuid.UUID] = _pk()
+    org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organisations.org_id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False)  # breach | near_miss | other
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    window_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    window_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="open")
+    reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    report_reference: Mapped[str | None] = mapped_column(String(200))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = _created()
+    __table_args__ = (
+        CheckConstraint("kind in ('breach','near_miss','other')", name="incident_kind"),
+        CheckConstraint("status in ('open','reported','closed')", name="incident_status"),
+        Index("ix_incidents_org_status", "org_id", "status"),
+    )

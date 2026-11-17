@@ -5,6 +5,7 @@ import { newKey } from "../lib/outbox";
 import { useClaimSender } from "../lib/useClaimSender";
 import { demoInfo, preparePayment, sampleFile } from "../demo";
 import { useI18n } from "../i18n";
+import { CONSENT_VERSION } from "../lib/consent";
 import { cropImage, NO_TRIM, rotateImage, shrinkImage, type Trim } from "../lib/imageEdit";
 import { Dialog } from "../components/Dialog";
 import { ACCEPT } from "../lib/fileTypes";
@@ -348,6 +349,7 @@ export default function Scan() {
         obligation_id: obligation!.obligation_id,
         claimant_ref: claimantRef.trim(),
         channel,
+        consent_version: CONSENT_VERSION,
       };
       if (pasted.trim()) fields.text = pasted.trim();
       if (declaredAmount.trim()) fields.declared_amount = declaredAmount.trim();
@@ -850,6 +852,7 @@ export default function Scan() {
               </p>
             )}
             <p className="muted small">{t("form.trust")}</p>
+            <p className="muted small">{t("consent.notice")}</p>
           </form>
         </div>
 

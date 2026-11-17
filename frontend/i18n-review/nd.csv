@@ -1,4 +1,5 @@
 "key","english","current_draft","status","note","reviewer_translation","approved"
+"consent.notice","We keep your proof, and the details on it, only as long as needed to check your payment, then remove the files. Only people who check payments can see them.","Sigcina ubufakazi bakho lemininingwane ekuyo isikhathi esidingekayo kuphela ukuze siqinisekise ukukhokha kwakho, bese sisusa amafayela. Abantu abahlola ukukhokha kuphela abangakubona.","draft","","",""
 "nav.scan","Scan","Skena","draft","","",""
 "nav.imageToText","Image to text","Isithombe sibe yibhalo","draft","","",""
 "nav.guardrails","Guardrails","Imithetho yokuvikela","draft","","",""

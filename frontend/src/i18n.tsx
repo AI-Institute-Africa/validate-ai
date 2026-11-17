@@ -19,6 +19,7 @@ function allowDrafts(): boolean {
 const KEY = "validate-lang";
 
 const SN: Record<string, string> = {
+  "consent.notice": "Tinochengeta uchapupu hwako nemashoko ari pauri kwenguva yakangodiwa kuti tinyatsoongorora kubhadhara kwako, tobva tadzima mafaera. Vanhu chete vanoongorora kubhadhara ndivo vanogona kuvaona.",
   "nav.scan": "Skena",
   "nav.imageToText": "Foto kuita zvinyorwa",
   "nav.guardrails": "Mitemo yekuchengetedza",
@@ -270,6 +271,7 @@ const SN: Record<string, string> = {
 };
 
 const ND: Record<string, string> = {
+  "consent.notice": "Sigcina ubufakazi bakho lemininingwane ekuyo isikhathi esidingekayo kuphela ukuze siqinisekise ukukhokha kwakho, bese sisusa amafayela. Abantu abahlola ukukhokha kuphela abangakubona.",
   "nav.scan": "Skena",
   "nav.imageToText": "Isithombe sibe yibhalo",
   "nav.guardrails": "Imithetho yokuvikela",
@@ -521,6 +523,7 @@ const ND: Record<string, string> = {
 };
 
 export const EN: Record<string, string> = {
+  "consent.notice": "We keep your proof, and the details on it, only as long as needed to check your payment, then remove the files. Only people who check payments can see them.",
   "nav.scan": "Scan",
   "nav.imageToText": "Image to text",
   "nav.guardrails": "Guardrails",

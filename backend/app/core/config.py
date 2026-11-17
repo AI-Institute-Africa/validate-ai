@@ -160,6 +160,12 @@ class Settings(BaseSettings):
     fx_fetch_hours: str = "5-16"
     fx_max_daily_move_pct: float = 25.0
 
+    # where this deployment's data lives, for audit packets and the compliance screen (for example
+    # "ZA-af-south-1" or "ZW-onprem"). Required in production: hosting is a deliberate choice.
+    data_region: str | None = None
+    # interactive API docs (/docs); default on in dev and off in production
+    docs_enabled: bool | None = None
+
     cors_origins: list[str] = ["http://localhost:5173"]
 
     # observability
@@ -170,6 +176,10 @@ class Settings(BaseSettings):
     @property
     def is_dev(self) -> bool:
         return self.env in ("dev", "test")
+
+    @property
+    def docs_on(self) -> bool:
+        return self.is_dev if self.docs_enabled is None else self.docs_enabled
 
 
 class ConfigError(RuntimeError):
@@ -213,6 +223,8 @@ def validate_for_startup(s: Settings) -> None:
         )
     if s.ollama_api_key:
         problems.append("POPS_OLLAMA_API_KEY must be empty: no hosted AI keys in production")
+    if not (s.data_region or "").strip():
+        problems.append("POPS_DATA_REGION must say where the data is hosted (e.g. ZA-af-south-1)")
     if s.kyc_face_backend in ("fake", "demo"):
         problems.append(f"POPS_KYC_FACE_BACKEND={s.kyc_face_backend} is for tests and demos only")
     if not s.clamav_host:

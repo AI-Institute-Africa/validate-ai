@@ -1,0 +1,42 @@
+# Private deployment: everything stays on servers you control. Use with the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.private.yml --profile local-vlm up -d
+#
+# What this changes: evidence goes to a self-hosted S3-compatible store (MinIO) instead of a shared
+# volume, the reader runs on the bundled Ollama (no outside AI service), and production-mode
+# settings are on. Set the values marked CHANGE in .env before starting. See docs/private-deployment.md.
+x-private: &private
+  environment:
+    POPS_ENV: prod
+    POPS_DATA_REGION: ${POPS_DATA_REGION:?set POPS_DATA_REGION, e.g. ZW-onprem}
+    POPS_STORAGE_BACKEND: s3
+    POPS_S3_ENDPOINT_URL: http://minio:9000
+    POPS_S3_BUCKET: pops-evidence
+    POPS_S3_ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+    POPS_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    POPS_OLLAMA_URL: http://ollama:11434
+    POPS_OLLAMA_API_KEY: ""
+    POPS_AI_ALLOWED_HOSTS: "[]"
+    POPS_DOCS_ENABLED: "false"
+
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    volumes: [minio:/data]
+
+  api:
+    <<: *private
+    depends_on: [minio]
+  worker:
+    <<: *private
+    depends_on: [minio]
+  beat:
+    <<: *private
+    depends_on: [minio]
+
+volumes:
+  minio:

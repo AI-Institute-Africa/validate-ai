@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import (
     Allocation,
     AuditEvent,
@@ -67,7 +68,9 @@ def build_packet(
             "risk_score": claim.risk_score,
             "risk_level": claim.risk_level,
             "created_at": claim.created_at.isoformat(),
+            "consent_version": claim.consent_version,
         },
+        "data_region": get_settings().data_region,
         "invoice": None
         if ob is None
         else {

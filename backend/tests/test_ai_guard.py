@@ -12,6 +12,7 @@ STRONG = "x" * 40
 def _prod(**over) -> Settings:
     base = dict(
         env="prod",
+        data_region="ZA-test",
         jwt_secret=STRONG,
         clamav_host="clamav",
         pipeline_mode="celery",

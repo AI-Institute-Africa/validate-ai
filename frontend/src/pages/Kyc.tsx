@@ -119,6 +119,7 @@ export default function Kyc() {
         title={t("kyc.title")}
         sub={t("kyc.sub")}
       />
+      <p className="muted small">{t("consent.notice")}</p>
       <div className="grid cols-2" style={{ alignItems: "start" }}>
         <div className="card">
           {demo && (

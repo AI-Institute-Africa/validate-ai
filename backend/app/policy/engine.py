@@ -142,6 +142,9 @@ class PolicyConfig(BaseModel):
         default=4, ge=0, le=14
     )  # longest a carried-forward rate may be
 
+    # retention for payment evidence files and raw alert text (None = keep); see app/compliance
+    evidence_retention_days: int | None = Field(default=None, ge=30, le=3650)
+    alert_body_retention_days: int | None = Field(default=None, ge=30, le=3650)
     # pilot scorecard: minutes of staff time one manual check is assumed to cost (BRD: about 2)
     pilot_minutes_per_manual_check: int = Field(default=2, ge=0, le=120)
     # reviewer corrections may be exported as training labels only with consent on record

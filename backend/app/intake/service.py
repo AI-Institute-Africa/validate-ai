@@ -97,6 +97,7 @@ def create_claim(
     source_type: str = "upload",
     client_key: str | None = None,
     request_fingerprint: str | None = None,
+    consent_version: str | None = None,
 ) -> Claim:
     claim = Claim(
         claim_id=uuid.uuid4(),
@@ -112,6 +113,7 @@ def create_claim(
         reason_codes=[],
         client_key=client_key,
         request_fingerprint=request_fingerprint,
+        consent_version=consent_version,
     )
     session.add(claim)
     session.flush()

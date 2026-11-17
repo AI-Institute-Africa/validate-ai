@@ -14,12 +14,12 @@ from app.analytics import training
 from app.analytics.pilot import pilot_scorecard
 from app.core.audit import audit
 from app.core.db import get_session
-from app.core.security import Principal, Role, require
+from app.core.security import Principal, Role, require, require_audit_read
 from app.policy.engine import load_policy
 
 router = APIRouter(tags=["pilot and audit"])
 DB = Annotated[Session, Depends(get_session)]
-Reviewer = Annotated[Principal, Depends(require(Role.REVIEWER))]
+AuditRead = Annotated[Principal, Depends(require_audit_read)]
 Admin = Annotated[Principal, Depends(require(Role.ADMIN))]
 
 
@@ -34,7 +34,7 @@ def scorecard(db: DB, p: Admin, start: date | None = None, end: date | None = No
 
 
 @router.get("/review/claims/{claim_id}/audit-packet")
-def audit_packet(claim_id: uuid.UUID, db: DB, p: Reviewer) -> dict:
+def audit_packet(claim_id: uuid.UUID, db: DB, p: AuditRead) -> dict:
     """How one claim was decided, for an auditor: no images, only fingerprints and records."""
     data = packet_mod.build_packet(db, p.org_id, claim_id, p.actor)
     if data is None:
