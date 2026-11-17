@@ -3,6 +3,7 @@
 import email
 import email.policy
 import hashlib
+import html.parser
 import io
 import re
 import zipfile
@@ -10,9 +11,17 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import imagehash
-from PIL import ExifTags, Image, ImageDraw, ImageFont, ImageOps
+from PIL import ExifTags, Image, ImageDraw, ImageFont, ImageOps, ImageSequence
 
 Image.MAX_IMAGE_PIXELS = 40_000_000  # decompression-bomb guard
+
+_AVIF = False
+try:
+    from PIL import features as _features
+
+    _AVIF = bool(_features.check("avif"))
+except Exception:  # pragma: no cover  # noqa: BLE001
+    _AVIF = False
 
 try:  # iPhone photos (HEIC/HEIF)
     from pillow_heif import register_heif_opener
@@ -33,6 +42,33 @@ _EMAIL_HEADER = re.compile(
     re.M | re.I,
 )
 _HEIF_BRANDS = {b"heic", b"heix", b"hevc", b"heim", b"heis", b"mif1", b"msf1"}
+_AVIF_BRANDS = {b"avif", b"avis"}
+
+# more everyday formats. Spreadsheets, slides, OpenDocument, e-books, RTF and HTML are read as
+# text (and any pictures inside them); none is ever executed or shown by a browser engine.
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+ODT = "application/vnd.oasis.opendocument.text"
+ODS = "application/vnd.oasis.opendocument.spreadsheet"
+ODP = "application/vnd.oasis.opendocument.presentation"
+EPUB = "application/epub+zip"
+RTF = "application/rtf"
+HTML = "text/html"
+SVG = "image/svg+xml"
+# types whose "image" is drawn from text or vectors: pixel forensics mean nothing for them
+RENDERED_TYPES = {TEXT, EML, HTML, RTF, XLSX, PPTX, ODT, ODS, ODP, EPUB, SVG}
+# easy to type up or edit: a bank or mobile-money app does not issue its receipts like this
+# a browser would run these if it opened them, so the original is only ever served as a download
+ACTIVE_CONTENT_TYPES = {HTML, SVG, RTF, EPUB}
+EDITABLE_TYPES = {DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, HTML, EPUB}
+_OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # old binary Word / Excel / PowerPoint
+MAX_TEXT_KEPT = 200_000  # characters of document text kept for the readers
+_OFFICE_ZIP = {
+    "word/document.xml": DOCX,
+    "xl/workbook.xml": XLSX,
+    "ppt/presentation.xml": PPTX,
+}
+_MIMETYPES = {ODT, ODS, ODP, EPUB}
 
 # Magic numbers: we trust file signatures, never the client's content type or extension.
 SIGNATURES: list[tuple[bytes, str]] = [
@@ -56,15 +92,45 @@ def sniff(data: bytes) -> str:
         return "image/webp"
     if data[4:8] == b"ftyp" and data[8:12] in _HEIF_BRANDS and HEIF:
         return "image/heic"
+    if data[4:8] == b"ftyp" and data[8:12] in _AVIF_BRANDS and _AVIF:
+        return "image/avif"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if data[:2] == b"BM" and len(data) > 26 and data[6:10] == b"\x00\x00\x00\x00":
+        return "image/bmp"
+    if data[:4] in (b"II*\x00", b"MM\x00*"):
+        return "image/tiff"
+    if data.startswith(_OLE_MAGIC):
+        raise RejectedFile(
+            "LEGACY_OFFICE",
+            "old .doc, .xls and .ppt files cannot be read safely: save it as PDF or as "
+            ".docx / .xlsx / .pptx and send that",
+        )
+    if data.startswith(b"{\\rtf"):
+        return RTF
     if data.startswith(b"PK\x03\x04"):
         try:
-            names = set(zipfile.ZipFile(io.BytesIO(data)).namelist())
-        except zipfile.BadZipFile as exc:
+            zf = zipfile.ZipFile(io.BytesIO(data))
+            names = set(zf.namelist())
+            mimetype = (
+                zf.read("mimetype").decode(errors="ignore").strip() if "mimetype" in names else ""
+            )
+        except (zipfile.BadZipFile, KeyError, RuntimeError) as exc:
             raise RejectedFile("CORRUPT_FILE", "the document could not be opened") from exc
-        if "word/document.xml" in names:
-            return DOCX
+        for marker, ctype in _OFFICE_ZIP.items():
+            if marker in names:
+                return ctype
+        if mimetype in _MIMETYPES:
+            return mimetype
     if b"\x00" not in data[:4096]:
         head = data[:4096]
+        low = head.lstrip().lower()
+        if b"<svg" in low[:2048] and (
+            low.startswith(b"<?xml") or low.startswith(b"<svg") or low.startswith(b"<!doctype svg")
+        ):
+            return SVG
+        if low.startswith(b"<!doctype html") or low.startswith(b"<html") or b"<html" in low[:1024]:
+            return HTML
         if len(_EMAIL_HEADER.findall(head)) >= 3 and re.search(rb"^From:", head, re.M | re.I):
             return EML
         try:
@@ -76,8 +142,9 @@ def sniff(data: bytes) -> str:
             return TEXT
     raise RejectedFile(
         "UNSUPPORTED_TYPE",
-        "accepted evidence: PNG, JPEG, WEBP, HEIC photos, PDF, Word (.docx), forwarded emails "
-        "(.eml) and pasted text",
+        "accepted evidence: photos and scans (PNG, JPEG, WEBP, HEIC, AVIF, GIF, BMP, TIFF, "
+        "SVG), PDF, Word, Excel and PowerPoint (.docx, .xlsx, .pptx), OpenDocument, RTF, HTML, "
+        "e-books (.epub), forwarded emails (.eml) and pasted text",
     )
 
 
@@ -349,6 +416,383 @@ def _jpeg_quality(img: Image.Image) -> int | None:
     return max(1, min(100, round(quality)))
 
 
+# ---- everyday documents beyond Word: spreadsheets, slides, OpenDocument, e-books, RTF, HTML, SVG
+
+_MAX_ROWS = 300  # per sheet / table
+_MAX_SHEETS = 6
+
+
+def _xml(data: bytes):
+    """Parse untrusted XML with entities, DTDs and the network switched off."""
+    from lxml import etree
+
+    parser = etree.XMLParser(
+        resolve_entities=False,
+        no_network=True,
+        load_dtd=False,
+        dtd_validation=False,
+        huge_tree=False,
+    )
+    try:
+        return etree.fromstring(data, parser)
+    except etree.XMLSyntaxError as exc:
+        raise RejectedFile("CORRUPT_FILE", "the document could not be read") from exc
+
+
+def _local(el) -> str:
+    return el.tag.rsplit("}", 1)[-1] if isinstance(el.tag, str) else ""
+
+
+def _safe_zip(data: bytes) -> tuple[zipfile.ZipFile, set[str]]:
+    zf = zipfile.ZipFile(io.BytesIO(data))
+    infos = zf.infolist()
+    if len(infos) > 2000 or sum(i.file_size for i in infos) > 60 * 1024 * 1024:
+        raise RejectedFile("CORRUPT_FILE", "the document is too large when unpacked")
+    names = {i.filename for i in infos}
+    if any(n.lower().endswith("vbaproject.bin") for n in names):
+        raise RejectedFile("MACRO_DOCUMENT", "documents with macros are not accepted")
+    if "[Content_Types].xml" in names and "macroEnabled" in zf.read("[Content_Types].xml").decode(
+        errors="replace"
+    ):
+        raise RejectedFile("MACRO_DOCUMENT", "documents with macros are not accepted")
+    return zf, names
+
+
+def _zip_images(
+    zf: zipfile.ZipFile, names: set[str], prefixes: tuple[str, ...]
+) -> list[Image.Image]:
+    images: list[Image.Image] = []
+    for name in sorted(n for n in names if n.startswith(prefixes)):
+        if len(images) >= MAX_PAGES - 1:
+            break
+        try:
+            img = Image.open(io.BytesIO(zf.read(name)))
+            img.load()
+            if min(img.size) >= 100:  # skip logos and icons
+                images.append(ImageOps.exif_transpose(img).convert("RGB"))
+        except Exception:  # noqa: BLE001, S112 - EMF/WMF and odd formats are skipped
+            continue
+    return images
+
+
+def _core_props(zf: zipfile.ZipFile, names: set[str]) -> dict[str, Any]:
+    """Who made and last saved an Office file, and when (docProps/core.xml)."""
+    if "docProps/core.xml" not in names:
+        return {}
+    try:
+        root = _xml(zf.read("docProps/core.xml"))
+    except RejectedFile:
+        return {}
+    wanted = {
+        "creator": "author",
+        "lastModifiedBy": "last_modified_by",
+        "created": "created",
+        "modified": "modified",
+    }
+    out = {}
+    for el in root.iter():
+        name = _local(el)
+        if name in wanted and el.text and el.text.strip():
+            out[wanted[name]] = el.text.strip()[:100]
+    return out
+
+
+def _doc_result(
+    text: str, images: list[Image.Image], meta: dict[str, Any], what: str
+) -> tuple[list[Image.Image], list[str], dict[str, Any]]:
+    text = text.strip()[:MAX_TEXT_KEPT]
+    pages = ([_render_text(text)] if text else []) + images
+    texts = ([text] if text else []) + [""] * len(images)
+    if not pages:
+        raise RejectedFile("UNREADABLE_DOCUMENT", f"the {what} has no text or images to read")
+    meta["embedded_images"] = len(images)
+    return pages, texts, meta
+
+
+def _read_xlsx(data: bytes) -> tuple[list[Image.Image], list[str], dict[str, Any]]:
+    zf, names = _safe_zip(data)
+    shared: list[str] = []
+    if "xl/sharedStrings.xml" in names:
+        for si in _xml(zf.read("xl/sharedStrings.xml")):
+            shared.append("".join(x.text or "" for x in si.iter() if _local(x) == "t"))
+    lines: list[str] = []
+    sheets = sorted(
+        (n for n in names if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n)),
+        key=lambda n: int(re.findall(r"\d+", n)[-1]),
+    )
+    for name in sheets[:_MAX_SHEETS]:
+        rows = 0
+        for row in _xml(zf.read(name)).iter():
+            if _local(row) != "row":
+                continue
+            cells = []
+            for c in row:
+                if _local(c) != "c":
+                    continue
+                kind = c.get("t")
+                val = ""
+                for child in c:
+                    if _local(child) == "v" and child.text is not None:
+                        val = child.text
+                    elif _local(child) == "is":
+                        val = "".join(x.text or "" for x in child.iter() if _local(x) == "t")
+                if kind == "s" and val.isdigit() and int(val) < len(shared):
+                    val = shared[int(val)]
+                if val.strip():
+                    cells.append(val.strip())
+            if cells:
+                lines.append(" | ".join(cells))
+                rows += 1
+                if rows >= _MAX_ROWS:
+                    break
+    meta = {"office": {"format": "xlsx", "sheets": len(sheets), **_core_props(zf, names)}}
+    return _doc_result(
+        "\n".join(lines), _zip_images(zf, names, ("xl/media/",)), meta, "spreadsheet"
+    )
+
+
+def _read_pptx(data: bytes) -> tuple[list[Image.Image], list[str], dict[str, Any]]:
+    zf, names = _safe_zip(data)
+    slides = sorted(
+        (n for n in names if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)),
+        key=lambda n: int(re.findall(r"\d+", n)[-1]),
+    )
+    lines: list[str] = []
+    for name in slides[: MAX_PAGES * 3]:
+        parts = [
+            x.text.strip()
+            for x in _xml(zf.read(name)).iter()
+            if _local(x) == "t" and x.text and x.text.strip()
+        ]
+        if parts:
+            lines.append(" | ".join(parts))
+    meta = {"office": {"format": "pptx", "slides": len(slides), **_core_props(zf, names)}}
+    return _doc_result(
+        "\n".join(lines), _zip_images(zf, names, ("ppt/media/",)), meta, "presentation"
+    )
+
+
+def _odf_lines(root) -> list[str]:
+    lines: list[str] = []
+    for el in root.iter():
+        name = _local(el)
+        if name in ("p", "h") and not any(_local(a) == "table-cell" for a in el.iterancestors()):
+            line = " ".join("".join(el.itertext()).split())
+            if line:
+                lines.append(line)
+        elif name == "table-row":
+            cells = [
+                " ".join("".join(c.itertext()).split()) for c in el if _local(c) == "table-cell"
+            ]
+            cells = [c for c in cells if c]
+            if cells:
+                lines.append(" | ".join(cells))
+    return lines[: _MAX_ROWS * _MAX_SHEETS]
+
+
+def _read_odf(data: bytes, fmt: str) -> tuple[list[Image.Image], list[str], dict[str, Any]]:
+    zf, names = _safe_zip(data)
+    if "content.xml" not in names:
+        raise RejectedFile("CORRUPT_FILE", "the document could not be read")
+    lines = _odf_lines(_xml(zf.read("content.xml")))
+    meta: dict[str, Any] = {"office": {"format": fmt}}
+    if "meta.xml" in names:
+        try:
+            for el in _xml(zf.read("meta.xml")).iter():
+                key = {
+                    "initial-creator": "author",
+                    "creator": "last_modified_by",
+                    "creation-date": "created",
+                    "date": "modified",
+                }.get(_local(el))
+                if key and el.text:
+                    meta["office"][key] = el.text.strip()[:100]
+        except RejectedFile:
+            pass
+    return _doc_result("\n".join(lines), _zip_images(zf, names, ("Pictures/",)), meta, "document")
+
+
+class _TextOf(html.parser.HTMLParser):
+    """Visible text of an HTML page. Scripts, styles and comments are dropped; nothing is run."""
+
+    BLOCK = {
+        "p",
+        "div",
+        "br",
+        "tr",
+        "li",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "table",
+        "section",
+        "article",
+        "td",
+        "th",
+    }
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.out: list[str] = []
+        self.skip = 0
+        self.title = ""
+        self._in_title = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "noscript", "template", "head"):
+            self.skip += 1
+        if tag == "title":
+            self._in_title = True
+        if tag in self.BLOCK:
+            self.out.append("\n" if tag != "td" and tag != "th" else " | ")
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "noscript", "template", "head") and self.skip:
+            self.skip -= 1
+        if tag == "title":
+            self._in_title = False
+        if tag in self.BLOCK:
+            self.out.append("\n")
+
+    def handle_data(self, data):
+        if self._in_title:
+            self.title += data
+        elif not self.skip:
+            self.out.append(data)
+
+
+def _html_text(raw: str) -> tuple[str, str]:
+    parser = _TextOf()
+    parser.feed(raw[:2_000_000])
+    parser.close()
+    text = "\n".join(" ".join(line.split()) for line in "".join(parser.out).splitlines())
+    text = "\n".join(line for line in text.splitlines() if line.strip(" |"))
+    return text, " ".join(parser.title.split())[:200]
+
+
+def _read_html(data: bytes) -> tuple[list[Image.Image], list[str], dict[str, Any]]:
+    text, title = _html_text(data.decode("utf-8", errors="replace"))
+    meta = {"office": {"format": "html", **({"title": title} if title else {})}}
+    return _doc_result(text, [], meta, "web page")
+
+
+def _read_epub(data: bytes) -> tuple[list[Image.Image], list[str], dict[str, Any]]:
+    zf, names = _safe_zip(data)
+    chapters = sorted(n for n in names if n.lower().endswith((".xhtml", ".html", ".htm")))
+    parts = []
+    for name in chapters[:30]:
+        text, _ = _html_text(zf.read(name).decode("utf-8", errors="replace"))
+        if text:
+            parts.append(text)
+        if sum(map(len, parts)) > MAX_TEXT_KEPT:
+            break
+    meta = {"office": {"format": "epub", "chapters": len(chapters)}}
+    return _doc_result("\n\n".join(parts), [], meta, "e-book")
+
+
+_RTF_SKIP = {
+    "fonttbl",
+    "colortbl",
+    "stylesheet",
+    "info",
+    "pict",
+    "header",
+    "footer",
+    "themedata",
+    "colorschememapping",
+    "datastore",
+    "latentstyles",
+    "listtable",
+    "listoverridetable",
+    "rsidtbl",
+    "generator",
+}
+
+
+def _rtf_text(raw: str) -> str:
+    """Plain text of an RTF file, by walking its groups. Hidden parts and pictures are skipped."""
+    out: list[str] = []
+    skip_depth: list[bool] = []
+    i, n = 0, len(raw)
+    while i < n:
+        ch = raw[i]
+        if ch == "{":
+            nxt = raw[i + 1 : i + 40]
+            m = re.match(r"\\\*|\\([a-z]+)", nxt)
+            hidden = bool(m and (m.group(0) == "\\*" or m.group(1) in _RTF_SKIP))
+            skip_depth.append(hidden or (bool(skip_depth) and skip_depth[-1]))
+            i += 1
+        elif ch == "}":
+            if skip_depth:
+                skip_depth.pop()
+            i += 1
+        elif ch == "\\":
+            m = re.match(r"\\([a-zA-Z]+)(-?\d+)? ?", raw[i:])
+            if m:
+                word = m.group(1)
+                if not (skip_depth and skip_depth[-1]):
+                    if word in ("par", "line", "row", "sect"):
+                        out.append("\n")
+                    elif word == "tab" or word == "cell":
+                        out.append(" | " if word == "cell" else "\t")
+                i += m.end()
+            elif raw[i + 1 : i + 2] == "'" and re.match(r"[0-9a-fA-F]{2}", raw[i + 2 : i + 4]):
+                if not (skip_depth and skip_depth[-1]):
+                    out.append(
+                        bytes([int(raw[i + 2 : i + 4], 16)]).decode("cp1252", errors="replace")
+                    )
+                i += 4
+            else:
+                if raw[i + 1 : i + 2] in ("\\", "{", "}") and not (skip_depth and skip_depth[-1]):
+                    out.append(raw[i + 1])
+                i += 2
+        else:
+            if not (skip_depth and skip_depth[-1]) and ch not in "\r\n":
+                out.append(ch)
+            i += 1
+    text = "".join(out)
+    return "\n".join(" ".join(line.split()) for line in text.splitlines() if line.strip())
+
+
+def _read_rtf(data: bytes) -> tuple[list[Image.Image], list[str], dict[str, Any]]:
+    return _doc_result(
+        _rtf_text(data.decode("latin-1")), [], {"office": {"format": "rtf"}}, "document"
+    )
+
+
+def _render_svg(data: bytes) -> tuple[list[Image.Image], list[str], dict[str, Any]]:
+    """An SVG drawn to pixels by MuPDF. It runs no scripts and fetches nothing."""
+    import pymupdf
+
+    try:
+        doc = pymupdf.open(stream=data, filetype="svg")
+        page = doc.load_page(0)
+        longest = max(page.rect.width, page.rect.height, 1)
+        zoom = min(4.0, 2000 / longest)
+        pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
+        img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
+        text = page.get_text().strip()
+    except Exception as exc:  # noqa: BLE001
+        raise RejectedFile("CORRUPT_FILE", "the SVG could not be drawn") from exc
+    return [img], [text], {"svg": {"has_text": bool(text)}}
+
+
+def _frames(img: Image.Image) -> list[Image.Image]:
+    """Every page of a TIFF scan (up to MAX_PAGES), or the first frame of a GIF."""
+    n = getattr(img, "n_frames", 1)
+    if img.format != "TIFF" or n <= 1:
+        return [img]
+    out = []
+    for frame in ImageSequence.Iterator(img):
+        out.append(frame.copy())
+        if len(out) >= MAX_PAGES:
+            break
+    return out
+
+
 def prepare(data: bytes, max_bytes: int) -> PreparedFile:
     if len(data) == 0:
         raise RejectedFile("EMPTY_FILE", "the file is empty")
@@ -362,6 +806,20 @@ def prepare(data: bytes, max_bytes: int) -> PreparedFile:
         pages, texts, meta = _render_pdf(data)
     elif ctype == DOCX:
         pages, texts, meta = _read_docx(data)
+    elif ctype == XLSX:
+        pages, texts, meta = _read_xlsx(data)
+    elif ctype == PPTX:
+        pages, texts, meta = _read_pptx(data)
+    elif ctype in (ODT, ODS, ODP):
+        pages, texts, meta = _read_odf(data, {ODT: "odt", ODS: "ods", ODP: "odp"}[ctype])
+    elif ctype == EPUB:
+        pages, texts, meta = _read_epub(data)
+    elif ctype == RTF:
+        pages, texts, meta = _read_rtf(data)
+    elif ctype == HTML:
+        pages, texts, meta = _read_html(data)
+    elif ctype == SVG:
+        pages, texts, meta = _render_svg(data)
     elif ctype == TEXT:
         text = data.decode("utf-8-sig").strip()
         pages, texts, meta = [_render_text(text)], [text], {"pasted_text": {"chars": len(text)}}
@@ -381,7 +839,12 @@ def prepare(data: bytes, max_bytes: int) -> PreparedFile:
             meta["image_text"] = text_chunks
         if ctype == "image/jpeg":
             meta["jpeg_quality"] = _jpeg_quality(img)
-        pages = [ImageOps.exif_transpose(img).convert("RGB")]
+        frames = _frames(img)
+        if ctype == "image/gif" and getattr(img, "is_animated", False):
+            meta["animated_frames"] = getattr(
+                img, "n_frames", 1
+            )  # a still is read: the first frame
+        pages = [ImageOps.exif_transpose(f).convert("RGB") for f in frames]
     first = pages[0]
     meta["width"], meta["height"] = first.size
     meta["pages"] = len(pages)

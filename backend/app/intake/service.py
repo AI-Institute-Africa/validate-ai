@@ -7,6 +7,7 @@ from app.claims.service import transition
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.security import Principal
+from app.intake import files
 from app.intake.files import DOCX, EML, TEXT, RejectedFile, phash_to_int, prepare
 from app.intake.scan import InfectedFile, scan
 from app.intake.storage import get_storage
@@ -38,8 +39,21 @@ def store_evidence(
         "image/jpeg": "jpg",
         "image/webp": "webp",
         "image/heic": "heic",
+        "image/avif": "avif",
+        "image/gif": "gif",
+        "image/bmp": "bmp",
+        "image/tiff": "tiff",
+        "image/svg+xml": "svg",
         "application/pdf": "pdf",
         DOCX: "docx",
+        files.XLSX: "xlsx",
+        files.PPTX: "pptx",
+        files.ODT: "odt",
+        files.ODS: "ods",
+        files.ODP: "odp",
+        files.EPUB: "epub",
+        files.RTF: "rtf",
+        files.HTML: "html",
         TEXT: "txt",
         EML: "eml",
     }[prepared.content_type]

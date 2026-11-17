@@ -26,7 +26,7 @@ from app.extraction.service import ExtractionResult, build_readers, extract
 from app.fraud import risk
 from app.fraud.forensics import ela
 from app.guardrails.rules import active_rules, evaluate_fields, plan_readers
-from app.intake.files import EML, TEXT, prepare
+from app.intake.files import RENDERED_TYPES, prepare
 from app.intake.service import submission_evidence
 from app.intake.storage import get_storage
 from app.models import (
@@ -381,7 +381,7 @@ def process_claim(
 
 
 # rendered by us from text, not captured by a camera: pixel forensics would mean nothing
-_RENDERED = {TEXT, EML}
+_RENDERED = RENDERED_TYPES  # pages drawn from text or vectors: no pixel forensics
 _CONFLICT_FIELDS = ("amount", "currency", "transaction_id", "date")
 
 

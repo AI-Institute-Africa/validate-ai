@@ -1,3 +1,5 @@
+import { ALLOWED_EXT, ALLOWED_TYPES, LEGACY_EXT } from "./fileTypes";
+
 // Client-side pre-flight for proof uploads. The server enforces the same limits; this only
 // saves a round trip. Limits mirror docs/configuration.md.
 
@@ -5,16 +7,6 @@ export const MAX_FILES = 5;
 export const MAX_BYTES = 10 * 1024 * 1024;
 export const MAX_TEXT = 20_000;
 
-const ALLOWED_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
-const ALLOWED_EXT = /\.(png|jpe?g|webp|heic|heif|pdf|docx)$/i;
 
 export type FileLike = { name: string; size: number; type: string };
 
@@ -38,8 +30,12 @@ export function validateFiles<T extends FileLike>(existing: T[], incoming: T[], 
   const files = [...existing];
   for (const f of incoming) {
     if (seen.has(fileKey(f))) continue;
+    if (LEGACY_EXT.test(f.name)) {
+      fail(`${f.name}: old .doc, .xls and .ppt files cannot be read safely. Save it as a PDF or as .docx, .xlsx, .pptx and send that.`, "file.err.legacy", { name: f.name });
+      continue;
+    }
     if (!ALLOWED_TYPES.has(f.type) && !ALLOWED_EXT.test(f.name)) {
-      fail(`${f.name}: this file type is not supported. Use a photo, PDF or Word file.`, "file.err.type", { name: f.name });
+      fail(`${f.name}: this file type is not supported. Use a photo, scan, PDF, Word, Excel or PowerPoint file, an email, or plain text.`, "file.err.type", { name: f.name });
       continue;
     }
     if (f.size > MAX_BYTES) {

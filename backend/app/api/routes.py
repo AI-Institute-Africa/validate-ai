@@ -71,7 +71,7 @@ from app.extraction.service import build_readers, extract
 from app.extraction.transcription import TranscriptionUnavailable
 from app.extraction.transcription import transcribe as transcribe_file
 from app.guardrails.rules import active_rules, plan_readers
-from app.intake.files import RejectedFile, prepare
+from app.intake.files import ACTIVE_CONTENT_TYPES, RejectedFile, prepare
 from app.intake.scan import InfectedFile, ScannerUnavailable, scan
 from app.intake.service import create_claim, resubmit
 from app.intake.storage import get_storage
@@ -749,15 +749,16 @@ def evidence_content(
         key, ctype = ev.preview_key, "image/png"
     else:
         key, ctype = ev.object_key, ev.content_type
-    return Response(
-        get_storage().get(key),
-        media_type=ctype,
-        headers={
-            "Cache-Control": "private, max-age=60",
-            "X-Content-Type-Options": "nosniff",
-            "Content-Security-Policy": "default-src 'none'",
-        },
-    )
+    headers = {
+        "Cache-Control": "private, max-age=60",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'",
+    }
+    if ctype in ACTIVE_CONTENT_TYPES:
+        # a web page or vector file from a stranger is never shown by the browser: it is downloaded
+        ctype = "application/octet-stream"
+        headers["Content-Disposition"] = "attachment"
+    return Response(get_storage().get(key), media_type=ctype, headers=headers)
 
 
 # --- credits ----------------------------------------------------------------------------------

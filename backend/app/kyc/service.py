@@ -40,7 +40,15 @@ log = logging.getLogger(__name__)
 
 ROLES = ("front", "back", "selfie")
 REQUIRED_ROLES = ("front", "selfie")
-IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/heic": "heic"}
+IMAGE_TYPES = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "image/heic": "heic",
+    "image/avif": "avif",
+    "image/bmp": "bmp",
+    "image/tiff": "tiff",
+}
 PIPELINE_ACTOR = "rule:kyc-pipeline"
 # capture problems the subject can fix by retaking the photo
 RETAKE = {
@@ -210,7 +218,8 @@ def create_verification(
         ext = IMAGE_TYPES.get(prepared.content_type)
         if ext is None:
             raise RejectedFile(
-                "IMAGE_REQUIRED", "identity documents must be photos (PNG/JPEG/WEBP/HEIC)"
+                "IMAGE_REQUIRED",
+                "identity documents must be photos (PNG, JPEG, WEBP, HEIC, AVIF, BMP or TIFF)",
             )
         key = f"kyc/{p.org_id}/{kyc.kyc_id}/{role}.{ext}"
         storage.put(key, data, prepared.content_type)

@@ -7,6 +7,7 @@ import { demoInfo, preparePayment, sampleFile } from "../demo";
 import { useI18n } from "../i18n";
 import { cropImage, NO_TRIM, rotateImage, shrinkImage, type Trim } from "../lib/imageEdit";
 import { Dialog } from "../components/Dialog";
+import { ACCEPT } from "../lib/fileTypes";
 import { validateFiles } from "../lib/validateFiles";
 import { Link } from "react-router-dom";
 import { useToast } from "../toast";
@@ -707,7 +708,7 @@ export default function Scan() {
               ref={uploadRef}
               type="file"
               multiple
-              accept="image/*,.heic,.heif,application/pdf,.docx,.eml,message/rfc822,.txt,text/plain"
+              accept={ACCEPT}
               hidden
               onChange={(e) => {
                 const replace = replaceUploadRef.current;
