@@ -268,6 +268,7 @@ const SN: Record<string, string> = {
   "msg.NO_CREDIT_FOUND": "Hatisati taona kubhadhara uku mumarekodhi edu ebhengi.",
   "msg.DOCUMENT_TRUNCATED": "Gwaro rako rakareba; chikwata chedu chemari chichatarisa mapeji asara.",
   "msg.PROVISIONAL": "Mvumo yakavhurika kusvika {until} UTC tichiri kusimbisa kubhadhara kwako.",
+  "msg.PAYEE_MISMATCH": "Munhu anogamuchira parisiti yako haaenderani neakaundi yedu. Tarisa kuti wakabhadhara kuakaundi chaiyo.",
 };
 
 const ND: Record<string, string> = {
@@ -520,6 +521,7 @@ const ND: Record<string, string> = {
   "msg.NO_CREDIT_FOUND": "Asikakuboni lokhu kukhokha kumarekhodi ethu ebhanki.",
   "msg.DOCUMENT_TRUNCATED": "Incwadi yakho ende; iqembu lethu lezimali lizahlola amakhasi asele.",
   "msg.PROVISIONAL": "Imvume ivuliwe kuze kube ngu-{until} UTC siqinisekisa ukukhokha kwakho.",
+  "msg.PAYEE_MISMATCH": "Ogunyaziweyo kurisithi yakho akavumelani le-akhawunti yethu. Sicela uhlole ukuthi ukhokhele ku-akhawunti efanele.",
 };
 
 export const EN: Record<string, string> = {
@@ -775,6 +777,7 @@ export const EN: Record<string, string> = {
   "msg.NO_CREDIT_FOUND": "We have not yet seen this payment in our bank records.",
   "msg.DOCUMENT_TRUNCATED": "Your document is long; our finance team will check the remaining pages.",
   "msg.PROVISIONAL": "Access is open until {until} UTC while we confirm your payment.",
+  "msg.PAYEE_MISMATCH": "The recipient on your receipt does not match our account. Please check that you paid the right account.",
 };
 
 export const DICTS: Record<Lang, Record<string, string>> = { en: EN, sn: SN, nd: ND };

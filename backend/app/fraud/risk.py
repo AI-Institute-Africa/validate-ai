@@ -20,6 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.orm import Session
 
+from app.claims.payees import same_payee
 from app.core import observability as obs
 from app.core.audit import audit
 from app.extraction import templates
@@ -34,6 +35,7 @@ from app.models import (
     Credit,
     Decision,
     Evidence,
+    ExtractedField,
     FraudAlert,
     Obligation,
     OutboxEvent,
@@ -166,6 +168,38 @@ def _file_signals(ev: Evidence, add: Any) -> None:
         )
 
 
+def _payee_changed(
+    session: Session, claim: Claim, fields: dict[str, FinalField] | None
+) -> list[str]:
+    """Recipients on this payer's earlier approved claims, if this receipt names none of them.
+
+    Advisory only (a payer may legitimately switch wallet): a signal for a person, never a rule.
+    """
+    now = fields.get("beneficiary") if fields else None
+    if now is None or not now.agreed or not now.normalised:
+        return []
+    earlier = {
+        v
+        for v in session.scalars(
+            select(ExtractedField.normalised_value)
+            .join(Claim, Claim.claim_id == ExtractedField.claim_id)
+            .where(
+                Claim.org_id == claim.org_id,
+                Claim.claimant_ref == claim.claimant_ref,
+                Claim.claim_id != claim.claim_id,
+                Claim.state.in_([ClaimState.APPROVED, ClaimState.PARTIALLY_ALLOCATED]),
+                ExtractedField.name == "beneficiary",
+                ExtractedField.agreed.is_(True),
+                ExtractedField.normalised_value.is_not(None),
+            )
+        )
+        if v
+    }
+    if not earlier or any(same_payee(now.normalised, e) for e in earlier):
+        return []
+    return sorted(earlier)[:5]
+
+
 def assess(
     session: Session,
     claim: Claim,
@@ -275,6 +309,19 @@ def assess(
         add("READERS_DISAGREE", "The two readers disagreed on a critical field.")
     if "RECEIPT_STATUS_NOT_SUCCESS" in reasons:
         add("STATUS_NOT_SUCCESS", "The receipt itself shows the payment as not completed.")
+    if "PAYEE_NOT_TRUSTED" in reasons:
+        add(
+            "RECIPIENT_NOT_TRUSTED",
+            "The receipt names a recipient that is not one of this organisation's trusted payees.",
+            recipient=(fields or {}).get("beneficiary") and fields["beneficiary"].normalised,
+        )
+    changed = _payee_changed(session, claim, fields)
+    if changed:
+        add(
+            "PAYEE_CHANGED",
+            "This payer's earlier approved payments named a different recipient than this receipt.",
+            earlier=changed,
+        )
     if reasons & {"TYPED_AMOUNT_DISAGREES", "TYPED_REFERENCE_DISAGREES"}:
         add("TYPED_DETAILS_DIFFER", "The details the payer typed differ from the receipt.")
     now = datetime.now(UTC)

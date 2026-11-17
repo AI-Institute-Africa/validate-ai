@@ -22,6 +22,7 @@ PAYER_MESSAGE_KEY = {
     "SUSPECTED_FAKE": "MANUAL_CHECK",
     "CREDIT_DISPUTED": "MANUAL_CHECK",
     "TAMPER_SUSPECTED": "IMAGE_CHECK",
+    "PAYEE_NOT_TRUSTED": "PAYEE_MISMATCH",
 }
 
 # internal reason code -> the key of its message
@@ -39,6 +40,7 @@ _REASON_CODES = (
     "REFERENCE_ALREADY_CONSUMED",
     "RECEIPT_STATUS_NOT_SUCCESS",
     "AWAITING_CREDIT",
+    "PAYEE_NOT_TRUSTED",
     "EXTRACTION_UNCONFIRMED",
     "MANY_LOW_CONFIDENCE_FIELDS",
     "TAMPER_SUSPECTED",
@@ -174,6 +176,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "The payment does not appear to have been sent to our account.",
         "sn": "Kubhadhara hakuna kuratidzika kuti kwakaendeswa kuakaundi yedu.",
         "nd": "Ukukhokha akubonakali kuthunyelwe ku-akhawunti yethu.",
+    },
+    "PAYEE_MISMATCH": {
+        "en": "The recipient on your receipt does not match our account. Please check that you "
+        "paid the right account.",
+        "sn": "Munhu anogamuchira parisiti yako haaenderani neakaundi yedu. Tarisa kuti "
+        "wakabhadhara kuakaundi chaiyo.",
+        "nd": "Ogunyaziweyo kurisithi yakho akavumelani le-akhawunti yethu. Sicela uhlole ukuthi "
+        "ukhokhele ku-akhawunti efanele.",
     },
     # outcomes sent to a payer when a claim's state changes
     "payer.approved": {
