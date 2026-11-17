@@ -20,6 +20,7 @@ from app.core import observability as obs
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.detect import runner as detect_runner
+from app.detect.near_duplicate import DuplicateSubject
 from app.extraction import preprocess, tamper
 from app.extraction.agreement import FinalField
 from app.extraction.readers.base import Reader
@@ -56,6 +57,7 @@ NEEDS_INFO = {"CAPTURE_TOO_SMALL", "CAPTURE_BLURRY", "UNREADABLE", "MISSING_AMOU
 DUPLICATE = {
     "DUPLICATE_FILE",
     "DUPLICATE_NEAR_FILE",
+    "NEAR_DUPLICATE_EMBEDDING",
     "DUPLICATE_REFERENCE",
     "REFERENCE_ALREADY_CONSUMED",
 }
@@ -204,7 +206,9 @@ def process_claim(
                     "evidence_id": str(e.evidence_id),
                 }
             )
-            result, problems, file_reasons = _read_file(session, e, cfg, readers, checks)
+            result, problems, file_reasons = _read_file(
+                session, e, cfg, readers, checks, claim.claim_id, dup_others
+            )
             reasons += file_reasons
             quality_problems.append(problems)
             per_file.append((e, result))
@@ -408,7 +412,13 @@ _CONFLICT_FIELDS = ("amount", "currency", "transaction_id", "date")
 
 
 def _read_file(
-    session: Session, ev: Evidence, cfg, readers: list[Reader], checks: list[dict]
+    session: Session,
+    ev: Evidence,
+    cfg,
+    readers: list[Reader],
+    checks: list[dict],
+    claim_id: uuid.UUID | None = None,
+    dup_others: set[uuid.UUID] | None = None,
 ) -> tuple[ExtractionResult, list[str], list[str]]:
     """Quality, forensics and extraction for one file of a submission."""
     reasons: list[str] = []
@@ -457,6 +467,21 @@ def _read_file(
     if report.results:
         checks.append(report.check(evidence_id=str(ev.evidence_id)))
         reasons += report.reasons
+    # near-duplicate: compares this picture with every recent one (docs/authenticity-detectors.md)
+    near = detect_runner.assess(
+        session,
+        kind="duplicate",
+        subject=DuplicateSubject(image, session, ev.org_id, ev.claim_id, ev.evidence_id),
+        org_id=ev.org_id,
+        cfg=cfg,
+        claim_id=ev.claim_id,
+        evidence_id=ev.evidence_id,
+    )
+    if near.results:
+        checks.append(near.check(evidence_id=str(ev.evidence_id)))
+        reasons += near.reasons
+        if dup_others is not None:
+            dup_others |= near.related
     if ev.content_type == "image/jpeg":
         _forensics(session, ev, image)
     result = extract(

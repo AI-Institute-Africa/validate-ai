@@ -63,3 +63,20 @@ class OnnxScorer:
         if not np.isfinite(value):
             raise ModelUnavailable("bad_output")
         return min(1.0, max(0.0, value))
+
+
+class OnnxEmbedder(OnnxScorer):
+    """An ONNX model whose output is an embedding vector, returned L2-normalised.
+
+    Used by the near-duplicate detector: similar pictures (the same receipt re-photographed, cropped
+    or re-rendered) land close together under cosine similarity.
+    """
+
+    def embed(self, img: Image.Image) -> np.ndarray:
+        tensor = to_tensor(img, self.entry.size, self.entry.channels)
+        out = np.asarray(self._session.run(None, {self._input: tensor})[0], dtype=np.float32)
+        vec = out.reshape(-1)
+        norm = float(np.linalg.norm(vec))
+        if vec.size == 0 or not np.isfinite(norm) or norm == 0.0:
+            raise ModelUnavailable("bad_output")
+        return vec / norm

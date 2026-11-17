@@ -10,6 +10,7 @@ from app.core.config import ConfigError, Settings, validate_for_startup
 from app.detect import registry
 from app.detect.base import DetectorResult, skipped
 from app.detect.manifest import ManifestError, file_sha256, load_manifest
+from app.detect.near_duplicate import top_matches
 from app.detect.onnx_runtime import ModelUnavailable, OnnxScorer, to_tensor
 from app.detect.runner import escalation_reason, safe_score, versions_from_checks
 from app.policy.engine import PolicyConfig
@@ -253,3 +254,19 @@ def test_production_refuses_a_detector_folder_that_is_a_url():
         validate_for_startup(
             Settings(_env_file=None, detect_model_dir="https://models.example.com/x", **base)
         )
+
+
+# --- near-duplicate search ------------------------------------------------------------------------
+
+
+def test_top_matches_ranks_by_cosine_and_drops_unrelated_rows():
+    import uuid
+
+    import numpy as np
+
+    ids = [uuid.uuid4() for _ in range(3)]
+    matrix = np.asarray([[1.0, 0.0], [0.8, 0.6], [0.0, 1.0]], dtype=np.float32)
+    got = top_matches(matrix, ids, np.asarray([1.0, 0.0], dtype=np.float32))
+    assert [g[0] for g in got] == [ids[0], ids[1]]  # the orthogonal row is below the floor
+    assert got[0][1] == 1.0 and abs(got[1][1] - 0.8) < 1e-6
+    assert top_matches(np.zeros((0, 2), dtype=np.float32), [], np.asarray([1.0, 0.0])) == []

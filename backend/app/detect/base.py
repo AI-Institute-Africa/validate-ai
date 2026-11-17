@@ -6,6 +6,7 @@ approves or rejects anything: a score is evidence for a person. Nothing here imp
 engine, so the policy and the pipeline can both depend on it.
 """
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -29,6 +30,9 @@ class DetectorResult:
     uncertain: bool = False  # the score sits in the model's "cannot tell" band
     latency_ms: float | None = None
     signals: list[str] = field(default_factory=list)
+    # other claims this one resembles, with the similarity (near-duplicate detector only).
+    # Used in-process to hold the earlier claim too; never stored or shown.
+    related: tuple[tuple[uuid.UUID, float], ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {

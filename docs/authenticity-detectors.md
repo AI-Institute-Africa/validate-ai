@@ -8,7 +8,7 @@
 | Piece | Status |
 | --- | --- |
 | Detector interface, manifest, ONNX loader, registry, shadow recording, `GET /admin/detectors` (migration 0014) | **built** (no model files ship, so every detector reports `no_model` until you install one) |
-| Near-duplicate detector (embedding) | planned |
+| Near-duplicate detector (embedding, migration 0015) | **built** (needs an embedding model file; none ships) |
 | Receipt / proof-of-payment forgery + AI-generated detector | planned |
 | ID-document forgery + AI-generated detector | planned |
 | Face deepfake / AI clone / presentation-attack detector | planned |
@@ -148,8 +148,16 @@ Signal weights are starting points to be set from measured precision (they are p
 | --- | --- | --- |
 | `POPS_DETECT_MODE` | `off` | `off`, `shadow` or `escalate`. A global switch; the policy can only narrow what it allows (turn kinds off, raise thresholds), never widen it. |
 | `POPS_DETECT_MODEL_DIR` | `./var/models/detect` | Folder holding the model files and `manifest.json`. A path outside it, or any URL, is refused in production. |
+| `POPS_DETECT_DUPLICATE_SCAN_LIMIT` | `20000` | Near-duplicate search compares a new picture with at most this many of the newest stored embeddings. Brute-force cosine search is exact and needs no extra database extension; past this size, a vector index (such as pgvector) is the next step. |
+| `POPS_DETECT_DUPLICATE_DAYS` | `180` | Only embeddings from the last this-many days are compared. |
 | policy `detect_enabled_kinds` | all | Which detectors run for the organisation: `receipt`, `doc`, `face`, `duplicate`, `text`. |
 | policy `detect_thresholds` | unset: the threshold the model was published with in `manifest.json`; with neither, the detector never escalates | Score at or above which a detector escalates. Set from the measured false-flag rate. |
+
+The near-duplicate model's output is an embedding vector (the others output one probability); it is stored as float16 bytes of an
+L2-normalised vector with the model's SHA-256, vectors from different model files are never compared, and in `escalate` mode a
+score (the best cosine similarity) at or above the threshold holds **both** claims, like the other duplicate checks. The
+search is across organisations, like the hash registry; no other organisation's data is shown. Retention deletes the embedding
+with its file.
 
 The model folder holds one file per detector and a `manifest.json` with each file's name, version, SHA-256,
 input specification, calibration, thresholds and a pointer to its model card. A file whose hash does not match

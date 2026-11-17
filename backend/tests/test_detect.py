@@ -1,12 +1,14 @@
 """Authenticity detectors in the pipeline: shadow records only, escalate sends to a person."""
 
+import numpy as np
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.core.config import get_settings
 from app.detect import registry
 from app.detect.base import DetectorResult
-from app.models import DetectorScore
+from app.detect.near_duplicate import NearDuplicateDetector
+from app.models import DetectorScore, Evidence, EvidenceEmbedding
 from tests.conftest import ecocash_fields, login, make_receipt
 from tests.test_flow import _obligation, _submit
 
@@ -38,9 +40,10 @@ class Fake:
         )
 
 
-def _mode(monkeypatch, mode, detector=None):
+def _mode(monkeypatch, mode, detector=None, **named):
     monkeypatch.setattr(get_settings(), "detect_mode", mode)
     dets = {"receipt": detector} if detector is not None else {}
+    dets.update(named)
     monkeypatch.setattr(registry, "build_detectors", lambda s=None: dets)
 
 
@@ -164,3 +167,105 @@ def test_detector_scores_are_append_only(client, session, monkeypatch):
     with pytest.raises(DBAPIError):
         session.execute(text("UPDATE detector_scores SET score = 0"))
     session.rollback()
+
+
+# --- near-duplicate embeddings -------------------------------------------------------------------
+
+
+class Fixed:
+    """Embeds every picture to the same unit vector: each receipt is a near-copy of the last."""
+
+    def __init__(self, vec=(1.0, 0.0, 0.0, 0.0)):
+        v = np.asarray(vec, dtype=np.float32)
+        self._v = v / np.linalg.norm(v)
+
+    def embed(self, img):
+        return self._v
+
+
+def _dup(embedder=None, **kw):
+    return NearDuplicateDetector(
+        name="fake_dup",
+        version="d1",
+        sha256="d" * 64,
+        embedder=embedder or Fixed(),
+        default_threshold=0.9,
+        scan_limit=1000,
+        days=30,
+        **kw,
+    )
+
+
+def _two(client, first_txn="PP251021.1432.A11111", second_txn="PP251021.1433.B22222"):
+    return _claim(client, first_txn), _claim(client, second_txn)
+
+
+def test_shadow_stores_embeddings_and_records_the_match_but_holds_nothing(
+    client, session, monkeypatch
+):
+    _mode(monkeypatch, "shadow", duplicate=_dup())
+    first, second = _two(client)
+    assert "NEAR_DUPLICATE_EMBEDDING" not in second["reason_codes"]
+    assert len(session.scalars(select(EvidenceEmbedding)).all()) == 2
+    rows = {r.claim_id: r for r in session.scalars(select(DetectorScore)).all()}
+    assert str(sorted(rows.values(), key=lambda r: r.created_at)[0].score) == "0.0"
+    latest = sorted(rows.values(), key=lambda r: r.created_at)[-1]
+    assert latest.label == "near_duplicate" and latest.score == pytest.approx(1.0, abs=1e-3)
+    assert latest.escalated is False and latest.signals == ["compared:1"]
+
+
+def test_escalate_holds_both_claims_for_a_near_duplicate(client, session, monkeypatch):
+    _mode(monkeypatch, "escalate", duplicate=_dup())
+    first, second = _two(client)
+    assert "NEAR_DUPLICATE_EMBEDDING" in second["reason_codes"]
+    assert second["state"] == "DUPLICATE_HOLD"
+    rev = login(client, "reviewer")
+    again = client.get(f"/claims/{first['claim_id']}", headers=rev).json()
+    assert again["state"] == "DUPLICATE_HOLD"  # the earlier receipt is held too, a person decides
+    assert "NEAR_DUPLICATE_EMBEDDING" in again["reason_codes"]
+
+
+def test_a_different_picture_does_not_escalate(client, session, monkeypatch):
+    class Alternating:
+        def __init__(self):
+            self.n = 0
+
+        def embed(self, img):
+            self.n += 1
+            return np.asarray([1.0, 0.0] if self.n % 2 else [0.0, 1.0], dtype=np.float32)
+
+    _mode(monkeypatch, "escalate", duplicate=_dup(Alternating()))
+    _, second = _two(client)
+    assert "NEAR_DUPLICATE_EMBEDDING" not in second["reason_codes"]
+
+
+def test_embeddings_are_never_compared_across_models(client, session, monkeypatch):
+    _mode(monkeypatch, "escalate", duplicate=_dup())
+    _claim(client, "PP251021.1432.A11111")
+    session.execute(update(EvidenceEmbedding).values(model_sha256="e" * 64))  # an older model
+    session.commit()
+    second = _claim(client, "PP251021.1433.B22222")
+    assert "NEAR_DUPLICATE_EMBEDDING" not in second["reason_codes"]
+
+
+def test_retention_removes_the_embedding_with_the_file(client, session, monkeypatch):
+    from app.compliance import retention
+    from tests.test_compliance import _policy
+
+    _mode(monkeypatch, "shadow", duplicate=_dup())
+    admin, rev = login(client, "admin"), login(client, "reviewer")
+    c = _claim(client)
+    assert len(session.scalars(select(EvidenceEmbedding)).all()) == 1
+    client.post(
+        f"/review/claims/{c['claim_id']}/reject",
+        headers=rev,
+        json={"reason": "OTHER", "note": None},
+    )
+    _policy(client, admin, evidence_retention_days=30)
+    from datetime import UTC, datetime, timedelta
+
+    session.execute(update(Evidence).values(received_at=datetime.now(UTC) - timedelta(days=45)))
+    session.commit()
+    assert retention.purge_payment_data(session)["evidence"] == 1
+    session.commit()
+    assert session.scalars(select(EvidenceEmbedding)).all() == []

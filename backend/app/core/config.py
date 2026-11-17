@@ -175,6 +175,10 @@ class Settings(BaseSettings):
     # (never approve or reject). The model files and manifest.json are read from detect_model_dir.
     detect_mode: Literal["off", "shadow", "escalate"] = "off"
     detect_model_dir: str = "./var/models/detect"
+    # near-duplicate search: compare with at most this many of the newest stored embeddings, from
+    # the last N days. Brute force is exact and simple; the ceiling is in the detectors doc.
+    detect_duplicate_scan_limit: int = 20000
+    detect_duplicate_days: int = 180
 
     # where this deployment's data lives, for audit packets and the compliance screen (for example
     # "ZA-af-south-1" or "ZW-onprem"). Required in production: hosting is a deliberate choice.

@@ -11,7 +11,8 @@ from app.core.config import Settings, get_settings
 from app.detect.base import DETECT_KINDS, Detector, DetectorResult, skipped
 from app.detect.image_detector import OnnxImageDetector
 from app.detect.manifest import Entry, ManifestError, load_manifest
-from app.detect.onnx_runtime import ModelUnavailable, OnnxScorer
+from app.detect.near_duplicate import NearDuplicateDetector
+from app.detect.onnx_runtime import ModelUnavailable, OnnxEmbedder, OnnxScorer
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class UnavailableDetector:
 
 
 @lru_cache(maxsize=8)
-def _build(model_dir: str) -> dict[str, Detector]:
+def _build(model_dir: str, scan_limit: int = 20000, days: int = 180) -> dict[str, Detector]:
     try:
         manifest: dict[str, Entry] = load_manifest(model_dir)
     except ManifestError as exc:
@@ -41,6 +42,14 @@ def _build(model_dir: str) -> dict[str, Detector]:
         entry = manifest.get(kind)
         if entry is None:
             out[kind] = UnavailableDetector(kind, "no_model")
+        elif kind == "duplicate":
+            try:
+                out[kind] = NearDuplicateDetector.from_entry(
+                    entry, OnnxEmbedder(entry), scan_limit, days
+                )
+            except ModelUnavailable as exc:
+                log.warning("detector %s not loaded: %s", kind, exc)
+                out[kind] = UnavailableDetector(kind, str(exc), entry.name)
         elif kind not in IMAGE_KINDS:
             out[kind] = UnavailableDetector(kind, "not_implemented", entry.name)
         else:
@@ -56,7 +65,7 @@ def build_detectors(settings: Settings | None = None) -> dict[str, Detector]:
     s = settings or get_settings()
     if s.detect_mode == "off":
         return {}
-    return _build(s.detect_model_dir)
+    return _build(s.detect_model_dir, s.detect_duplicate_scan_limit, s.detect_duplicate_days)
 
 
 def reset() -> None:
@@ -74,7 +83,11 @@ def describe(settings: Settings | None = None) -> dict[str, object]:
         manifest_state = "ok" if manifest else "absent"
     except ManifestError as exc:
         manifest_state = f"invalid: {exc}"
-    loaded = _build(s.detect_model_dir) if s.detect_mode != "off" else {}
+    loaded = (
+        _build(s.detect_model_dir, s.detect_duplicate_scan_limit, s.detect_duplicate_days)
+        if s.detect_mode != "off"
+        else {}
+    )
     rows = []
     for kind in DETECT_KINDS:
         entry = manifest.get(kind)

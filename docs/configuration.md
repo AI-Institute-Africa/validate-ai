@@ -203,6 +203,8 @@ Trained detectors for fake and AI-generated receipts and IDs, deepfake faces and
 - `POPS_DETECT_MODEL_DIR` (default `./var/models/detect`): the model files and `manifest.json` (file, version,
   SHA-256, thresholds). A path outside it, or any URL, is refused in production; a file whose hash does not
   match the manifest is not loaded.
+- `POPS_DETECT_DUPLICATE_SCAN_LIMIT` (default `20000`) and `POPS_DETECT_DUPLICATE_DAYS` (default `180`): how many of the
+  newest stored embeddings, from how many days, a new picture is compared with.
 - policy `detect_enabled_kinds` (default all): `receipt`, `doc`, `face`, `duplicate`, `text`.
 - policy `detect_thresholds`: per-detector score at or above which it escalates; set from the model card's measured
   false-flag rate, not guessed. Unset means the threshold in `manifest.json`; with neither, the detector never escalates.

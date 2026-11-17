@@ -38,6 +38,7 @@ class Report:
     mode: str = "off"
     results: list[DetectorResult] = field(default_factory=list)
     reasons: list[str] = field(default_factory=list)
+    related: set[uuid.UUID] = field(default_factory=set)  # earlier claims to hold too
 
     def check(self, **extra: Any) -> dict[str, Any]:
         """The entry written into a run's checks."""
@@ -104,9 +105,12 @@ def assess(
         return report
     result = safe_score(detector, subject)
     report.results.append(result)
-    reason = escalation_reason(result, threshold_for(kind, cfg, detector), s.detect_mode)
+    threshold = threshold_for(kind, cfg, detector)
+    reason = escalation_reason(result, threshold, s.detect_mode)
     if reason:
         report.reasons.append(reason)
+        if threshold is not None:
+            report.related |= {cid for cid, sim in result.related if sim >= threshold}
     session.add(
         DetectorScore(
             org_id=org_id,

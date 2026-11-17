@@ -19,6 +19,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -788,3 +789,24 @@ class DetectorScore(Base):
         Index("ix_detector_scores_kyc", "kyc_id"),
         Index("ix_detector_scores_kind", "org_id", "kind", "created_at"),
     )
+
+
+class EvidenceEmbedding(Base):
+    """The image embedding of one claim file, for near-duplicate search across organisations.
+
+    Stored as float16 bytes of an L2-normalised vector, with the SHA-256 of the model that made it:
+    vectors from different models are never compared. This is personal data in the same way the
+    picture is, so retention removes it with the file (app/compliance/retention.py).
+    """
+
+    __tablename__ = "evidence_embeddings"
+    evidence_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evidence.evidence_id"), primary_key=True
+    )
+    org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organisations.org_id"), nullable=False)
+    claim_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("claims.claim_id"), nullable=False)
+    model_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    dim: Mapped[int] = mapped_column(Integer, nullable=False)
+    vector: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = _created()
+    __table_args__ = (Index("ix_evidence_embeddings_model", "model_sha256", "created_at"),)
