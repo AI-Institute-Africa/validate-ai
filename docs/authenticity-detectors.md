@@ -7,7 +7,7 @@
 
 | Piece | Status |
 | --- | --- |
-| Detector interface, registry, shadow recording, `GET /admin/detectors` | planned |
+| Detector interface, manifest, ONNX loader, registry, shadow recording, `GET /admin/detectors` (migration 0014) | **built** (no model files ship, so every detector reports `no_model` until you install one) |
 | Near-duplicate detector (embedding) | planned |
 | Receipt / proof-of-payment forgery + AI-generated detector | planned |
 | ID-document forgery + AI-generated detector | planned |
@@ -127,7 +127,8 @@ new deployment. Each technique below has a reason; none needs a hosted service.
    and **cannot be auto-approved** while the signal stands. A score below the threshold changes nothing.
 4. Reviewers see an **Authenticity** card: the score, the label, the model version, a "shadow" or "live" badge,
    a plain-language reason and a heatmap where available.
-5. Resolved alerts (`confirmed_fake`, `false_positive`) are compared with the shadow scores in the scorecard,
+5. The reason codes a detector adds are **staff-only**: the payer-facing claim view hides them (`INTERNAL_REASONS`), like `SUSPECTED_FAKE`.
+6. Resolved alerts (`confirmed_fake`, `false_positive`) are compared with the shadow scores in the scorecard,
    so the real precision and recall of each detector is visible before anyone switches it on.
 
 Signal weights are starting points to be set from measured precision (they are policy, per organisation):
@@ -145,10 +146,10 @@ Signal weights are starting points to be set from measured precision (they are p
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `POPS_DETECT_MODE` | `off` | `off`, `shadow` or `escalate`. A global switch; the policy can narrow it, never widen it. |
+| `POPS_DETECT_MODE` | `off` | `off`, `shadow` or `escalate`. A global switch; the policy can only narrow what it allows (turn kinds off, raise thresholds), never widen it. |
 | `POPS_DETECT_MODEL_DIR` | `./var/models/detect` | Folder holding the model files and `manifest.json`. A path outside it, or any URL, is refused in production. |
 | policy `detect_enabled_kinds` | all | Which detectors run for the organisation: `receipt`, `doc`, `face`, `duplicate`, `text`. |
-| policy `detect_thresholds` | per detector, from the model card | Score at or above which a detector escalates. Set from the measured false-flag rate. |
+| policy `detect_thresholds` | unset: the threshold the model was published with in `manifest.json`; with neither, the detector never escalates | Score at or above which a detector escalates. Set from the measured false-flag rate. |
 
 The model folder holds one file per detector and a `manifest.json` with each file's name, version, SHA-256,
 input specification, calibration, thresholds and a pointer to its model card. A file whose hash does not match

@@ -196,16 +196,17 @@ What admins receive:
 ## Authenticity detectors (planned)
 
 Trained detectors for fake and AI-generated receipts and IDs, deepfake faces and near-duplicates; see
-`docs/authenticity-detectors.md`. Not built yet; these are the settings the code will read.
+`docs/authenticity-detectors.md`. The framework is built; no model files ship, so nothing scores until you install one.
 
 - `POPS_DETECT_MODE` (default `off`): `off`, `shadow` (record scores, change nothing) or `escalate` (a high score can
-  only send a claim to a person). The policy can narrow this, never widen it.
+  only send a claim to a person). The policy can only narrow what this allows, never widen it.
 - `POPS_DETECT_MODEL_DIR` (default `./var/models/detect`): the model files and `manifest.json` (file, version,
   SHA-256, thresholds). A path outside it, or any URL, is refused in production; a file whose hash does not
   match the manifest is not loaded.
 - policy `detect_enabled_kinds` (default all): `receipt`, `doc`, `face`, `duplicate`, `text`.
 - policy `detect_thresholds`: per-detector score at or above which it escalates; set from the model card's measured
-  false-flag rate, not guessed.
+  false-flag rate, not guessed. Unset means the threshold in `manifest.json`; with neither, the detector never escalates.
+- `GET /admin/detectors` (admin): mode, manifest state and each detector's version, hash and load state.
 - policy `fraud_weights` also accepts `NEAR_DUPLICATE_EMBEDDING`, `AI_GENERATED_SUSPECTED`, `DEEPFAKE_SUSPECTED`,
   `SYNTHETIC_FACE_SUSPECTED`, `FORGED_POP_SUSPECTED` and `AI_TEXT_SUSPECTED` (0 switches one off).
 

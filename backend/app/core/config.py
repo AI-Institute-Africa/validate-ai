@@ -170,6 +170,12 @@ class Settings(BaseSettings):
     fx_fetch_hours: str = "5-16"
     fx_max_daily_move_pct: float = 25.0
 
+    # trained authenticity detectors (docs/authenticity-detectors.md). off: nothing runs. shadow:
+    # scores are recorded and change nothing. escalate: a high score can send a claim to a person
+    # (never approve or reject). The model files and manifest.json are read from detect_model_dir.
+    detect_mode: Literal["off", "shadow", "escalate"] = "off"
+    detect_model_dir: str = "./var/models/detect"
+
     # where this deployment's data lives, for audit packets and the compliance screen (for example
     # "ZA-af-south-1" or "ZW-onprem"). Required in production: hosting is a deliberate choice.
     data_region: str | None = None
@@ -235,6 +241,8 @@ def validate_for_startup(s: Settings) -> None:
         )
     if s.ollama_api_key:
         problems.append("POPS_OLLAMA_API_KEY must be empty: no hosted AI keys in production")
+    if "://" in s.detect_model_dir:
+        problems.append("POPS_DETECT_MODEL_DIR must be a local folder, never a URL")
     if not (s.data_region or "").strip():
         problems.append("POPS_DATA_REGION must say where the data is hosted (e.g. ZA-af-south-1)")
     if s.kyc_face_backend in ("fake", "demo"):

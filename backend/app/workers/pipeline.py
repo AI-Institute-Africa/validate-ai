@@ -19,6 +19,7 @@ from app.claims.states import REVIEWABLE, TRANSITIONS
 from app.core import observability as obs
 from app.core.audit import audit
 from app.core.config import get_settings
+from app.detect import runner as detect_runner
 from app.extraction import preprocess, tamper
 from app.extraction.agreement import FinalField
 from app.extraction.readers.base import Reader
@@ -220,6 +221,9 @@ def process_claim(
             versions.update(r.versions)
             failures.update(r.failures)
         run.model_versions = {**versions, "guardrails": [r.name for r in rules]}
+        detector_versions = detect_runner.versions_from_checks(checks)
+        if detector_versions:
+            run.model_versions["detectors"] = detector_versions
         for name in failures:
             obs.READER_FAILURES.labels(name).inc()
         if failures:
@@ -439,6 +443,20 @@ def _read_file(
         if forensic.score >= cfg.tamper_review_score:
             reasons.append("TAMPER_SUSPECTED")
             obs.TAMPER_FLAGS.inc()
+    # trained authenticity detectors (docs/authenticity-detectors.md): shadow mode records only;
+    # escalate mode may add a reason that sends the claim to a person. Never approves or rejects.
+    report = detect_runner.assess(
+        session,
+        kind="receipt",
+        subject=image,
+        org_id=ev.org_id,
+        cfg=cfg,
+        claim_id=ev.claim_id,
+        evidence_id=ev.evidence_id,
+    )
+    if report.results:
+        checks.append(report.check(evidence_id=str(ev.evidence_id)))
+        reasons += report.reasons
     if ev.content_type == "image/jpeg":
         _forensics(session, ev, image)
     result = extract(

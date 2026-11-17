@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.security import Principal, Role
+from app.detect import runner as detect_runner
 from app.extraction.readers.base import ReaderUnavailable
 from app.extraction.schema import FieldReading
 from app.intake.files import RejectedFile, phash_to_int, prepare
@@ -421,6 +422,25 @@ def process(session: Session, kyc_id: uuid.UUID) -> None:
             "signals": tamper_signals,
         }
     )
+    # trained authenticity detector on the card image (docs/authenticity-detectors.md)
+    authenticity = detect_runner.assess(
+        session,
+        kind="doc",
+        subject=cards["front"].image,
+        org_id=kyc.org_id,
+        cfg=cfg,
+        kyc_id=kyc.kyc_id,
+        evidence_id=ev["front"].evidence_id,
+    )
+    if authenticity.results:
+        checks.append(
+            {
+                "name": "authenticity",
+                "ok": not authenticity.reasons,
+                "mode": authenticity.mode,
+                "results": [r.as_dict() for r in authenticity.results],
+            }
+        )
     kyc.doc_type, kyc.issuing_country = doc_type, country
     kyc.doc_number_hash = docintegrity.doc_number_hash(country, number)
     session.flush()
@@ -432,6 +452,7 @@ def process(session: Session, kyc_id: uuid.UUID) -> None:
     )
     if fm is not None and "MULTIPLE_FACES_IN_SELFIE" in fm.problems:
         flags.append("MULTIPLE_FACES_IN_SELFIE")
+    flags += [r for r in authenticity.reasons if r not in flags]  # escalate mode only
     checks.append({"name": "integrity", "ok": not flags, "flags": flags})
 
     idn = idnumbers.check(country, number)
