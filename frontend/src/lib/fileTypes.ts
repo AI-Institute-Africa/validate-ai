@@ -3,7 +3,8 @@
 
 export const IMAGE_TYPES = [
   "image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "image/avif",
-  "image/gif", "image/bmp", "image/tiff", "image/svg+xml",
+  "image/gif", "image/bmp", "image/tiff", "image/svg+xml", "image/jp2", "image/vnd.adobe.photoshop",
+  "image/x-adobe-dng", "image/x-canon-cr2", "image/x-nikon-nef", "image/x-sony-arw",
 ];
 export const DOCUMENT_TYPES = [
   "application/pdf",
@@ -26,7 +27,8 @@ export const DOCUMENT_TYPES = [
 export const ALLOWED_TYPES = new Set([...IMAGE_TYPES, ...DOCUMENT_TYPES]);
 
 export const EXTENSIONS = [
-  "png", "jpg", "jpeg", "webp", "heic", "heif", "avif", "gif", "bmp", "tif", "tiff", "svg",
+  "png", "jpg", "jpeg", "jfif", "webp", "heic", "heif", "avif", "gif", "bmp", "tif", "tiff", "svg", "jp2", "j2k",
+  "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2", "psd", "ai",
   "pdf", "docx", "xlsx", "pptx", "odt", "ods", "odp", "epub", "rtf", "html", "htm",
   "eml", "txt", "md", "csv", "tsv",
 ];

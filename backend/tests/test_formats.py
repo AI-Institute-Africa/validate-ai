@@ -263,3 +263,115 @@ def test_web_and_vector_originals_are_only_ever_downloaded(client):
         assert got.headers["content-type"].startswith("application/octet-stream")
         assert "attachment" in got.headers["content-disposition"]
         assert got.headers["x-content-type-options"] == "nosniff"
+
+
+# --- camera RAW, Photoshop, JPEG 2000, PostScript -------------------------------------------------
+
+
+def _jpeg(size=(900, 600)) -> bytes:
+    return _img("JPEG", size=size)
+
+
+def _dng(preview: bytes | None) -> bytes:
+    import struct
+
+    # a TIFF container: first directory holds the DNGVersion tag (50706), then the camera's preview
+    ifd = (
+        struct.pack("<H", 1) + struct.pack("<HHI4s", 50706, 1, 4, bytes([1, 4, 0, 0])) + b"\0\0\0\0"
+    )
+    head = b"II*\x00" + struct.pack("<I", 8) + ifd
+    return head + (b"\x00" * 64 + preview if preview else b"\x00" * 64)
+
+
+def _cr2(preview: bytes) -> bytes:
+    return b"II*\x00\x10\x00\x00\x00CR\x02\x00" + b"\x00" * 200 + preview
+
+
+def _psd(w=160, h=120) -> bytes:
+    import struct
+
+    head = b"8BPS" + struct.pack(">H", 1) + b"\0" * 6 + struct.pack(">HIIHH", 3, h, w, 8, 3)
+    return head + struct.pack(">III", 0, 0, 0) + struct.pack(">H", 0) + b"\xff" * (w * h * 3)
+
+
+def test_raw_files_are_read_from_their_embedded_photo():
+    for name, data in (("dng", _dng(_jpeg())), ("cr2", _cr2(_jpeg()))):
+        assert sniff(data) == files.RAW, name
+        p = prepare(data, MAX)
+        assert p.content_type == files.RAW and p.image.size == (900, 600), name
+        assert p.meta["raw"]["preview_px"] == [900, 600]
+
+
+def test_the_largest_embedded_photo_is_the_one_used():
+    data = _dng(_jpeg((200, 150))) + b"\x00" * 16 + _jpeg((1200, 800))
+    assert prepare(data, MAX).image.size == (1200, 800)
+
+
+def test_a_raw_file_with_no_readable_photo_is_refused_with_advice():
+    with pytest.raises(RejectedFile) as e:
+        prepare(_dng(None), MAX)
+    assert e.value.code == "RAW_NO_PREVIEW" and "JPEG" in str(e.value)
+
+
+def test_a_normal_tiff_scan_is_not_mistaken_for_raw():
+    assert sniff(_img("TIFF")) == "image/tiff"
+
+
+def test_photoshop_and_jpeg2000_files_are_read():
+    assert sniff(_psd()) == files.PSD
+    p = prepare(_psd(), MAX)
+    assert p.content_type == files.PSD and p.image.size == (160, 120)
+    jp2 = _img("JPEG2000")
+    assert sniff(jp2) == files.JP2 and prepare(jp2, MAX).pages
+
+
+def test_a_photoshop_proof_is_flagged_as_editable(client):
+    h, rev = login(client, "submitter"), login(client, "reviewer")
+    ob = _obligation(client, h)
+    r = client.post(
+        "/claims",
+        headers=h,
+        data={"obligation_id": ob["obligation_id"], "claimant_ref": "l-1", "channel": "ecocash"},
+        files={"file": ("proof.psd", _psd(), files.PSD)},
+    )
+    assert r.status_code == 201, r.text
+    detail = client.get(f"/review/claims/{r.json()['claim_id']}", headers=rev).json()
+    assert "EDITABLE_DOCUMENT" in {s["code"] for s in detail["claim"]["risk_signals"]}
+
+
+def test_postscript_and_old_illustrator_files_are_refused_but_pdf_compatible_ai_is_read():
+    for ps in (
+        b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 10 10\n",
+        b"\xc5\xd0\xd3\xc6" + b"\0" * 40,
+    ):
+        with pytest.raises(RejectedFile) as e:
+            prepare(ps, MAX)
+        assert e.value.code == "POSTSCRIPT"
+    import pymupdf
+
+    doc = pymupdf.open()
+    doc.new_page().insert_text((72, 72), "Illustrator artwork saved with PDF compatibility")
+    ai = doc.tobytes()  # modern .ai files are PDFs underneath
+    assert sniff(ai) == "application/pdf" and "Illustrator" in prepare(ai, MAX).text
+
+
+def _with_qr(text: str) -> bytes:
+    import cv2
+
+    qr = cv2.QRCodeEncoder.create().encode(text)
+    qr = cv2.resize(qr, None, fx=8, fy=8, interpolation=cv2.INTER_NEAREST)
+    qr = cv2.copyMakeBorder(qr, 60, 60, 60, 60, cv2.BORDER_CONSTANT, value=255)
+    ok, buf = cv2.imencode(".png", qr)
+    assert ok
+    return buf.tobytes()
+
+
+def test_a_qr_code_on_a_receipt_is_read_and_kept_as_data():
+    url = f"https://pay.example.co.zw/r/{TXN}"
+    p = prepare(_with_qr(url), MAX)
+    assert p.meta["qr"] == [url]
+
+
+def test_no_qr_means_no_qr_key_and_a_page_of_text_is_not_searched():
+    assert "qr" not in prepare(_img("PNG"), MAX).meta
+    assert "qr" not in prepare(HTML, MAX).meta

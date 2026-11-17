@@ -55,12 +55,15 @@ EPUB = "application/epub+zip"
 RTF = "application/rtf"
 HTML = "text/html"
 SVG = "image/svg+xml"
+RAW = "image/x-raw"  # camera RAW (DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2): its embedded photo
+PSD = "image/vnd.adobe.photoshop"
+JP2 = "image/jp2"
 # types whose "image" is drawn from text or vectors: pixel forensics mean nothing for them
 RENDERED_TYPES = {TEXT, EML, HTML, RTF, XLSX, PPTX, ODT, ODS, ODP, EPUB, SVG}
 # easy to type up or edit: a bank or mobile-money app does not issue its receipts like this
 # a browser would run these if it opened them, so the original is only ever served as a download
 ACTIVE_CONTENT_TYPES = {HTML, SVG, RTF, EPUB}
-EDITABLE_TYPES = {DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, HTML, EPUB}
+EDITABLE_TYPES = {DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, HTML, EPUB, PSD}
 _OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # old binary Word / Excel / PowerPoint
 MAX_TEXT_KEPT = 200_000  # characters of document text kept for the readers
 _OFFICE_ZIP = {
@@ -98,6 +101,18 @@ def sniff(data: bytes) -> str:
         return "image/gif"
     if data[:2] == b"BM" and len(data) > 26 and data[6:10] == b"\x00\x00\x00\x00":
         return "image/bmp"
+    if data[:8] == b"8BPS\x00\x01\x00\x00" or data[:4] == b"8BPS":
+        return PSD
+    if data[:12] == b"\x00\x00\x00\x0cjP  \r\n\x87\n" or data[:4] == b"\xff\x4f\xff\x51":
+        return JP2
+    if data[:4] == b"%!PS" or data[:4] == b"\xc5\xd0\xd3\xc6":
+        raise RejectedFile(
+            "POSTSCRIPT",
+            "PostScript and old EPS/AI files can contain programs and are not accepted: export it "
+            "as PDF, PNG or JPEG and send that",
+        )
+    if _is_raw(data):
+        return RAW
     if data[:4] in (b"II*\x00", b"MM\x00*"):
         return "image/tiff"
     if data.startswith(_OLE_MAGIC):
@@ -143,8 +158,8 @@ def sniff(data: bytes) -> str:
     raise RejectedFile(
         "UNSUPPORTED_TYPE",
         "accepted evidence: photos and scans (PNG, JPEG, WEBP, HEIC, AVIF, GIF, BMP, TIFF, "
-        "SVG), PDF, Word, Excel and PowerPoint (.docx, .xlsx, .pptx), OpenDocument, RTF, HTML, "
-        "e-books (.epub), forwarded emails (.eml) and pasted text",
+        "JPEG 2000, SVG, camera RAW, Photoshop), PDF, Word, Excel and PowerPoint (.docx, .xlsx, "
+        ".pptx), OpenDocument, RTF, HTML, e-books (.epub), forwarded emails (.eml) and pasted text",
     )
 
 
@@ -414,6 +429,77 @@ def _jpeg_quality(img: Image.Image) -> int | None:
     scale = avg / 57.625 * 100
     quality = (200 - scale) / 2 if scale <= 100 else 5000 / scale
     return max(1, min(100, round(quality)))
+
+
+# ---- camera RAW: read the full-size photo every RAW file carries inside it
+
+_RAW_MAKERS = (
+    b"NIKON",
+    b"SONY",
+    b"FUJIFILM",
+    b"OLYMPUS",
+    b"PENTAX",
+    b"Panasonic",
+    b"LEICA",
+    b"Canon",
+)
+
+
+def _tiff_has_tag(data: bytes, wanted: int) -> bool:
+    """Is `wanted` a tag in the first directory of a TIFF-style file? (DNG has tag 50706.)"""
+    import struct
+
+    try:
+        order = "<" if data[:2] == b"II" else ">"
+        offset = struct.unpack(order + "I", data[4:8])[0]
+        count = struct.unpack(order + "H", data[offset : offset + 2])[0]
+        for i in range(min(count, 200)):
+            entry = data[offset + 2 + 12 * i : offset + 14 + 12 * i]
+            if len(entry) == 12 and struct.unpack(order + "H", entry[:2])[0] == wanted:
+                return True
+    except struct.error:
+        return False
+    return False
+
+
+def _is_raw(data: bytes) -> bool:
+    if data[4:12] == b"ftypcrx ":  # Canon CR3
+        return True
+    if data[:15] == b"FUJIFILMCCD-RAW":
+        return True
+    if data[:4] in (b"IIRO", b"IIRS", b"IIU\x00"):  # Olympus ORF, Panasonic RW2
+        return True
+    if data[:4] in (b"II*\x00", b"MM\x00*"):
+        if data[8:10] == b"CR":  # Canon CR2
+            return True
+        if _tiff_has_tag(data, 50706):  # DNGVersion
+            return True
+        # Nikon NEF / Sony ARW and friends: a camera maker in the header of a large TIFF container
+        if len(data) > 3_000_000 and any(m in data[:8192] for m in _RAW_MAKERS):
+            return True
+    return False
+
+
+def _raw_photo(data: bytes) -> tuple[Image.Image, dict[str, Any]]:
+    """The largest JPEG inside a RAW file (its preview). Raw sensor data is never decoded."""
+    starts = [m.start() for m in re.finditer(rb"\xff\xd8\xff", data)][:60]
+    best = None
+    for pos in starts:
+        try:
+            img = Image.open(io.BytesIO(data[pos:]))
+            size = img.size  # header only: cheap
+        except Exception:  # noqa: BLE001, S112 - not a real JPEG, keep looking
+            continue
+        if best is None or size[0] * size[1] > best[0]:
+            best = (size[0] * size[1], pos)
+    if best is None or best[0] < 160 * 160:
+        raise RejectedFile(
+            "RAW_NO_PREVIEW",
+            "this RAW file has no photo inside that we can read: export it as JPEG and send that",
+        )
+    img = Image.open(io.BytesIO(data[best[1] :]))
+    img.load()
+    return img, {"raw": {"preview_px": list(img.size), "bytes": len(data)}}
 
 
 # ---- everyday documents beyond Word: spreadsheets, slides, OpenDocument, e-books, RTF, HTML, SVG
@@ -793,6 +879,29 @@ def _frames(img: Image.Image) -> list[Image.Image]:
     return out
 
 
+def _qr_codes(pages: list[Image.Image]) -> list[str]:
+    """Text of any QR codes on the first pages (receipts often carry a verification link or
+    reference). It is shown to a reviewer as data only: nothing is opened or fetched."""
+    import cv2
+    import numpy as np
+
+    found: list[str] = []
+    detector = cv2.QRCodeDetector()
+    for page in pages[:3]:
+        try:
+            gray = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2GRAY)
+            if max(gray.shape) > 2400:  # keep the search quick on very large scans
+                k = 2400 / max(gray.shape)
+                gray = cv2.resize(gray, None, fx=k, fy=k, interpolation=cv2.INTER_AREA)
+            value, _, _ = detector.detectAndDecode(gray)
+        except Exception:  # noqa: BLE001, S112 - a QR that cannot be read is simply not reported
+            continue
+        text = (value or "").strip()
+        if text and text not in found:
+            found.append(text[:500])
+    return found[:5]
+
+
 def prepare(data: bytes, max_bytes: int) -> PreparedFile:
     if len(data) == 0:
         raise RejectedFile("EMPTY_FILE", "the file is empty")
@@ -827,8 +936,14 @@ def prepare(data: bytes, max_bytes: int) -> PreparedFile:
         pages, texts, meta = _read_eml(data, max_bytes)
     else:
         try:
-            img = Image.open(io.BytesIO(data))
-            img.load()
+            if ctype == RAW:
+                img, raw_meta = _raw_photo(data)
+                meta.update(raw_meta)
+            else:
+                img = Image.open(io.BytesIO(data))
+                img.load()
+        except RejectedFile:
+            raise
         except Exception as exc:  # noqa: BLE001
             raise RejectedFile("CORRUPT_FILE", "the image could not be decoded") from exc
         exif = _exif(img)
@@ -846,6 +961,9 @@ def prepare(data: bytes, max_bytes: int) -> PreparedFile:
             )  # a still is read: the first frame
         pages = [ImageOps.exif_transpose(f).convert("RGB") for f in frames]
     first = pages[0]
+    qr = _qr_codes(pages) if ctype not in RENDERED_TYPES else []
+    if qr:
+        meta["qr"] = qr
     meta["width"], meta["height"] = first.size
     meta["pages"] = len(pages)
     if len(pages) > 1:

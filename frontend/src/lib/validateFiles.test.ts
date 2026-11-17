@@ -31,7 +31,7 @@ describe("validateFiles", () => {
 });
 
 describe("every everyday type is accepted", () => {
-  const ok = ["a.gif", "a.bmp", "a.tif", "a.tiff", "a.avif", "a.svg", "a.xlsx", "a.pptx", "a.odt", "a.ods", "a.odp", "a.epub", "a.rtf", "a.html", "a.csv", "a.md", "a.txt", "a.eml", "A.JPG"];
+  const ok = ["a.dng", "a.CR2", "a.cr3", "a.nef", "a.arw", "a.psd", "a.ai", "a.jp2", "a.jfif", "a.gif", "a.bmp", "a.tif", "a.tiff", "a.avif", "a.svg", "a.xlsx", "a.pptx", "a.odt", "a.ods", "a.odp", "a.epub", "a.rtf", "a.html", "a.csv", "a.md", "a.txt", "a.eml", "A.JPG"];
   it("by name when the browser gives no type", () => {
     for (const name of ok) expect(validateFiles([], [f(name, 50, "")]).files, name).toHaveLength(1);
   });

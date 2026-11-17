@@ -80,7 +80,11 @@ statement CSV / manual credit ─► normalised credits ─► credit-first re-m
 Every proof-of-payment format people actually send:
 
 - Photos, screenshots and scans: PNG, JPEG, WEBP, iPhone HEIC, AVIF, GIF (first frame), BMP, TIFF
-  (every page of a multi-page scan) and SVG (drawn to pixels, never run).
+  (every page of a multi-page scan), JPEG 2000, Photoshop (.psd, the flattened picture) and SVG
+  (drawn to pixels, never run). Camera RAW (DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2) is read from
+  the full-size photo inside it; RAW files are often over the 10 MB limit, so export a JPEG then.
+  Illustrator (.ai) works when saved with PDF compatibility; old PostScript .ai/.eps are refused.
+  QR codes on a photo are decoded and shown to the reviewer as data (nothing is opened).
 - PDFs: **every page**. A PDF's own text layer is read as an exact, independent third reader.
 - Office documents: Word (.docx), Excel (.xlsx), PowerPoint (.pptx) and OpenDocument (.odt, .ods,
   .odp): text, tables, cells and embedded pictures. Macro documents are refused, and an
