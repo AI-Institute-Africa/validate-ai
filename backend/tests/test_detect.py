@@ -90,16 +90,6 @@ def test_escalate_sends_a_high_score_to_a_person_and_never_to_approval(
     assert row.escalated is True and row.mode == "escalate"
 
 
-@pytest.mark.parametrize(
-    "det",
-    [
-        Fake(score=0.2),  # below the threshold
-        Fake(uncertain=True),  # the model says it cannot tell
-        Fake(skip="no_model"),
-        Fake(boom=True),  # a crash is a skipped detector, not a failed claim
-    ],
-    ids=["low", "uncertain", "skipped", "crash"],
-)
 def test_the_payer_is_never_shown_a_forgery_or_ai_signal(client, monkeypatch):
     _mode(monkeypatch, "escalate", Fake(score=0.97, label="ai_generated"))
     sub = login(client, "submitter")
@@ -112,6 +102,16 @@ def test_the_payer_is_never_shown_a_forgery_or_ai_signal(client, monkeypatch):
     assert not any("generated" in m.lower() or "fake" in m.lower() for m in payer["messages"])
 
 
+@pytest.mark.parametrize(
+    "det",
+    [
+        Fake(score=0.2),  # below the threshold
+        Fake(uncertain=True),  # the model says it cannot tell
+        Fake(skip="no_model"),
+        Fake(boom=True),  # a crash is a skipped detector, not a failed claim
+    ],
+    ids=["low", "uncertain", "skipped", "crash"],
+)
 def test_escalate_ignores_low_uncertain_skipped_and_crashed(client, session, monkeypatch, det):
     _mode(monkeypatch, "escalate", det)
     c = _claim(client)
