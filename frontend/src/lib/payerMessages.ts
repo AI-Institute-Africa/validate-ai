@@ -12,3 +12,15 @@ export const REJECT_CONSEQUENCES = [
 ];
 
 export const REQUEST_INFO_NOTE = "Your message is sent to the payer exactly as you type it. Do not mention suspicion or fraud.";
+
+export const REJECT_REASONS = [
+  "PAYMENT_NOT_RECEIVED",
+  "DUPLICATE_CONFIRMED",
+  "PAYMENT_FAILED_OR_REVERSED",
+  "WRONG_BENEFICIARY",
+  "AMOUNT_MISMATCH",
+  "CURRENCY_MISMATCH",
+  "TAMPERED_DOCUMENT",
+  "WRONG_OBLIGATION",
+  "OTHER",
+];

@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { API, api, Candidate, Claim, Field, hasRole, money, post, ReviewDetail } from "../api";
 import { humanize, stateInfo } from "../labels";
 import { useToast, useUndo } from "../toast";
 import { Dialog } from "../components/Dialog";
 import { compareRows, lowConfidenceCount, type CompareStatus } from "../lib/comparison";
-import { REJECT_CONSEQUENCES, REJECT_PAYER_MESSAGE, REQUEST_INFO_NOTE } from "../lib/payerMessages";
+import { REJECT_CONSEQUENCES, REJECT_PAYER_MESSAGE, REJECT_REASONS, REQUEST_INFO_NOTE } from "../lib/payerMessages";
 import { cssFilter, DEFAULT_VIEW, isDefault, rotateBy, setLevel, zoomBy } from "../lib/viewer";
 import { Chip, Loading, Reasons, StateChip } from "../ui";
 import { agoText, EvidenceChip, loadSort, TierBadge } from "./Queue";
@@ -46,17 +46,6 @@ function RunHistory({ claimId }: { claimId: string }) {
   );
 }
 
-const REJECT_REASONS = [
-  "PAYMENT_NOT_RECEIVED",
-  "DUPLICATE_CONFIRMED",
-  "PAYMENT_FAILED_OR_REVERSED",
-  "WRONG_BENEFICIARY",
-  "AMOUNT_MISMATCH",
-  "CURRENCY_MISMATCH",
-  "TAMPERED_DOCUMENT",
-  "WRONG_OBLIGATION",
-  "OTHER",
-];
 
 function displayValue(f: Field): string {
   if (f.name === "amount" && f.normalised_value) return (Number(f.normalised_value) / 100).toFixed(2);
@@ -403,12 +392,16 @@ export default function ClaimReview() {
     onSuccess: () => { setReverseFor(null); setReverseReason(""); done("Allocation reversed"); },
   });
 
-  // "next" follows the order the reviewer chose in the queue, not the server's order
-  const nextId = queue.data && sortClaims(queue.data, loadSort()).find((c) => c.claim_id !== id)?.claim_id;
+  // "next" walks the claims the reviewer ticked in the queue; otherwise the order they sorted it in
+  const selection = (useLocation().state as { selection?: string[] } | null)?.selection;
+  const nextId = selection
+    ? selection[selection.indexOf(id!) + 1]
+    : queue.data && sortClaims(queue.data, loadSort()).find((c) => c.claim_id !== id)?.claim_id;
+  const nextState = selection ? { selection } : undefined;
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.target as HTMLElement).tagName.match(/INPUT|TEXTAREA|SELECT/)) return;
-      if (e.key === "n" && nextId) nav(`/claims/${nextId}`);
+      if (e.key === "n" && nextId) nav(`/claims/${nextId}`, { state: nextState });
       else if (e.key === "c") { e.preventDefault(); last4Ref.current?.focus(); }
       else if (e.key === "r" && q.data && REVIEWABLE.includes(q.data.claim.state)) { e.preventDefault(); setRejectOpen(true); }
       else if (/^[1-9]$/.test(e.key) && q.data && Number(e.key) <= q.data.candidates.length) setSelected(Number(e.key) - 1);
@@ -451,7 +444,7 @@ export default function ClaimReview() {
               ["?", "Show this list"],
             ]}
           />
-          {nextId && <> · <Link to={`/claims/${nextId}`}>Next claim →</Link></>}
+          {nextId && <> · <Link to={`/claims/${nextId}`} state={nextState}>Next claim →</Link></>}
         </span>
       </div>
 
@@ -639,7 +632,7 @@ export default function ClaimReview() {
           </span>
           <button type="button" onClick={() => { goDecision(); setTimeout(() => last4Ref.current?.focus(), 350); }}>Confirm…</button>
           <button type="button" className="danger" onClick={() => setRejectOpen(true)}>Reject…</button>
-          {nextId && <Link className="btn secondary" to={`/claims/${nextId}`}>Next claim →</Link>}
+          {nextId && <Link className="btn secondary" to={`/claims/${nextId}`} state={nextState}>Next claim →</Link>}
         </div>
       )}
 

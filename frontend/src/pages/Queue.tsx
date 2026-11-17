@@ -7,6 +7,8 @@ import { Chip, EmptyState, Loading, PageHeader, StateChip } from "../ui";
 import { bucketOf, slaOf, SLA_MINUTES, type Bucket } from "../lib/triage";
 import { ariaSort, DEFAULT_SORT, nextSort, sortClaims, type Sort, type SortKey } from "../lib/sortClaims";
 import { ShortcutLegend } from "../components/ShortcutLegend";
+import { pruneSelection, toggle, toggleAll } from "../lib/bulk";
+import { BulkBar } from "./QueueBulk";
 import { RiskBadge } from "./Fraud";
 import "./review.css";
 
@@ -88,6 +90,7 @@ export default function Queue() {
   const nav = useNavigate();
   const [sort, setSort] = useState<Sort>(loadSort);
   const [cursor, setCursor] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const chooseSort = (key: SortKey) => {
     const next = nextSort(sort, key);
     setSort(next);
@@ -135,13 +138,30 @@ export default function Queue() {
     return () => window.removeEventListener("keydown", onKey);
   }, [rows, cursor, nav]);
   useEffect(() => setCursor(0), [bucket, state, channel]);
+  // a ticked claim that is no longer listed (filtered out, or decided elsewhere) is dropped from the selection
+  const visibleIds = (rows ?? []).map((c) => c.claim_id).join(",");
+  useEffect(() => {
+    setSelected((s) => (s.size ? pruneSelection(s, visibleIds ? visibleIds.split(",") : []) : s));
+  }, [visibleIds]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName.match(/INPUT|TEXTAREA|SELECT|BUTTON|A/) && !(e.target as HTMLElement).closest("tr[data-row]")) return;
+      if (e.key === "x" && rows?.[cursor]) {
+        e.preventDefault();
+        setSelected((s) => toggle(s, rows[cursor].claim_id));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [rows, cursor]);
+  const chosen = (rows ?? []).filter((c) => selected.has(c.claim_id));
 
   return (
     <section className="rv" id="rv-panel">
       <PageHeader
         title="Review queue"
         sub="Claims waiting for a person. Click a column title to sort. Click a row, or use j and k then Enter, to open the receipt, the matching bank credit and the decision."
-        actions={<ShortcutLegend title="Queue shortcuts" shortcuts={[["j ↓", "Next claim"], ["k ↑", "Previous claim"], ["Enter", "Open the claim in focus"], ["?", "Show this list"]]} />}
+        actions={<ShortcutLegend title="Queue shortcuts" shortcuts={[["j ↓", "Next claim"], ["k ↑", "Previous claim"], ["x", "Tick or untick the claim in focus"], ["Enter", "Open the claim in focus"], ["?", "Show this list"]]} />}
       />
       <div
         className="rv-tabs"
@@ -212,6 +232,14 @@ export default function Queue() {
             <table className="rv-cards">
               <thead>
                 <tr>
+                  <th className="sel">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all listed claims"
+                      checked={rows.length > 0 && rows.every((c) => selected.has(c.claim_id))}
+                      onChange={() => setSelected(toggleAll(selected, rows.map((c) => c.claim_id)))}
+                    />
+                  </th>
                   <th aria-sort={ariaSort(sort, "waiting")}><SortBtn k="waiting" label="Waiting" sort={sort} onSort={chooseSort} /></th>
                   <th aria-sort={ariaSort(sort, "status")}><SortBtn k="status" label="Status" sort={sort} onSort={chooseSort} /></th>
                   <th>Claimant</th>
@@ -231,8 +259,16 @@ export default function Queue() {
                     tabIndex={i === cursor ? 0 : -1}
                     className={`rv-click${i === cursor ? " cursor" : ""}`}
                     onFocus={() => setCursor(i)}
-                    onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button")) nav(`/claims/${c.claim_id}`); }}
+                    onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button,input")) nav(`/claims/${c.claim_id}`); }}
                   >
+                    <td className="sel" data-label="Select">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${c.claimant_ref}`}
+                        checked={selected.has(c.claim_id)}
+                        onChange={() => setSelected(toggle(selected, c.claim_id))}
+                      />
+                    </td>
                     <td data-label="Waiting">
                       <Link className="rv-age" to={`/claims/${c.claim_id}`} title={new Date(c.created_at).toLocaleString()}>
                         {agoText(c.created_at)}
@@ -272,6 +308,7 @@ export default function Queue() {
           </div>
         </div>
       )}
+      <BulkBar selected={chosen} onClear={() => setSelected(new Set())} />
     </section>
   );
 }

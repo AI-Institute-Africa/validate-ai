@@ -240,3 +240,14 @@ kbd { padding: 2px 7px; border: 1px solid var(--line); border-bottom-width: 2px;
 .rv-sort { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: 600; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; min-height: 0; }
 .rv-sort[data-active="true"] { color: var(--accent); }
 tr.rv-click:focus-visible, tr.rv-click.cursor { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+.modal.wide { width: min(96vw, 860px); max-height: 90vh; overflow: auto; }
+.bulk-bar { position: sticky; bottom: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; margin-top: 12px; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; box-shadow: var(--shadow); }
+.bulk-bar .bulk-count { font-weight: 700; margin-right: auto; }
+.bulk-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.bulk-table th, .bulk-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.bulk-table input.last4 { width: 6em; text-transform: uppercase; letter-spacing: .1em; }
+.bulk-skip { color: var(--muted); }
+.bulk-result.ok { color: var(--ok); }
+.bulk-result.bad { color: var(--bad); }
+td.sel, th.sel { width: 36px; }
