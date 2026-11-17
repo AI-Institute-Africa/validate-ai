@@ -4,6 +4,13 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.claims.messages import (  # noqa: F401 - re-exported for older imports
+    PAYER_MESSAGE_KEY,
+    REASON_TEXT,
+    explain,
+    explain_keys,
+    render,
+)
 from app.claims.states import check_transition
 from app.core.audit import audit
 from app.entitlements.outbox import enqueue_event, enqueue_payer_message
@@ -47,18 +54,16 @@ def transition(
 # Neutral wording only: a payer is never told a claim is suspected (blueprint 4.5), and a
 # rejection never says why. Sent only to claims that arrived over WhatsApp.
 def _payer_text(claim: Claim, target: ClaimState) -> str | None:
+    lang = claim.payer_lang  # chosen by the payer; English unless that language is switched on
     if target == ClaimState.APPROVED:
-        return "Thank you. Your payment has been confirmed."
+        return render("payer.approved", lang)
     if target == ClaimState.PARTIALLY_ALLOCATED:
-        return REASON_TEXT["PARTIAL_PAYMENT"]
+        return render("PARTIAL_PAYMENT", lang)
     if target == ClaimState.REJECTED:
-        return "We could not confirm your payment. Please contact our finance team."
+        return render("payer.rejected", lang)
     if target == ClaimState.NEEDS_INFORMATION:
-        hints = " ".join(explain(list(claim.reason_codes)))
-        return hints or (
-            "We need a little more information about your payment. Please send a clearer copy "
-            "of your proof of payment."
-        )
+        hints = " ".join(explain(list(claim.reason_codes), lang))
+        return hints or render("payer.needs_info", lang)
     return None
 
 
@@ -123,53 +128,3 @@ def record_decision(
     )
     session.add(decision)
     return decision
-
-
-# Plain-language reasons that can be sent to the payer (blueprint 5.10).
-REASON_TEXT = {
-    "CAPTURE_TOO_SMALL": "The image is too small to read. Please upload a full-size screenshot.",
-    "CAPTURE_BLURRY": "The image is blurry. Please upload a clearer photo or screenshot.",
-    "UNREADABLE": "We could not read the payment details. Please upload a clearer copy.",
-    "MISSING_AMOUNT": "We could not find the amount on your receipt.",
-    "MISSING_REFERENCE": "We could not find a transaction reference on your receipt.",
-    "TYPED_AMOUNT_DISAGREES": "The amount you typed does not match the receipt.",
-    "TYPED_REFERENCE_DISAGREES": "The reference you typed does not match the receipt.",
-    "DUPLICATE_FILE": "This receipt has already been submitted.",
-    "DUPLICATE_NEAR_FILE": "A very similar receipt has already been submitted.",
-    "DUPLICATE_REFERENCE": "This transaction reference has already been submitted.",
-    "REFERENCE_ALREADY_CONSUMED": "This transaction has already been credited.",
-    "RECEIPT_STATUS_NOT_SUCCESS": "The receipt shows the payment as not completed.",
-    "AWAITING_CREDIT": "Your payment is waiting for confirmation from our bank records.",
-    "EXTRACTION_UNCONFIRMED": "Some payment details need a quick check by our finance team.",
-    "MANY_LOW_CONFIDENCE_FIELDS": "Some details were hard to read, so our finance team will check.",
-    "TAMPER_SUSPECTED": "The receipt image needs a manual check by our finance team.",
-    "CURRENCY_MISMATCH": "The currency paid does not match the invoice currency.",
-    "WRONG_BENEFICIARY": "The payment does not appear to have been sent to our account.",
-    "AMOUNT_MISMATCH": "The amount received differs from the amount claimed.",
-    "PARTIAL_PAYMENT": "Your payment was recorded, but the invoice is not yet fully paid.",
-    "OVERPAYMENT": "Your payment exceeds the amount due; the remainder is held for you.",
-    # neutral wording on purpose: payers are never told a claim is suspected (blueprint 4.5)
-    "SUSPECTED_FAKE": "Your payment needs a manual check by our finance team.",
-    "NO_CREDIT_FOUND": "We have not yet seen this payment in our bank records.",
-    "DOCUMENT_TRUNCATED": "Your document is long; our finance team will check the remaining pages.",
-    "CREDIT_DISPUTED": "Your payment needs a manual check by our finance team.",
-}
-
-
-def explain(reasons: list[str]) -> list[str]:
-    return [REASON_TEXT[r] for r in reasons if r in REASON_TEXT]
-
-
-# Neutral names for the payer's screen, so it can show each message in the payer's language without
-# the API revealing why. A suspected-fake claim and a disputed credit read the same, and no name
-# hints at suspicion.
-PAYER_MESSAGE_KEY = {
-    "SUSPECTED_FAKE": "MANUAL_CHECK",
-    "CREDIT_DISPUTED": "MANUAL_CHECK",
-    "TAMPER_SUSPECTED": "IMAGE_CHECK",
-}
-
-
-def explain_keys(reasons: list[str]) -> list[str]:
-    """One key per message `explain` returns, in the same order."""
-    return [PAYER_MESSAGE_KEY.get(r, r) for r in reasons if r in REASON_TEXT]

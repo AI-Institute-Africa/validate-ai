@@ -115,3 +115,16 @@ A weight of 0 switches a signal off.
   fake detection sharp.
 - Tune weights from resolved alerts. If admins keep clearing one signal, lower its weight; if a
   confirmed-fake pattern keeps scoring low, raise the signals it triggers.
+
+
+## Trusted payees (recipient on the receipt)
+
+The bank gate proves money landed in one of OUR accounts. It does not look at who the receipt says was
+paid. Set `trusted_payees` in the policy (names, wallet numbers, merchant codes) and a receipt whose agreed
+recipient matches none of them gets the reason `PAYEE_NOT_TRUSTED`: it is a RED reason, so the claim is never
+auto-approved, and a reviewer sees the `RECIPIENT_NOT_TRUSTED` signal. The payer is told, neutrally, to check
+they paid the right account (key `PAYEE_MISMATCH`). Phone numbers are compared by their last nine digits, names
+by letters and digits (one may sit inside the other). An empty list means no opinion.
+
+`PAYEE_CHANGED` is a separate, advisory signal: this payer's earlier approved payments named a different
+recipient. It only informs a person; it never blocks or approves.

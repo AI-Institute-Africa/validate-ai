@@ -1,10 +1,15 @@
-import { ALLOWED_EXT, ALLOWED_TYPES, LEGACY_EXT } from "./fileTypes";
+import { ALLOWED_EXT, ALLOWED_TYPES, LEGACY_EXT, RAW_EXT } from "./fileTypes";
 
 // Client-side pre-flight for proof uploads. The server enforces the same limits; this only
 // saves a round trip. Limits mirror docs/configuration.md.
 
 export const MAX_FILES = 5;
 export const MAX_BYTES = 10 * 1024 * 1024;
+// camera RAW is large by nature, so only it may be bigger (mirrors POPS_MAX_RAW_UPLOAD_BYTES)
+export const MAX_RAW_BYTES = 80 * 1024 * 1024;
+export const MAX_TOTAL_BYTES = 120 * 1024 * 1024;
+
+export const limitFor = (name: string) => (RAW_EXT.test(name) ? MAX_RAW_BYTES : MAX_BYTES);
 export const MAX_TEXT = 20_000;
 
 
@@ -38,8 +43,13 @@ export function validateFiles<T extends FileLike>(existing: T[], incoming: T[], 
       fail(`${f.name}: this file type is not supported. Use a photo, scan, PDF, Word, Excel or PowerPoint file, an email, or plain text.`, "file.err.type", { name: f.name });
       continue;
     }
-    if (f.size > MAX_BYTES) {
-      fail(`${f.name}: larger than ${MAX_BYTES / 1024 / 1024} MB.`, "file.err.size", { name: f.name, mb: String(MAX_BYTES / 1024 / 1024) });
+    const limit = limitFor(f.name);
+    if (f.size > limit) {
+      fail(`${f.name}: larger than ${limit / 1024 / 1024} MB.`, "file.err.size", { name: f.name, mb: String(limit / 1024 / 1024) });
+      continue;
+    }
+    if (files.reduce((n, x) => n + x.size, 0) + f.size > MAX_TOTAL_BYTES) {
+      fail(`${f.name}: together the files may not be more than ${MAX_TOTAL_BYTES / 1024 / 1024} MB.`, "file.err.total", { name: f.name, mb: String(MAX_TOTAL_BYTES / 1024 / 1024) });
       continue;
     }
     if (f.size === 0) {

@@ -53,4 +53,9 @@ def scan(data: bytes) -> str:
     if text.endswith("FOUND"):
         sig = text.split(":", 1)[-1].removesuffix("FOUND").strip()
         raise InfectedFile(sig)
+    if "size limit exceeded" in text.lower():
+        # a big file (camera RAW) past clamd's own limit: say what to change, and still fail closed
+        raise ScannerUnavailable(
+            "clamd refused the file as too large: raise StreamMaxLength (see docker-compose.yml)"
+        )
     raise ScannerUnavailable(f"unexpected clamd reply: {text[:200]}")

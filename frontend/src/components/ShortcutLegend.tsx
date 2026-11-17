@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Dialog } from "./Dialog";
+import { Icon } from "./Icon";
 
 export type Shortcut = [keys: string, what: string];
 
@@ -20,7 +21,7 @@ export function ShortcutLegend({ title, shortcuts }: { title: string; shortcuts:
   return (
     <>
       <button type="button" className="ghost small" onClick={() => setOpen(true)} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
-        ⌨ Shortcuts
+        <Icon name="keyboard" size={14} /> Shortcuts
       </button>
       {open && (
         <Dialog title={title} onClose={() => setOpen(false)}>

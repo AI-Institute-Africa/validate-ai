@@ -50,6 +50,7 @@ export const REASONS: Record<string, string> = {
   CAPTURE_GLARE: "There is glare on the document.",
   AMOUNT_MISMATCH: "The amount on the receipt differs from the amount received.",
   WRONG_BENEFICIARY: "The payment went to an account that is not ours.",
+  PAYEE_NOT_TRUSTED: "The receipt names a recipient that is not one of the trusted payees. Check who was paid.",
   PARTIAL_PAYMENT: "Only part of the invoice was paid.",
   OVERPAYMENT: "More than the invoice amount was paid.",
   NOT_EXACT_PAYMENT: "Only exact payments are approved automatically.",

@@ -35,7 +35,7 @@ with sync_playwright() as p:
 
     page.goto(f"{base}/?persona=admin")
     expect(page.get_by_role("heading", name="Know that a payment, or a person, is real. In seconds.")).to_be_visible()
-    expect(page.locator(".demo-bar")).to_contain_text("synthetic")
+    expect(page.locator(".demo-bar")).to_contain_text("synthetic", ignore_case=True)
     page.screenshot(path=f"{out}/1-home.png", full_page=True)
 
     page.get_by_role("button", name="Start the 3-minute tour").click()

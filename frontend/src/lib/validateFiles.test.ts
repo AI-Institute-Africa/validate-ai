@@ -50,3 +50,17 @@ describe("every everyday type is accepted", () => {
     expect(r.errors[0]).toMatch(/save it as a PDF/i);
   });
 });
+
+describe("size limits", () => {
+  it("lets camera RAW be large but nothing else", () => {
+    expect(validateFiles([], [f("IMG.dng", 60 * 1024 * 1024, "")]).files).toHaveLength(1);
+    expect(validateFiles([], [f("IMG.CR2", 81 * 1024 * 1024, "")]).errors[0]).toMatch(/larger than 80 MB/);
+    expect(validateFiles([], [f("scan.tiff", 11 * 1024 * 1024, "")]).errors[0]).toMatch(/larger than 10 MB/);
+  });
+  it("keeps one request under the total budget", () => {
+    const big = (n: string) => f(n, 70 * 1024 * 1024, "");
+    const r = validateFiles([], [big("a.dng"), big("b.dng")]);
+    expect(r.files).toHaveLength(1);
+    expect(r.issues[0].key).toBe("file.err.total");
+  });
+});

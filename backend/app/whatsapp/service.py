@@ -18,6 +18,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.claims import messages as pm
 from app.core import ratelimit
 from app.core.audit import audit
 from app.core.config import get_settings
@@ -26,7 +27,7 @@ from app.extraction.templates import parse_text
 from app.intake.files import RejectedFile
 from app.intake.scan import ScannerUnavailable
 from app.intake.service import create_claim
-from app.models import AuditEvent, Claim, Obligation
+from app.models import AuditEvent, Claim, Obligation, PayerPref
 from app.payment_codes.codes import find_codes
 
 log = logging.getLogger(__name__)
@@ -108,6 +109,30 @@ def _hash(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()[:64]
 
 
+_LANG_WORDS = {
+    "en": "en", "english": "en", "sn": "sn", "shona": "sn", "chishona": "sn",
+    "nd": "nd", "ndebele": "nd", "isindebele": "nd", "sindebele": "nd",
+}  # fmt: skip
+
+
+def _language_request(text: str) -> str | None:
+    """A message that is only a language name ("shona", "nd") asks for replies in it."""
+    return _LANG_WORDS.get(text.strip().lower())
+
+
+def _pref(session: Session, wa_id: str) -> str:
+    row = session.get(PayerPref, _hash(wa_id))
+    return row.lang if row else "en"
+
+
+def _set_pref(session: Session, wa_id: str, lang: str) -> None:
+    row = session.get(PayerPref, _hash(wa_id))
+    if row is None:
+        session.add(PayerPref(wa_hash=_hash(wa_id), lang=lang))
+    else:
+        row.lang = lang
+
+
 def _obligation(session: Session, codes: list[str]) -> Obligation | None:
     if not codes:
         return None
@@ -166,6 +191,14 @@ def handle_message(session: Session, msg: dict[str, Any]) -> Outcome:
         return Outcome(None)
 
     text = _text_of(msg)
+    lang = _pref(session, wa_id)
+    if kind == "text" and (wanted := _language_request(text)) is not None:
+        _set_pref(session, wa_id, wanted)
+        _seen(session, message_id, None, None)
+        if wanted != "en" and not pm.language_live(wanted):
+            # honest and always in English: the language exists but is not switched on yet
+            return Outcome(pm.NOT_LIVE.format(name=pm.LANG_NAMES[wanted]))
+        return Outcome(pm.render("wa.lang_set", wanted))
     obligation = _obligation(session, find_codes(text))
     has_media = kind in MEDIA_TYPES
     # a text that is only the code (no payment details): remember it for the photo that follows
@@ -181,18 +214,15 @@ def handle_message(session: Session, msg: dict[str, Any]) -> Outcome:
             after={"obligation_id": str(obligation.obligation_id)},
         )
         _seen(session, message_id, obligation.org_id, None)
-        return Outcome(f"Thanks. Now send the proof of payment for {obligation.payment_code}.")
+        return Outcome(pm.render("wa.send_proof", lang, code=obligation.payment_code))
     if obligation is None and has_media:
         obligation = _remembered(session, wa_id)
     if obligation is None:
         _seen(session, message_id, None, None)
-        return Outcome(
-            "Please send your proof of payment with your payment code (for example CG-H4CC093) "
-            "in the caption. You will find the code on your invoice."
-        )
+        return Outcome(pm.render("wa.need_code", lang))
     if not has_media and not is_proof_text:
         _seen(session, message_id, obligation.org_id, None)
-        return Outcome("Please send a screenshot, PDF or the payment SMS as your proof.")
+        return Outcome(pm.render("wa.need_proof", lang))
 
     s = get_settings()
     try:
@@ -216,22 +246,19 @@ def handle_message(session: Session, msg: dict[str, Any]) -> Outcome:
             declared_currency=obligation.currency,
             declared_reference=None,
             source_type="whatsapp",
+            payer_lang=lang,
         )
     except ratelimit.RateLimited:
-        return Outcome("You are sending too fast. Please wait a minute and try again.")
+        return Outcome(pm.render("wa.too_fast", lang))
     except RejectedFile as exc:
         _seen(session, message_id, obligation.org_id, None)
-        return Outcome(f"We could not accept that file: {exc}")
+        return Outcome(pm.render("wa.file_refused", lang, reason=str(exc)))
     except (httpx.HTTPError, ScannerUnavailable):
         # not marked seen: Meta's redelivery retries it
         log.warning("WhatsApp media %s could not be fetched or scanned", message_id, exc_info=True)
         raise
     _seen(session, message_id, obligation.org_id, claim)
-    return Outcome(
-        f"Received your proof of payment for {obligation.payment_code}. We will confirm it once "
-        "the money reaches our account.",
-        claim.claim_id,
-    )
+    return Outcome(pm.render("wa.received", lang, code=obligation.payment_code), claim.claim_id)
 
 
 def _seen(session: Session, message_id: str, org_id: uuid.UUID | None, claim: Claim | None) -> None:

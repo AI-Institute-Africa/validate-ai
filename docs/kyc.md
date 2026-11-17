@@ -121,3 +121,80 @@ See [`third-party-notices.md`](third-party-notices.md). In short: card-corner de
 Tesseract preprocessing follow MIT-licensed projects; the ID-vs-selfie matching approach follows
 DocFace; workflow and feature ideas (not code) come from OpenKYC and a commercial SDK's public
 description.
+
+
+## Face matching with InsightFace (optional)
+
+`POPS_KYC_FACE_BACKEND=insightface` uses an ArcFace ONNX model the way it was trained: each face is first
+warped so its five landmarks (eyes, nose, mouth corners, from the YuNet detector) land on fixed points in a
+112 x 112 picture, then embedded. The plain `onnx` backend crops a loose box instead, which scores lower on
+small, old ID photos. Both give a cosine score; the policy threshold `kyc_min_face_score` is a calibrated
+number, not a default (see `backend/tools/eval/face_eval.py`).
+
+| Setting | Value |
+| --- | --- |
+| `POPS_KYC_FACE_BACKEND` | `insightface` |
+| `POPS_KYC_FACE_MODEL_PATH` | e.g. `./var/models/w600k_r50.onnx` (from InsightFace's `buffalo_l` pack) |
+| `POPS_KYC_FACE_DETECTOR_PATH` | YuNet `face_detection_yunet_*.onnx` (OpenCV Zoo). **Required**: without it the backend refuses to start rather than match worse |
+
+**Licensing.** The InsightFace code is MIT, but its pretrained models are for **non-commercial research
+use only**. This project is non-commercial, so that fits; do not reuse the weights in a commercial product
+without a licence from InsightFace. Nothing is bundled: you download the files yourself.
+
+**Tested without the weights:** the alignment maths (a rotated, shrunk or moved face is warped back onto the
+template) and the fail-closed behaviour. **Not tested:** real accuracy, and that YuNet reports its landmarks
+in the order assumed (right eye, left eye, nose, right and left mouth corner, viewed from the image).
+Check both once on a few real photos before relying on it.
+
+
+## National ID numbers: what can and cannot be checked offline
+
+| Country | What we check | Checksum |
+| --- | --- | --- |
+| South Africa | 13 digits, Luhn check digit, a real birth date, the century (never in the future), sex | Yes (published) |
+| Zimbabwe | shape; the check letter (mod 23) is shown to a reviewer as **advisory** only | Community-derived, not official |
+| Kenya | 7 or 8 digits; obvious inventions (11111111, 12345678, runs up or down) | **None is published** |
+| Ghana Card | `GHA-#########-#`; obvious inventions | **None is published** (the Card has a check character, but its algorithm is not public) |
+| Nigeria, Zambia, Tanzania, Uganda | shape; obvious inventions | none used |
+
+A number that fails shape or looks invented goes to a person; it is never rejected automatically, and a
+passing number is never described as "verified". Whether the holder exists is a registry question (NIA in
+Ghana, IPRS in Kenya) and needs the registry or a licensed provider (Smile ID, uqudo).
+
+
+## Calibrating the face threshold (what real data we need)
+
+`kyc_min_face_score` (default 0.45) is a starting guess, not a measurement. It must be set from your own
+ID-photo and selfie pairs, because faces on small, old, compressed ID photos score lower than benchmark
+pairs, and error rates differ by population.
+
+**Collect** (with written consent, stored only for this purpose, deleted afterwards):
+- 300 or more *genuine* pairs: a real ID photo and a selfie of the same person, taken the way payers will take them
+  (phones in common use, poor light included).
+- 3,000 or more *impostor* pairs: the same ID photos paired with selfies of other people. They can be built by
+  re-pairing the genuine set. A false-accept rate of 0.1% cannot even be measured with fewer than about 3,000.
+- Mix the people the system will really serve (ages, skin tones, glasses, head coverings); report each group
+  separately, since one overall number can hide a group the system fails.
+
+**Run** `python backend/tools/eval/face_eval.py --pairs pairs.csv` (columns `card,selfie,same`). It prints false-accept
+and false-reject rates by threshold, the AUC with a 95% interval, and how far the chosen threshold moves when the
+pairs are resampled. Choose the threshold for the false-accept rate you can live with, and keep auto-verification
+in `shadow` mode until the numbers hold on a fresh set. **No real pairs were available while building this, so the
+default has not been calibrated.**
+
+## Measuring the tamper check
+
+`python backend/tools/eval/tamper_eval.py --genuine DIR --forged DIR` (or `--demo` for a synthetic self-test).
+
+**What the self-test found.** On synthetic edits (pasted patch, retyped text, inpainting, a re-compressed region, on
+flat generated ID cards that were JPEG-saved first) the current tamper analyser separates forged from genuine
+no better than chance: AUC about 0.50 (95% interval about 0.39 to 0.61). This set is synthetic and flat, so it does
+not say how the check performs on real documents, but it is a clear warning not to rely on it. The check is already
+only a *flag* that can route a claim to a person and can never approve or reject one, which is the right place for a
+signal this uncertain. Measure it on a labelled real set before trusting its default threshold
+(`tamper_review_score` = 0.6) or giving it more weight.
+
+**SIDTD** (European IDs with Crop-and-Replace, inpainted and printed/filmed forgeries) is the natural real set. It
+could not be downloaded here (its host is not reachable from this environment). Before using it: check the licence
+on its repository record (published sources disagree between CC BY-SA and CC BY-NC-ND), use it for evaluation only,
+and do not commit or redistribute any of its images. It contains no African IDs.

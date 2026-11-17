@@ -1,0 +1,59 @@
+/* Motion: used only where it explains something (a page arriving, a list appearing, a number settling,
+   a result being decided). Short, eased, never looping. Everything here is switched off for people who
+   ask their device for reduced motion (see ui.css). */
+
+@keyframes arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes pop { from { opacity: 0; transform: scale(0.96) translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes sweep { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+/* a page arrives */
+.page { animation: arrive var(--calm) var(--ease) both; }
+
+/* lists and grids reveal one item after another (set --i on children for a longer list) */
+.reveal > * { animation: arrive var(--calm) var(--ease) both; }
+.reveal > *:nth-child(1) { animation-delay: 30ms; }
+.reveal > *:nth-child(2) { animation-delay: 90ms; }
+.reveal > *:nth-child(3) { animation-delay: 150ms; }
+.reveal > *:nth-child(4) { animation-delay: 210ms; }
+.reveal > *:nth-child(5) { animation-delay: 270ms; }
+.reveal > *:nth-child(n + 6) { animation-delay: 330ms; }
+tbody.reveal tr { animation: fade var(--calm) var(--ease) both; }
+tbody.reveal tr:nth-child(1) { animation-delay: 20ms; }
+tbody.reveal tr:nth-child(2) { animation-delay: 60ms; }
+tbody.reveal tr:nth-child(3) { animation-delay: 100ms; }
+tbody.reveal tr:nth-child(4) { animation-delay: 140ms; }
+tbody.reveal tr:nth-child(n + 5) { animation-delay: 180ms; }
+
+/* surfaces that open */
+.persona-menu { animation: pop 160ms var(--ease) both; transform-origin: top right; }
+.modal { animation: pop 200ms var(--ease) both; }
+.overlay { animation: fade 160ms var(--ease) both; }
+.toast { animation: slide-in 220ms var(--ease) both; }
+.bulk-bar { animation: arrive 220ms var(--ease) both; }
+
+/* a result is decided: its headline settles, the ticks draw themselves */
+.outcome { animation: fade var(--calm) var(--ease) both; }
+.outcome .headline { animation: arrive var(--calm) var(--ease) 80ms both; }
+.tick { stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw 420ms var(--ease) 120ms forwards; }
+.tick-ring { stroke-dasharray: 70; stroke-dashoffset: 70; animation: draw 520ms var(--ease) forwards; }
+
+/* progress that fills rather than jumps */
+.upload-bar { transition: width 260ms var(--ease); }
+.meter i { transform-origin: left; animation: sweep 600ms var(--ease) both; }
+
+/* small, physical responses to the pointer */
+.card, .scn, .stat, .tour-step { transition: border-color var(--quick) var(--ease), background var(--quick) var(--ease); }
+.tour-step:hover { border-color: color-mix(in srgb, var(--text) 30%, var(--line)); }
+tbody tr { transition: background var(--quick) var(--ease); }
+a { transition: color var(--quick) var(--ease); }
+.seg button, .rv-pill, .rv-tab { transition: background var(--quick) var(--ease), color var(--quick) var(--ease), border-color var(--quick) var(--ease); }
+.skeleton-line { animation: shimmer 1.4s infinite; }
+
+/* the first thing on the home page types in slightly after the page, so the eye lands on it */
+.hero2 h1 { animation: arrive 520ms var(--ease) 60ms both; }
+.hero2 p, .hero2 .cta { animation: arrive 520ms var(--ease) 160ms both; }
+.hero2 .how-steps { animation: fade 700ms var(--ease) 320ms both; }

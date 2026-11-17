@@ -1,3 +1,4 @@
+import { Icon } from "../components/Icon";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, del, hasRole, post, type ShadowScorecard } from "../api";
@@ -613,7 +614,7 @@ export default function Guardrails() {
             <ul className="locked">
               {list.data?.system.map((g) => (
                 <li key={g.id}>
-                  <span className="lock-chip" aria-hidden>🔒</span> <strong>{g.name}</strong>
+                  <span className="lock-chip" aria-hidden><Icon name="lock" size={13} /></span> <strong>{g.name}</strong>
                   <span className="badge tier-green locked-badge">always on</span>
                   <div className="muted small">{g.description}</div>
                 </li>

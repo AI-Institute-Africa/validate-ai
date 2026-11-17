@@ -1,3 +1,4 @@
+import { Icon } from "../components/Icon";
 import { ACCEPT } from "../lib/fileTypes";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -260,13 +261,13 @@ export default function ImageToText() {
                   </div>
                 </div>
                 <button type="button" className="ghost small" onClick={clear}>
-                  ✕
+                  <Icon name="close" size={13} />
                 </button>
               </div>
             ) : (
               <>
                 <div className="drop-icon" aria-hidden>
-                  <span className="drop-glyph">⇪</span>
+                  <span className="drop-glyph"><Icon name="upload" size={22} /></span>
                 </div>
                 <p>
                   <strong>Drag a photo or document here</strong> or choose how to add it:
@@ -277,14 +278,14 @@ export default function ImageToText() {
             <div className="capture-row">
               <button type="button" className="capture" onClick={() => cameraRef.current?.click()}>
                 <span className="glyph" aria-hidden>
-                  📷
+                  <Icon name="camera" size={20} />
                 </span>
                 Take a photo
                 <span className="muted small">uses your camera</span>
               </button>
               <button type="button" className="capture" onClick={() => uploadRef.current?.click()}>
                 <span className="glyph" aria-hidden>
-                  📁
+                  <Icon name="upload" size={20} />
                 </span>
                 Upload file
                 <span className="muted small">PNG, JPG, PDF, Word</span>
@@ -348,7 +349,7 @@ export default function ImageToText() {
           {!result && !convert.isPending && !error && (
             <div className="card empty-state">
               <div className="empty-glyph" aria-hidden>
-                🔤
+                <Icon name="text" size={22} />
               </div>
               <p className="muted">
                 The text will appear here. Nothing is stored: close or reload the page and the

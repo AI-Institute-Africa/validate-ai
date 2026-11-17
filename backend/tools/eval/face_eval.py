@@ -90,6 +90,28 @@ def main() -> None:
             f"  threshold {p.threshold:6.3f}   false accept {p.far:6.1%}"
             f"   false reject {p.frr:6.1%}"
         )
+    auc = calibration.auc(gen, imp)
+    lo, hi = calibration.bootstrap_ci(calibration.auc, gen, imp)
+    print(f"\nAUC {auc:.4f}  (95% interval {lo:.4f} to {hi:.4f}; 0.5 is a coin toss)")
+    # how much the answer could move: the threshold again on resampled pairs
+    picks = []
+    import random
+
+    rnd = random.Random(0)  # noqa: S311 - reproducible statistics
+    for _ in range(200):
+        g = [rnd.choice(gen) for _ in gen]
+        i = [rnd.choice(imp) for _ in imp]
+        p = calibration.threshold_for_far(g, i, a.far)
+        if p:
+            picks.append(p.threshold)
+    if picks:
+        picks.sort()
+        print(
+            f"Threshold for FAR <= {a.far:.2%} moves between "
+            f"{picks[int(0.025 * len(picks))]:.3f} and "
+            f"{picks[int(0.975 * len(picks)) - 1]:.3f} (95%) when the pairs are resampled."
+        )
+    print("Protocol for collecting real pairs: docs/kyc.md, 'Calibrating the face threshold'.")
     need = calibration.min_pairs_for(a.far)
     pick = calibration.threshold_for_far(gen, imp, a.far)
     if len(imp) < need:

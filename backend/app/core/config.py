@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     s3_secret_key: str | None = None
 
     max_upload_bytes: int = 10 * 1024 * 1024
+    # camera RAW files are large by nature (20-80 MB); only they may exceed max_upload_bytes
+    max_raw_upload_bytes: int = 80 * 1024 * 1024
+    # everything one request may carry, so a few big files cannot exhaust memory
+    max_claim_upload_bytes: int = 120 * 1024 * 1024
 
     # malware scanning via clamd (INSTREAM). Required in prod.
     clamav_host: str | None = None
@@ -73,9 +77,10 @@ class Settings(BaseSettings):
 
     # global kill switch for KYC auto-verification (app/kyc/auto.py); overrides every policy
     kyc_auto_disabled: bool = False
-    # face matching for KYC: onnx (needs POPS_KYC_FACE_MODEL_PATH) | fake (tests) | demo | none.
+    # face matching for KYC: onnx (needs POPS_KYC_FACE_MODEL_PATH) | insightface (the same ArcFace
+    # model, with the face aligned first: needs YuNet too) | fake (tests) | demo | none.
     # With none, or a missing model, nothing is auto-verified: a person decides (fail closed).
-    kyc_face_backend: Literal["onnx", "fake", "demo", "none"] = "onnx"
+    kyc_face_backend: Literal["onnx", "insightface", "fake", "demo", "none"] = "onnx"
     kyc_face_model_path: str = "./var/models/face-embedding.onnx"
     # face detector: a YuNet ONNX model (OpenCV Zoo); on OpenCV 4 the bundled Haar cascade is
     # used when this file is absent
@@ -89,6 +94,11 @@ class Settings(BaseSettings):
     lookup_backend: Literal["fake", "browser"] = "fake"
     lookup_allowed_domains: list[str] = []
     lookup_timeout_seconds: int = 60
+
+    # languages (besides English) whose outbound messages (WhatsApp, approve/reject texts) a
+    # fluent reviewer has signed off and that may be sent; see app/claims/messages.py
+    payer_message_languages_live: list[str] = []
+    allow_draft_payer_messages: bool = False  # staging only: send unreviewed drafts
 
     # extraction readers: ollama | donut | fake ; ocr: tesseract | none
     vlm_backend: Literal["ollama", "donut", "fake"] = "ollama"
@@ -179,6 +189,8 @@ def validate_for_startup(s: Settings) -> None:
         problems.append("POPS_VLM_BACKEND=fake is for tests and demos only")
     if s.demo:
         problems.append("POPS_DEMO=true is for the standalone demo only")
+    if s.allow_draft_payer_messages:
+        problems.append("POPS_ALLOW_DRAFT_PAYER_MESSAGES sends unreviewed translations to payers")
     if s.lookup_mode != "off" and s.lookup_backend == "fake":
         problems.append("POPS_LOOKUP_BACKEND=fake is for tests and demos only")
     if s.lookup_mode != "off" and not s.lookup_allowed_domains:
