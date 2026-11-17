@@ -97,6 +97,52 @@ jobs:
             frontend/shots
             api.log
 
+  # The console as a person uses it: the standalone demo (what the README tells people to run) and
+  # the browser scripts that drive it. The demo is reset before each script (see the runner), so
+  # they cannot affect one another.
+  browser:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: demo
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      POPS_DATABASE_URL: postgresql+psycopg://postgres@127.0.0.1:5432/demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install -e "./backend[dev]" && python -m playwright install --with-deps chromium
+      - run: cd frontend && npm ci && npm run build
+      - name: Start the demo
+        run: |
+          cd backend
+          nohup python -m app.demo --no-browser --port 8000 --data-dir "$RUNNER_TEMP/demo" > ../demo.log 2>&1 &
+          for i in $(seq 90); do curl -sf localhost:8000/api/demo/info >/dev/null && break; sleep 2; done
+          curl -sf localhost:8000/api/demo/info >/dev/null
+      - name: Browser tests
+        run: sh frontend/e2e/run_demo_suite.sh http://127.0.0.1:8000 shots  # saved under frontend/shots
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-screenshots
+          path: |
+            frontend/shots
+            demo.log
+
   docker:
     runs-on: ubuntu-latest
     steps:
