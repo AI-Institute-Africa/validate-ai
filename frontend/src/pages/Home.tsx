@@ -200,7 +200,7 @@ export default function Home() {
         <>
           <div className="section-title" id="tour">
             <h2>Guided tour</h2>
-            <span className="muted small">Six short stories. Each one runs the real product and shows what happened.</span>
+            <span className="muted small">Short stories. Each one runs the real product and shows what happened.</span>
           </div>
           {!started && (
             <div className="card">

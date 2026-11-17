@@ -32,17 +32,25 @@ own files; the launcher checks this and tells you what to change. A normal user 
 
 Everything the **rules, ledger, review queue, audit trail and permissions** do is the real code, and
 so is the API. Documents are fictional ("Republic of Validia", `VDA`) and say SAMPLE on their face.
+Zimbabwean *money* is real in the demo: USD and ZWG (ZiG) amounts, EcoCash and InnBucks wallets.
 
 ## The stories
 
 Payments: *pay and get approved*, *receipt before the money* (then deliver it), *edited receipt*,
-*same receipt twice*, *paid part of the amount*, *blurry photo*.
+*same receipt twice*, *paid part of the amount*, *blurry photo*, *pay in ZiG*, *pay with InnBucks* and
+*USD invoice paid in ZiG*.
 Identity: *verify an ID in seconds*, *passport with MRZ*, *someone else's selfie*, *expired ID*,
 *edited passport*, *one ID, two people*, *no face in the selfie*.
 
 Each is a short script in `backend/app/demo/scenarios.py` that drives the real API as a persona, and
 **each declares the outcome and reason code it must produce**. `tests/test_demo.py` runs all of them,
 so the demo cannot quietly drift from the engine.
+
+**USD invoice paid in ZiG** needs `POPS_FX_ENABLED=true` (`python -m app.demo` sets it). The demo has no
+internet, so the story enters a sample rate by hand (27.2508 ZWG per USD, the RBZ ask rate of
+13 Nov 2026) as the approver, exactly as a person would when the Reserve Bank's site is down. The
+claim goes to a reviewer, with the converted amount and the rate's source shown; it is never settled
+automatically. See `docs/fx-rates.md`.
 
 On the **Verify a payment** and **Verify an ID** pages, *Try a sample* fills the form with a generated
 case so you can submit it yourself.

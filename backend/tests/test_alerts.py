@@ -58,6 +58,38 @@ def test_parser_reads_incoming_credits(text):
 
 
 @pytest.mark.parametrize(
+    ("sender", "text", "provider", "currency", "minor"),
+    [
+        (
+            "InnBucks",
+            "You have received ZWG 1,090.03 from Tendai Moyo (263771234567). Txn ID: IB2610170001.",
+            "INNBUCKS",
+            "ZWG",
+            109003,
+        ),
+        (
+            "OneMoney",
+            "You have received USD 12.50 from Rudo Ncube, Transaction ID OM123456789.",
+            "ONEMONEY",
+            "USD",
+            1250,
+        ),
+        (
+            "Omari",
+            "Payment of USD 40.00 from Tendai Moyo. Reference OM2610170001.",
+            "OMARI",
+            "USD",
+            4000,
+        ),
+    ],
+)
+def test_other_zimbabwean_wallet_placeholders_parse(sender, text, provider, currency, minor):
+    p = parse(text, sender)
+    assert (p.provider, p.currency, p.amount_minor) == (provider, currency, minor)
+    assert p.reference
+
+
+@pytest.mark.parametrize(
     "text",
     [
         "You have sent USD10.00 to JOHN. Approval Code: PP1234567",

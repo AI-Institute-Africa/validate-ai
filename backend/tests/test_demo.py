@@ -26,6 +26,7 @@ if not any(getattr(r, "path", "").startswith("/demo") for r in app.routes):
 @pytest.fixture
 def api(monkeypatch) -> S.Api:
     monkeypatch.setattr(get_settings(), "kyc_face_backend", "demo")
+    monkeypatch.setattr(get_settings(), "fx_enabled", True)
     a = service.api_for(TestClient(app))
     a.call("admin", "POST", "/admin/policy", json={"version": S.POLICY_VERSION, "config": S.POLICY})
     return a
@@ -34,6 +35,7 @@ def api(monkeypatch) -> S.Api:
 @pytest.fixture
 def demo_client(monkeypatch) -> TestClient:
     monkeypatch.setattr(get_settings(), "kyc_face_backend", "demo")
+    monkeypatch.setattr(get_settings(), "fx_enabled", True)
     c = TestClient(app)
     service.api_for(c).call(
         "admin", "POST", "/admin/policy", json={"version": S.POLICY_VERSION, "config": S.POLICY}
@@ -67,6 +69,26 @@ def test_receipt_before_money_is_approved_once_the_money_arrives(api):
     assert r.state == "AWAITING_FINANCIAL_CONFIRMATION" and len(r.followups) == 1
     after = S.deliver_money(api, **r.followups[0]["params"])
     assert after.state == "APPROVED" and "AUTO_APPROVED" in after.reasons
+
+
+def test_a_usd_invoice_paid_in_zig_shows_the_official_rate_and_is_not_settled(api):
+    r = S.BY_ID["pay-usd-in-zig"].run(api)
+    assert r.state == "PENDING_REVIEW" and "CROSS_CURRENCY_AT_OFFICIAL_RATE" in r.reasons
+    assert "RATE_DEVIATION" not in r.reasons  # ZWG 1,090.03 is USD 40.00 at the sample rate
+    packet = api.call("reviewer", "GET", f"/review/claims/{r.ref_id}/audit-packet")
+    fx = packet["official_rate"]
+    assert fx["ask"] == S.DEMO_RATE and fx["converted_minor"] == 4000
+    # nothing was allocated: a mixed-currency payment never settles by itself
+    detail = api.call("reviewer", "GET", f"/review/claims/{r.ref_id}")
+    assert detail["allocations"] == []
+
+
+def test_zig_and_innbucks_stories_are_settled_in_their_own_terms(api):
+    for sid in ("pay-zig", "pay-innbucks"):
+        r = S.BY_ID[sid].run(api)
+        assert r.state == "APPROVED", (sid, r.reasons)
+    claim = api.call("reviewer", "GET", f"/claims/{r.ref_id}")
+    assert claim["channel"] == "innbucks"
 
 
 def test_the_payer_is_never_told_about_suspected_fraud(api):

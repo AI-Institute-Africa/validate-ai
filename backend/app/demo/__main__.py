@@ -126,6 +126,7 @@ def main() -> None:
         POPS_STORAGE_BACKEND="local",
         POPS_STORAGE_LOCAL_DIR=str(data / "evidence"),
         POPS_LOG_JSON="false",
+        POPS_FX_ENABLED="true",  # the cross-currency story reads a (manually entered) rate
         POPS_CORS_ORIGINS='["http://localhost:5173"]',
     )
     os.environ.pop("POPS_CLAMAV_HOST", None)

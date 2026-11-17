@@ -108,8 +108,8 @@ def prepare_payment(variant: str, request: Request) -> dict[str, Any]:
         "payment_code": s.invoice["payment_code"],
         "claimant_ref": s.invoice["learner_ref"],
         "amount": s.amount,
-        "currency": "USD",
-        "channel": "ecocash",
+        "currency": s.currency,
+        "channel": s.channel,
         "file_url": f"/demo/files/{key}",
         "filename": "receipt.png",
     }

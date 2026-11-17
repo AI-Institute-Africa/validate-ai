@@ -53,6 +53,9 @@ const SAMPLES: { id: string; label: string; hint: string }[] = [
   { id: "edited", label: "Edited receipt", hint: "The image shows signs of editing" },
   { id: "short", label: "Paid part", hint: "Less than the invoice amount" },
   { id: "blurry", label: "Blurry photo", hint: "Too blurry to read" },
+  { id: "zig", label: "Paid in ZiG", hint: "A ZWG invoice paid in ZWG" },
+  { id: "innbucks", label: "Paid with InnBucks", hint: "Another wallet, same proof" },
+  { id: "usd_in_zig", label: "USD invoice paid in ZiG", hint: "A person decides, with the official rate" },
 ];
 
 function tierClass(tier: string): string {

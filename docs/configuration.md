@@ -73,7 +73,7 @@ Tokens are kept in `sessionStorage`, never `localStorage`.
 | --- | --- |
 | `POPS_VLM_BACKEND`, `POPS_OLLAMA_URL`, `POPS_OLLAMA_API_KEY`, `POPS_OLLAMA_MODEL` | Vision reader (see `docs/models.md`). |
 | `POPS_OCR_BACKEND`, `POPS_OCR_LANGUAGES` | Tesseract second reader (`eng` by default). |
-| `POPS_PROVIDER_TEMPLATES_FILE` | JSON list that adds or overrides provider layouts, without a code change. |
+| `POPS_PROVIDER_TEMPLATES_FILE` | JSON list that adds or overrides provider layouts, without a code change. Example: `sample_data/zw/provider_templates.example.json`. |
 | `POPS_STATEMENT_PROFILES_FILE` | JSON list that adds or overrides bank statement layouts. The same profile reads a CSV or a digital PDF statement (column names matched case-insensitively in the PDF's table header). |
 | `POPS_STATUS_SYNONYMS_FILE` | JSON object of extra payment-status words, e.g. in Shona or isiNdebele: `{"word": "success"}` (values: `success`, `pending`, `failed`, `reversed`). |
 
@@ -112,7 +112,7 @@ optional `POPS_WHATSAPP_ORG_ID` and `POPS_WHATSAPP_GRAPH_URL`.
 ## Alerts
 
 See [`alerts.md`](alerts.md): `POPS_ALERT_IMAP_HOST/USER/PASSWORD/FOLDER/SOURCE_ID`,
-`POPS_ALERT_SOURCE_STALE_MINUTES` (default 30), `POPS_ALERT_TEMPLATES_FILE`, and
+`POPS_ALERT_SOURCE_STALE_MINUTES` (default 30), `POPS_ALERT_TEMPLATES_FILE` (example: `sample_data/zw/alert_templates.example.json`; the built-in InnBucks, OneMoney and O'mari templates are unconfirmed guesses), and
 `POPS_RATE_LIMIT_ALERTS_PER_MINUTE` (default 120 per source).
 
 ## Phase-4 advisory features
