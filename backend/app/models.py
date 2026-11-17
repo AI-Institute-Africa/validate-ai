@@ -166,6 +166,8 @@ class Claim(Base):
     correlation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), default=_uuid)
     # a client-chosen key (Idempotency-Key header) so a retried upload cannot create a second
     # claim, and a fingerprint of what was sent so the same key with different content is refused
+    # the language this payer asked to be messaged in (en/sn/nd); English is used unless it is live
+    payer_lang: Mapped[str | None] = mapped_column(String(2))
     client_key: Mapped[str | None] = mapped_column(String(80))
     request_fingerprint: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = _created()
@@ -660,4 +662,15 @@ class AlertMessage(Base):
     __table_args__ = (
         UniqueConstraint("source_id", "body_sha256", name="uq_alert_message_dedupe"),
         Index("ix_alert_messages_org_created", "org_id", "created_at"),
+    )
+
+
+class PayerPref(Base):
+    """A WhatsApp payer's language, kept by a hash of the number (never the number itself)."""
+
+    __tablename__ = "payer_prefs"
+    wa_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    lang: Mapped[str] = mapped_column(String(2), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

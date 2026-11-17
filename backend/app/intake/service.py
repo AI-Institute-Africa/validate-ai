@@ -96,6 +96,7 @@ def create_claim(
     declared_currency: str | None,
     declared_reference: str | None,
     source_type: str = "upload",
+    payer_lang: str | None = None,
     client_key: str | None = None,
     request_fingerprint: str | None = None,
 ) -> Claim:
@@ -113,6 +114,7 @@ def create_claim(
         reason_codes=[],
         client_key=client_key,
         request_fingerprint=request_fingerprint,
+        payer_lang=payer_lang,
     )
     session.add(claim)
     session.flush()

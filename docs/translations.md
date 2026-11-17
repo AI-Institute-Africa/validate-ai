@@ -30,8 +30,13 @@ revealing why).
 None is signed off, so payers still see English. The admin and reviewer pages stay in English on purpose,
 and so do the demo-only parts (sample buttons, the demo banner).
 
-Not yet translated: messages sent outside the console (the WhatsApp outbox and the reject/approve texts in
-`backend/app/claims/service.py::_payer_text`), and the text inside the downloadable summary's header lines.
+Messages sent outside the console (WhatsApp replies, and the approve / reject / ask-for-more texts) are in
+`backend/app/claims/messages.py`, in the same three languages and under the same rule: a WhatsApp payer
+texts `shona` or `ndebele` (or `english`) to choose, but they are answered in English until that language is
+switched on (`POPS_PAYER_MESSAGE_LANGUAGES_LIVE=["sn"]` once a fluent reviewer has signed the text off) or the
+string is added to `REVIEWED`. Staging can preview drafts with `POPS_ALLOW_DRAFT_PAYER_MESSAGES=true`; production
+refuses to start with it. The reason sentences are the same words as the console's (a test keeps them in step).
+Still English only: the header lines of the downloadable summary file and anything a reviewer types by hand.
 To preview the drafts on a test site: set `VITE_ALLOW_UNREVIEWED_TRANSLATIONS=true`, or run
 `localStorage.setItem('validate-allow-draft-translations','1')` in the browser and pick the language.
 

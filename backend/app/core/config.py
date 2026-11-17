@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     lookup_allowed_domains: list[str] = []
     lookup_timeout_seconds: int = 60
 
+    # languages (besides English) whose outbound messages (WhatsApp, approve/reject texts) a
+    # fluent reviewer has signed off and that may be sent; see app/claims/messages.py
+    payer_message_languages_live: list[str] = []
+    allow_draft_payer_messages: bool = False  # staging only: send unreviewed drafts
+
     # extraction readers: ollama | donut | fake ; ocr: tesseract | none
     vlm_backend: Literal["ollama", "donut", "fake"] = "ollama"
     # Shadow mode (blueprint phase 4): advisory AI proposals recorded beside claims and scored
@@ -183,6 +188,8 @@ def validate_for_startup(s: Settings) -> None:
         problems.append("POPS_VLM_BACKEND=fake is for tests and demos only")
     if s.demo:
         problems.append("POPS_DEMO=true is for the standalone demo only")
+    if s.allow_draft_payer_messages:
+        problems.append("POPS_ALLOW_DRAFT_PAYER_MESSAGES sends unreviewed translations to payers")
     if s.lookup_mode != "off" and s.lookup_backend == "fake":
         problems.append("POPS_LOOKUP_BACKEND=fake is for tests and demos only")
     if s.lookup_mode != "off" and not s.lookup_allowed_domains:

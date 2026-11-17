@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.claims.messages import render
 from app.core import observability as obs
 from app.core.audit import audit
 from app.entitlements.outbox import enqueue_event, enqueue_payer_message, entitlement_payload
@@ -172,8 +173,7 @@ def grant_if_eligible(
         session,
         claim,
         "provisional",
-        f"Access is open until {grant.expires_at:%Y-%m-%d %H:%M} UTC "
-        "while we confirm your payment.",
+        render("payer.provisional", claim.payer_lang, until=f"{grant.expires_at:%Y-%m-%d %H:%M}"),
     )
     obs.PROVISIONAL_EVENTS.labels("granted").inc()
     return grant
