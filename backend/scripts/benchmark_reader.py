@@ -8,7 +8,8 @@ Layout of the labelled set (never used for training; see blueprint 12.2):
     python scripts/benchmark_reader.py <dir> qwen2.5vl:7b [more models] [--card CARD.md]
 
 Scores are per field, exact match after the engine's own normalisation, plus latency.
---card appends an accuracy-by-template table (by each label's "provider" or "template") for a model card.
+--card appends an accuracy-by-template table (by each label's "provider" or "template") to a file,
+for a model card.
 """
 
 import json
