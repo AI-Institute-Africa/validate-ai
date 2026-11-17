@@ -6,6 +6,7 @@ and approves. A wrong last 4 is refused by the server.
     python e2e/bulk_approve.py http://127.0.0.1:8000
 """
 
+import atexit
 import json
 import os
 import sys
@@ -43,6 +44,18 @@ cur = call("GET", "/admin/policy", admin)
 cfg = {**cur["config"], "auto_approve_enabled": False}
 call("POST", "/admin/policy", admin, {"version": f"{cur['version']}-manual-{os.getpid()}", "config": cfg})
 # (the demo's scripted stories re-apply their own policy, so the payer below uses the sample button)
+
+
+def _put_policy_back() -> None:
+    """Leave the demo as we found it: the other browser scripts expect auto-approve to be on, and
+    this one must not break them whichever order they run in, or when it fails half way."""
+    try:
+        call("POST", "/admin/policy", admin, {"version": f"{cur['version']}-restored-{os.getpid()}", "config": cur["config"]})
+    except Exception as exc:  # the demo may already be gone; say so, do not hide the real result
+        print(f"could not restore the demo policy: {exc}", file=sys.stderr)
+
+
+atexit.register(_put_policy_back)
 
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=exe, args=["--no-sandbox"])
