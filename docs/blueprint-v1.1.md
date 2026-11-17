@@ -428,6 +428,11 @@ Each layer catches a different kind of error. Layer 4 is the one a model cannot 
 | 7. Ledger invariants | Double posting, over-allocation, partial writes, replays | Unique and check constraints, atomic transactions, idempotency keys, append-only compensating entries | Transaction rolls back |
 | 8. Review, audit, monitoring | Errors the layers above missed | Sampled audit of auto-approvals, daily control totals, unmatched-credit report, drift alerts, reversal tracking | Incident procedure and kill switch |
 
+> **Update (authenticity detectors).** Layer 6's tamper flags are hand-written today. A locally trained set of
+> detectors (receipt and ID forgery, AI-generated content, face deepfake and clone, near-duplicate) is designed in
+> [`authenticity-detectors.md`](authenticity-detectors.md). They add flags to layer 6 and layer 4's duplicate checks,
+> start in shadow mode, may only escalate to a person, and never approve or reject.
+
 ### 11.2 Design rules
 
 - **Fail closed.** A timeout, low confidence or missing source never approves; it routes to review.
@@ -446,7 +451,7 @@ Not at first. Start with a pretrained VLM, prompts and a strict schema, then tra
 | Main VLM reader | Not initially; fine-tune later if needed | Benchmark pretrained models on real local POPs first. Fine-tune an open-weights VLM (for example with LoRA) only if a high-volume channel misses its accuracy target, or to cut cost or keep data in-house |
 | Document-type classifier | Yes, a small one | Cheap to train on local layouts (mobile money, bank apps, slips) and speeds routing |
 | Provider layout fingerprints | No, use rules | Deterministic templates are easier to audit than a model |
-| Tamper and forgery detection | Later and carefully | Few labelled fakes exist at first; begin with off-the-shelf forensic checks as flags, then train as real cases accumulate |
+| Tamper and forgery detection | Later and carefully | Few labelled fakes exist at first; begin with off-the-shelf forensic checks as flags, then train as real cases accumulate (design for the trained detectors, run locally with no outside AI: [`authenticity-detectors.md`](authenticity-detectors.md)) |
 | Risk and fraud scoring | After shadow mode | Gradient-boosted model on labelled outcomes; it may escalate a case, never approve one |
 | Matching and allocation | No | Rules and ledger constraints, not a model |
 

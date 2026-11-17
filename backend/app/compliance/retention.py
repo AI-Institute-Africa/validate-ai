@@ -10,12 +10,12 @@ their files. KYC images have their own purge (`kyc/service.py::purge_evidence`).
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import audit
 from app.intake.storage import get_storage
-from app.models import AlertMessage, Claim, ClaimState, Evidence, Organisation
+from app.models import AlertMessage, Claim, ClaimState, Evidence, EvidenceEmbedding, Organisation
 from app.policy.engine import load_policy
 
 log = logging.getLogger(__name__)
@@ -51,6 +51,10 @@ def purge_payment_data(session: Session, now: datetime | None = None) -> dict[st
                         except Exception:  # noqa: BLE001 - a missing file must not stop the purge
                             log.warning("could not delete %s during retention", key)
                 e.purged_at = now
+                # the embedding is personal data like the picture: it goes with it
+                session.execute(
+                    delete(EvidenceEmbedding).where(EvidenceEmbedding.evidence_id == e.evidence_id)
+                )
                 audit(
                     session,
                     actor="rule:retention",

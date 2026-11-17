@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.detect.base import DETECT_KINDS
 from app.models import ApprovalTier, EvidenceTier, PaymentPolicy
 
 # Default weight (0-100) of each fake-POP signal; organisations tune them in their policy.
@@ -148,6 +149,11 @@ class PolicyConfig(BaseModel):
         default=4, ge=0, le=14
     )  # longest a carried-forward rate may be
 
+    # trained authenticity detectors (docs/authenticity-detectors.md): which kinds run for this
+    # organisation, and the score at or above which each escalates (unset = never escalates)
+    detect_enabled_kinds: list[str] = Field(default_factory=lambda: list(DETECT_KINDS))
+    detect_thresholds: dict[str, float] = Field(default_factory=dict)
+
     # retention for payment evidence files and raw alert text (None = keep); see app/compliance
     evidence_retention_days: int | None = Field(default=None, ge=30, le=3650)
     alert_body_retention_days: int | None = Field(default=None, ge=30, le=3650)
@@ -161,6 +167,24 @@ class PolicyConfig(BaseModel):
     # reviewer; it can never approve, reject or allocate on its own.
     tamper_enabled: bool = True
     tamper_review_score: float = Field(default=0.6, ge=0.0, le=1.0)
+
+    @field_validator("detect_enabled_kinds")
+    @classmethod
+    def _known_kinds(cls, v: list[str]) -> list[str]:
+        bad = sorted(set(v) - set(DETECT_KINDS))
+        if bad:
+            raise ValueError(f"unknown detector kinds: {', '.join(bad)}")
+        return v
+
+    @field_validator("detect_thresholds")
+    @classmethod
+    def _valid_thresholds(cls, v: dict[str, float]) -> dict[str, float]:
+        bad = sorted(set(v) - set(DETECT_KINDS))
+        if bad:
+            raise ValueError(f"unknown detector kinds: {', '.join(bad)}")
+        if any(not 0.0 < x <= 1.0 for x in v.values()):
+            raise ValueError("detector thresholds must be above 0 and at most 1")
+        return v
 
     @field_validator("second_approver_above_minor", mode="before")
     @classmethod

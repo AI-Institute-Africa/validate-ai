@@ -19,6 +19,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -750,3 +751,62 @@ class PayerPref(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class DetectorScore(Base):
+    """One authenticity detector's score for one file or face (append-only).
+
+    Recorded in shadow and escalate mode alike, with the model's version and SHA-256, so a past
+    decision can be explained after the model has been replaced and shadow scores can be compared
+    with what reviewers decided. A skipped row says why nothing was scored.
+    """
+
+    __tablename__ = "detector_scores"
+    score_id: Mapped[uuid.UUID] = _pk()
+    org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organisations.org_id"), nullable=False)
+    claim_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("claims.claim_id"))
+    kyc_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("kyc_verifications.kyc_id"))
+    # a claim file (evidence) or a KYC photo (kyc_evidence): no foreign key, it names either
+    evidence_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    kind: Mapped[str] = mapped_column(String(12), nullable=False)
+    detector: Mapped[str] = mapped_column(String(80), nullable=False)
+    model_version: Mapped[str | None] = mapped_column(String(120))
+    model_sha256: Mapped[str | None] = mapped_column(String(64))
+    score: Mapped[float | None] = mapped_column(Float)
+    label: Mapped[str | None] = mapped_column(String(20))
+    skipped: Mapped[str | None] = mapped_column(String(80))
+    uncertain: Mapped[bool] = mapped_column(nullable=False, default=False)
+    mode: Mapped[str] = mapped_column(String(10), nullable=False)
+    escalated: Mapped[bool] = mapped_column(nullable=False, default=False)
+    signals: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = _created()
+    __table_args__ = (
+        CheckConstraint("mode in ('shadow','escalate')", name="detector_mode"),
+        CheckConstraint(
+            "score is null or (score >= 0 and score <= 1)", name="detector_score_range"
+        ),
+        Index("ix_detector_scores_claim", "claim_id"),
+        Index("ix_detector_scores_kyc", "kyc_id"),
+        Index("ix_detector_scores_kind", "org_id", "kind", "created_at"),
+    )
+
+
+class EvidenceEmbedding(Base):
+    """The image embedding of one claim file, for near-duplicate search across organisations.
+
+    Stored as float16 bytes of an L2-normalised vector, with the SHA-256 of the model that made it:
+    vectors from different models are never compared. This is personal data in the same way the
+    picture is, so retention removes it with the file (app/compliance/retention.py).
+    """
+
+    __tablename__ = "evidence_embeddings"
+    evidence_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evidence.evidence_id"), primary_key=True
+    )
+    org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organisations.org_id"), nullable=False)
+    claim_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("claims.claim_id"), nullable=False)
+    model_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    dim: Mapped[int] = mapped_column(Integer, nullable=False)
+    vector: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = _created()
+    __table_args__ = (Index("ix_evidence_embeddings_model", "model_sha256", "created_at"),)
