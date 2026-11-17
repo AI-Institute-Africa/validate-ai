@@ -284,7 +284,7 @@ function CandidateCard({ c, selected, onSelect, index }: { c: Candidate; selecte
       )}
       <div className="gates">
         {c.gates.map((g) => (
-          <span key={g.name} className={`chip ${g.passed ? "pass" : "fail"}`} title={g.detail}>
+          <span key={g.name} className={`chip2 ${g.passed ? "tone-ok" : "tone-bad"}`} title={g.detail}>
             {g.passed ? "✓" : "✗"} {humanize(g.name)}
           </span>
         ))}

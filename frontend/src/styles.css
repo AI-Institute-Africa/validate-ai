@@ -1,56 +1,4 @@
-/* Validate — Payproof-inspired palette: slate neutrals, brand blue, tier colours. */
-:root {
-  --bg: #f8fafc;
-  --panel: #ffffff;
-  --text: #0f172a;
-  --muted: #64748b;
-  --line: #e2e8f0;
-  --accent: #2563eb;
-  --accent-strong: #1d4ed8;
-  --grad: linear-gradient(135deg, #2563eb, #4338ca);
-  --ok: #16a34a;
-  --ok-bg: #f0fdf4;
-  --warn: #d97706;
-  --warn-bg: #fffbeb;
-  --bad: #dc2626;
-  --bad-bg: #fef2f2;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0f172a;
-    --panel: #1e293b;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
-    --line: #334155;
-    --accent: #60a5fa;
-    --accent-strong: #93bbfd;
-    --ok: #4ade80;
-    --ok-bg: #143522;
-    --warn: #fbbf24;
-    --warn-bg: #3b2f0d;
-    --bad: #f87171;
-    --bad-bg: #3f1d1b;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0f172a;
-  --panel: #1e293b;
-  --text: #e2e8f0;
-  --muted: #94a3b8;
-  --line: #334155;
-  --accent: #60a5fa;
-  --accent-strong: #93bbfd;
-  --ok: #4ade80;
-  --ok-bg: #143522;
-  --warn: #fbbf24;
-  --warn-bg: #3b2f0d;
-  --bad: #f87171;
-  --bad-bg: #3f1d1b;
-  color-scheme: dark;
-}
-
+/* Validate: base elements and page styles. Colours, sizes and shadows live in tokens.css. */
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -98,10 +46,10 @@ ul { margin: 0; padding-left: 18px; }
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 16px 18px;
   margin-bottom: 14px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow);
 }
 .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .toolbar h2 { margin: 0; }
@@ -152,7 +100,7 @@ button.small { padding: 3px 10px; font-size: 12px; font-weight: 500; }
 label { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-weight: 500; }
 label .muted { font-weight: 400; }
 
-table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 thead th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--bg); }
 tbody tr:last-child td { border-bottom: none; }
@@ -513,9 +461,6 @@ dd { margin: 0; }
 .candidate .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .kbd { font-family: ui-monospace, monospace; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; color: var(--muted); }
 .gates { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-.chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; }
-.chip.pass { color: var(--ok); background: var(--ok-bg); }
-.chip.fail { color: var(--bad); background: var(--bad-bg); }
 .history { margin: 0; padding-left: 18px; }
 .history li { margin-bottom: 4px; }
 .actions form.inline input { flex: 1; min-width: 160px; }

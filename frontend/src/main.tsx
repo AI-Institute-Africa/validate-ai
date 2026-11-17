@@ -10,6 +10,7 @@ import { ToastProvider, useToast } from "./toast";
 import { useTheme } from "./theme";
 import { Avatar } from "./ui";
 import Home from "./pages/Home";
+import "./tokens.css";
 import "./styles.css";
 import "./ui.css";
 
