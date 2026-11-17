@@ -116,7 +116,7 @@ def test_parse_text_reads_labelled_lines():
         ("ZAF", "8001015009087", True),
         ("ZAF", "8001015009088", False),
         ("ZAF", "8002305009081", False),  # no 30 February, however the check digit works out
-        ("KEN", "12345678", True),
+        ("KEN", "23456781", True),
         ("XYZ", "anything", None),
     ],
 )
@@ -433,3 +433,30 @@ def test_zimbabwe_check_letter_is_advisory_and_handles_remainder_zero():
     s = str(n)
     assert idnumbers.check("ZWE", f"{s[:2]}-{s[2:]} Z 42").checksum == "valid"
     assert idnumbers.check("ZWE", "6312").ok is False
+
+
+@pytest.mark.parametrize(
+    ("country", "number", "ok", "note"),
+    [
+        ("KEN", "12345678", False, "PLACEHOLDER"),  # a plain run is an invented number
+        ("KEN", "11111111", False, "PLACEHOLDER"),
+        ("KEN", "87654321", False, "PLACEHOLDER"),
+        ("KEN", "23456781", True, None),  # a real-looking 8 digit number
+        ("KEN", "1234567", False, "PLACEHOLDER"),
+        ("KEN", "123456789", False, "FORMAT"),  # nine digits: too long
+        ("KEN", "12A45678", False, "FORMAT"),
+        ("GHA", "GHA-722108846-3", True, None),
+        ("GHA", "gha722108846 3".replace(" ", "-"), True, None),  # case does not matter
+        ("GHA", "GHA-722108846", False, "FORMAT"),  # the final character is missing
+        ("GHA", "GHA-111111111-1", False, "PLACEHOLDER"),
+        ("NGA", "22212345678", True, None),
+        ("NGA", "00000000000", False, "PLACEHOLDER"),
+    ],
+)
+def test_kenya_ghana_and_friends_check_shape_and_invented_numbers_only(country, number, ok, note):
+    from app.kyc import idnumbers
+
+    r = idnumbers.check(country, number)
+    assert r.ok is ok, (country, number, r)
+    assert (note in r.notes) if note else not r.notes
+    assert r.checksum == "unchecked"  # no public checksum exists: never claim one was verified

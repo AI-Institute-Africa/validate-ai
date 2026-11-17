@@ -145,3 +145,18 @@ without a licence from InsightFace. Nothing is bundled: you download the files y
 template) and the fail-closed behaviour. **Not tested:** real accuracy, and that YuNet reports its landmarks
 in the order assumed (right eye, left eye, nose, right and left mouth corner, viewed from the image).
 Check both once on a few real photos before relying on it.
+
+
+## National ID numbers: what can and cannot be checked offline
+
+| Country | What we check | Checksum |
+| --- | --- | --- |
+| South Africa | 13 digits, Luhn check digit, a real birth date, the century (never in the future), sex | Yes (published) |
+| Zimbabwe | shape; the check letter (mod 23) is shown to a reviewer as **advisory** only | Community-derived, not official |
+| Kenya | 7 or 8 digits; obvious inventions (11111111, 12345678, runs up or down) | **None is published** |
+| Ghana Card | `GHA-#########-#`; obvious inventions | **None is published** (the Card has a check character, but its algorithm is not public) |
+| Nigeria, Zambia, Tanzania, Uganda | shape; obvious inventions | none used |
+
+A number that fails shape or looks invented goes to a person; it is never rejected automatically, and a
+passing number is never described as "verified". Whether the holder exists is a registry question (NIA in
+Ghana, IPRS in Kenya) and needs the registry or a licensed provider (Smile ID, uqudo).

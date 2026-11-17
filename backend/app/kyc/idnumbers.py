@@ -69,6 +69,21 @@ def _za(value: str, today: date) -> IdNumberResult:
     return IdNumberResult(True, "valid", dob=dob, sex=sex)
 
 
+def looks_like_placeholder(value: str) -> bool:
+    """All one digit, or a plain run up or down (11111111, 12345678): what people type when they
+    invent a number. A real holder is possible but very unlikely, so it goes to a person."""
+    d = re.sub(r"\D", "", value)
+    if len(d) < 6:
+        return False
+    if len(set(d)) == 1:
+        return True
+    steps = {(int(b) - int(a)) % 10 for a, b in zip(d, d[1:], strict=False)}
+    return steps in ({1}, {9})
+
+
+# Kenya (7-8 digits) and the Ghana Card (GHA-#########-#) have NO published check digit: nothing
+# offline can prove a number was issued. We check shape and obvious inventions only; whether the
+# holder exists needs the registry (NIA, IPRS) or a licensed provider such as Smile ID or uqudo.
 _SIMPLE = {
     "KEN": r"\d{7,8}",
     "NGA": r"\d{11}",
@@ -91,4 +106,8 @@ def check(country: str | None, number: str | None, today: date | None = None) ->
     pattern = _SIMPLE.get(country)
     if pattern is None:
         return IdNumberResult(None)
-    return IdNumberResult(bool(re.fullmatch(pattern, value)))
+    if not re.fullmatch(pattern, value):
+        return IdNumberResult(False, notes=("FORMAT",))
+    if looks_like_placeholder(value):
+        return IdNumberResult(False, notes=("PLACEHOLDER",))
+    return IdNumberResult(True)
