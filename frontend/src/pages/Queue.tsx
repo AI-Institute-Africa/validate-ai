@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, Claim, money } from "../api";
 import { reasonText, type Tone } from "../labels";
 import { Chip, EmptyState, Loading, PageHeader, StateChip } from "../ui";
-import { bucketOf, slaOf, type Bucket } from "../lib/triage";
+import { bucketOf, slaOf, SLA_MINUTES, type Bucket } from "../lib/triage";
+import { ariaSort, DEFAULT_SORT, nextSort, sortClaims, type Sort, type SortKey } from "../lib/sortClaims";
+import { ShortcutLegend } from "../components/ShortcutLegend";
 import { RiskBadge } from "./Fraud";
 import "./review.css";
 
@@ -59,8 +61,42 @@ export function agoText(iso: string): string {
   return `${Math.floor(mins / 1440)} d ago`;
 }
 
+const SORT_KEY = "validate-queue-sort";
+export function loadSort(): Sort {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(SORT_KEY) ?? "null");
+    if (s && typeof s.key === "string" && (s.dir === "asc" || s.dir === "desc")) return s;
+  } catch {
+    /* no storage: use the default */
+  }
+  return DEFAULT_SORT;
+}
+
+const SLA_LABEL = ["", `${SLA_MINUTES[0] / 60} h+`, `${SLA_MINUTES[1] / 60} h+`, `${SLA_MINUTES[2] / 60} h+`];
+
+function SortBtn({ k, label, sort, onSort }: { k: SortKey; label: string; sort: Sort; onSort: (k: SortKey) => void }) {
+  const active = sort.key === k;
+  return (
+    <button type="button" className="rv-sort" data-active={active} onClick={() => onSort(k)} title={`Sort by ${label.toLowerCase()}`}>
+      {label}
+      <span aria-hidden>{active ? (sort.dir === "asc" ? "▲" : "▼") : ""}</span>
+    </button>
+  );
+}
+
 export default function Queue() {
   const nav = useNavigate();
+  const [sort, setSort] = useState<Sort>(loadSort);
+  const [cursor, setCursor] = useState(0);
+  const chooseSort = (key: SortKey) => {
+    const next = nextSort(sort, key);
+    setSort(next);
+    try {
+      sessionStorage.setItem(SORT_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  };
   const [state, setState] = useState("");
   const [channel, setChannel] = useState("");
   const [bucket, setBucket] = useState<Bucket>("needs_review");
@@ -78,13 +114,34 @@ export default function Queue() {
     needs_review: all?.filter((c) => bucketOf(c) === "needs_review").length ?? 0,
     flagged: all?.filter((c) => bucketOf(c) === "flagged").length ?? 0,
   };
-  const rows = all?.filter((c) => bucketOf(c) === bucket);
+  const rows = all && sortClaims(all.filter((c) => bucketOf(c) === bucket), sort);
+
+  // j / k move through the rows, Enter opens the one in focus
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName.match(/INPUT|TEXTAREA|SELECT|BUTTON|A/)) return;
+      if (!rows?.length) return;
+      if (e.key === "j" || e.key === "ArrowDown" || e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const step = e.key === "j" || e.key === "ArrowDown" ? 1 : -1;
+        const next = Math.min(rows.length - 1, Math.max(0, cursor + step));
+        setCursor(next);
+        document.querySelector<HTMLElement>(`tr[data-row="${next}"]`)?.focus();
+      } else if (e.key === "Enter" && rows[cursor] && document.activeElement?.closest("tr[data-row]")) {
+        nav(`/claims/${rows[cursor].claim_id}`);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [rows, cursor, nav]);
+  useEffect(() => setCursor(0), [bucket, state, channel]);
 
   return (
     <section className="rv" id="rv-panel">
       <PageHeader
         title="Review queue"
-        sub="Claims waiting for a person. The oldest are first. Click a row to open the receipt, the matching bank credit and the decision."
+        sub="Claims waiting for a person. Click a column title to sort. Click a row, or use j and k then Enter, to open the receipt, the matching bank credit and the decision."
+        actions={<ShortcutLegend title="Queue shortcuts" shortcuts={[["j ↓", "Next claim"], ["k ↑", "Previous claim"], ["Enter", "Open the claim in focus"], ["?", "Show this list"]]} />}
       />
       <div
         className="rv-tabs"
@@ -155,20 +212,25 @@ export default function Queue() {
             <table className="rv-cards">
               <thead>
                 <tr>
-                  <th>Waiting</th>
-                  <th>Status</th>
+                  <th aria-sort={ariaSort(sort, "waiting")}><SortBtn k="waiting" label="Waiting" sort={sort} onSort={chooseSort} /></th>
+                  <th aria-sort={ariaSort(sort, "status")}><SortBtn k="status" label="Status" sort={sort} onSort={chooseSort} /></th>
                   <th>Claimant</th>
-                  <th className="num">Declared</th>
+                  <th className="num" aria-sort={ariaSort(sort, "declared")}><SortBtn k="declared" label="Declared" sort={sort} onSort={chooseSort} /></th>
                   <th>Evidence</th>
-                  <th title="Level: how careful to be. Risk: fake-receipt signals.">Level and risk</th>
+                  <th title="Level: how careful to be. Risk: fake-receipt signals.">
+                    <SortBtn k="level" label="Level" sort={sort} onSort={chooseSort} /> and <SortBtn k="risk" label="risk" sort={sort} onSort={chooseSort} />
+                  </th>
                   <th>Why it is here</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((c) => (
+                {rows.map((c, i) => (
                   <tr
                     key={c.claim_id}
-                    className="rv-click"
+                    data-row={i}
+                    tabIndex={i === cursor ? 0 : -1}
+                    className={`rv-click${i === cursor ? " cursor" : ""}`}
+                    onFocus={() => setCursor(i)}
                     onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button")) nav(`/claims/${c.claim_id}`); }}
                   >
                     <td data-label="Waiting">
@@ -176,8 +238,8 @@ export default function Queue() {
                         {agoText(c.created_at)}
                       </Link>
                       {slaOf(c.created_at, Date.now()).level > 0 && (
-                        <Chip tone={slaOf(c.created_at, Date.now()).tone} title="Waiting longer than the reminder thresholds">
-                          overdue
+                        <Chip tone={slaOf(c.created_at, Date.now()).tone} title={`Waiting longer than ${SLA_LABEL[slaOf(c.created_at, Date.now()).level].replace("+", "")}. Reminders go out at ${SLA_MINUTES.map((m) => m / 60 + " h").join(", ")}.`}>
+                          {SLA_LABEL[slaOf(c.created_at, Date.now()).level]}
                         </Chip>
                       )}
                     </td>
