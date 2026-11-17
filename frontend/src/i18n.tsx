@@ -21,7 +21,6 @@ const KEY = "validate-lang";
 const SN: Record<string, string> = {
   "nav.scan": "Skena",
   "nav.guardrails": "Guardrails",
-  "hero.title": "Chenjedza kubhadhara",
   "hero.sub":
     "Tora foto, skena kana pawoora risiti yako yekubhadhara. Tinoverenga risiti, tobva taita cheki nemari yanga yakapihwa — risiti chete haizombobvunyi.",
   "drop.drag": "Ratsidza risiti pano",
@@ -45,8 +44,6 @@ const SN: Record<string, string> = {
   "form.ref.opt": "(chakaziviswa)",
   "form.submit": "Chenjedza kubhadhara kunoku",
   "form.submitting": "Kutumira…",
-  "form.trust":
-    "Risiti yako inonyengera. Inongoti chibvunzo chete — inochinjwa nemari yanga yanga yakapihwa chete.",
   "result.checking": "Tichi Chenjedza Risiti Yako…",
   "result.title": "Mhedzisiro",
   "result.status": "Mamiriro",
@@ -97,16 +94,12 @@ const ND: Record<string, string> = {
   "form.ref.opt": "(elisiwe)",
   "form.submit": "Hlola lokhu kukhokha",
   "form.submitting": "Kuthunzelwa…",
-  "form.trust":
-    "Irekhodi lakho liqinisekiswa. Liyisicelo kuphela — liyaqinisekiswa ngemali engeniswe kuphela.",
   "result.checking": "Siya Hlola Irekhodi Lakho…",
   "result.title": "Umbhalo",
   "result.status": "Isimo",
   "result.outcome": "Ukuphendula",
   "result.declared": "Okusiwe",
   "result.channel": "Indlela",
-  "result.green.note":
-    "Umbala okuluhlaza ushoko lokuthi irekhodi lifundwe kahle futhi lihambisana ngenye imali — ukuvuma okugcwele kusengathi kubhange.",
   "steps.uploaded": "Kulayishwe & kuvikelekile",
   "steps.quality": "Kuhloliwe ngokufundeka",
   "steps.reading": "Ukufunda irekhodi",
@@ -204,6 +197,19 @@ export const EN: Record<string, string> = {
   "prov.body": "You have access while we wait for the money. It ends in",
   "prov.urgent": "Send your proof now so it isn't interrupted.",
   "footer.text": "Validate — non-commercial demo. A receipt is a claim, not a confirmation.",
+  "form.ready": "Ready to send",
+  "form.readable": "The photo is clear and readable",
+  "send.progress": "Sending {pct}%",
+  "send.label": "Sending your upload",
+  "outbox.title": "Waiting to send ({n})",
+  "outbox.help": "Saved on this phone only. They are sent again by themselves when you are back online, and removed once sent.",
+  "outbox.discard": "Discard",
+  "outbox.sendnow": "Send now",
+  "outbox.clear": "Clear saved uploads",
+  "offline.banner": "No connection. You can still prepare your upload: it is saved on this phone and sent again when you are back online.",
+  "wait.review": "A member of our finance team is taking a look at your payment. You don't need to do anything. We'll update this page.",
+  "wait.money": "We have your receipt. We're waiting for the money to show up in our records, which can take a little while.",
+  "loading": "Loading",
 };
 
 export const DICTS: Record<Lang, Record<string, string>> = { en: EN, sn: SN, nd: ND };

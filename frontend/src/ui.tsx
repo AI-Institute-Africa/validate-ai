@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { hasRole, switchPersona } from "./api";
 import { personaForRole } from "./personas";
 import { reasonText, stateInfo, type Tone } from "./labels";
+import { useI18n } from "./i18n";
 
 export function Chip({ tone = "neutral", children, title }: { tone?: Tone; children: ReactNode; title?: string }) {
   return (
@@ -50,8 +51,9 @@ export function EmptyState({ icon = "✓", title, children, action }: { icon?: s
 }
 
 export function Loading({ lines = 3 }: { lines?: number }) {
+  const { t } = useI18n();
   return (
-    <div className="skeleton-card" aria-busy="true" aria-label="Loading">
+    <div className="skeleton-card" aria-busy="true" aria-label={t("loading")}>
       {Array.from({ length: lines }, (_, i) => (
         <div key={i} className="skeleton-line" style={{ width: `${90 - i * 14}%` }} />
       ))}

@@ -11,7 +11,7 @@ import { validateFiles } from "../lib/validateFiles";
 import { Link } from "react-router-dom";
 import { useToast } from "../toast";
 import { EmptyState, Loading, PageHeader, Reasons, StateChip } from "../ui";
-import { payerWaitNote } from "../labels";
+import { payerWaitKey } from "../labels";
 import "./scan.css";
 
 type Recent = { claim_id: string; code: string; when: string };
@@ -72,6 +72,7 @@ function formatCode(raw: string): string {
 }
 
 function OfflineBanner() {
+  const { t } = useI18n();
   // the browser tells us when the connection comes and goes: no polling, which would cost mobile data
   const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   useEffect(() => {
@@ -87,8 +88,7 @@ function OfflineBanner() {
   if (online) return null;
   return (
     <div className="offline-banner" role="alert">
-      ⚠ No connection. You can still prepare your upload: it is saved on this phone and sent again
-      when you are back online.
+      ⚠ {t("offline.banner")}
     </div>
   );
 }
@@ -197,7 +197,7 @@ function ResultCard({ claim, code, onRetry }: { claim: Claim; code: string; onRe
         </p>
       )}
 
-      {done && payerWaitNote(state) && <p className="wait-note" role="status">{payerWaitNote(state)}</p>}
+      {done && payerWaitKey(state) && <p className="wait-note" role="status">{t(payerWaitKey(state)!)}</p>}
 
       {/* payers only ever see the server's plain messages */}
       {claim.messages.length > 0 && (
@@ -649,7 +649,7 @@ export default function Scan() {
                       </div>
                     ))}
                     <button type="button" className={fileVerified ? "secondary verified" : "secondary"} onClick={() => setFileVerified((v) => !v)}>
-                      {fileVerified ? "✓ Ready to send" : "The photo is clear and readable"}
+                      {fileVerified ? `✓ ${t("form.ready")}` : t("form.readable")}
                     </button>
                   </>
                 ) : (
@@ -799,38 +799,35 @@ export default function Scan() {
               <div
                 className="upload-progress"
                 role="progressbar"
-                aria-label="Sending your upload"
+                aria-label={t("send.label")}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(sender.state.progress * 100)}
               >
                 <div className="upload-bar" style={{ width: `${Math.round(sender.state.progress * 100)}%` }} />
-                <span>Sending {Math.round(sender.state.progress * 100)}%</span>
+                <span>{t("send.progress").replace("{pct}", String(Math.round(sender.state.progress * 100)))}</span>
               </div>
             )}
             {sender.queued.length > 0 && (
               <div className="outbox" role="status">
-                <b>Waiting to send ({sender.queued.length})</b>
-                <p className="muted small">
-                  Saved on this phone only. They are sent again by themselves when you are back
-                  online, and removed once sent.
-                </p>
+                <b>{t("outbox.title").replace("{n}", String(sender.queued.length))}</b>
+                <p className="muted small">{t("outbox.help")}</p>
                 <ul>
                   {sender.queued.map((q) => (
                     <li key={q.key}>
                       <span>{q.label || "Payment"} · {q.files.length} file{q.files.length === 1 ? "" : "s"}</span>
                       <button type="button" className="ghost small" onClick={() => void sender.discard(q.key)}>
-                        Discard
+                        {t("outbox.discard")}
                       </button>
                     </li>
                   ))}
                 </ul>
                 <div className="outbox-actions">
                   <button type="button" className="secondary small" onClick={() => void sender.retryNow()}>
-                    Send now
+                    {t("outbox.sendnow")}
                   </button>
                   <button type="button" className="ghost small" onClick={() => void sender.clearAll()}>
-                    Clear saved uploads
+                    {t("outbox.clear")}
                   </button>
                 </div>
               </div>

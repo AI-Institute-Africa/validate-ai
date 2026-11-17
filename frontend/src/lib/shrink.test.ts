@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fitWithin, shouldShrink } from "./imageEdit";
-import { payerWaitNote } from "../labels";
+import { payerWaitKey } from "../labels";
+import { EN } from "../i18n";
 
 describe("fitWithin", () => {
   it("never upscales", () => {
@@ -24,13 +25,13 @@ describe("shouldShrink", () => {
   });
 });
 
-describe("payerWaitNote", () => {
+describe("payerWaitKey", () => {
   it("is calm and never hints at suspicion", () => {
     for (const s of ["PENDING_REVIEW", "DUPLICATE_HOLD", "AWAITING_FINANCIAL_CONFIRMATION"]) {
-      const n = payerWaitNote(s);
-      expect(n).toBeTruthy();
-      expect(n!.toLowerCase()).not.toMatch(/fake|fraud|suspic|duplicate|edited|tamper/);
+      const key = payerWaitKey(s);
+      expect(key).toBeTruthy();
+      expect(EN[key!].toLowerCase()).not.toMatch(/fake|fraud|suspic|duplicate|edited|tamper/);
     }
-    expect(payerWaitNote("APPROVED")).toBeNull();
+    expect(payerWaitKey("APPROVED")).toBeNull();
   });
 });
