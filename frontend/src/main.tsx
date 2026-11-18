@@ -10,6 +10,7 @@ import { ToastProvider, useToast } from "./toast";
 import { useTheme } from "./theme";
 import { Avatar } from "./ui";
 import { Icon } from "./components/Icon";
+import { installFlair } from "./lib/flair";
 import Home from "./pages/Home";
 import "./tokens.css";
 import "./styles.css";
@@ -278,6 +279,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 // No login screen: quietly sign in as a demo persona, learn whether this is the demo, then render.
+installFlair();
 void ensureSession()
   .then(() => loadDemo())
   .finally(() =>

@@ -178,3 +178,95 @@ html { scrollbar-color: color-mix(in srgb, var(--brand) 55%, var(--line)) transp
   :root:not([data-theme="light"]) .sidebar nav a.active { background: color-mix(in srgb, var(--brand) 32%, transparent); }
   :root:not([data-theme="light"]) .sidebar nav a:hover { background: color-mix(in srgb, var(--brand) 20%, transparent); }
 }
+
+/* ── flair: graphics, ambient motion, cursor effects ──────
+   Looping motion lives only in decoration (hero art, background, one call-to-action pulse). Reduced motion turns
+   all of it off at the bottom of this file. */
+
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes drift { 0% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(4vw, 3vh, 0) scale(1.12); } 100% { transform: translate3d(-3vw, 6vh, 0) scale(1); } }
+@keyframes scan { 0% { transform: translateY(-30px); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateY(190px); opacity: 0; } }
+@keyframes orbit { to { transform: rotate(360deg); } }
+@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes glow-pulse { 0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 2px 6px color-mix(in srgb, var(--brand) 35%, transparent), 0 0 0 0 color-mix(in srgb, var(--brand) 45%, transparent); } 60% { box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 2px 6px color-mix(in srgb, var(--brand) 35%, transparent), 0 0 0 12px transparent; } }
+@keyframes wiggle { 0%, 100% { transform: translateX(1px) scale(1.12) rotate(0); } 30% { transform: translateX(1px) scale(1.18) rotate(-10deg); } 60% { transform: translateX(1px) scale(1.18) rotate(8deg); } }
+@keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes line-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes check-draw { to { stroke-dashoffset: 0; } }
+
+/* ambient mesh behind everything: three soft blobs drifting very slowly */
+body::before { content: ""; position: fixed; inset: -10vmax; z-index: -1; pointer-events: none; background:
+  radial-gradient(40vmax 34vmax at 12% 18%, color-mix(in srgb, var(--sky) 38%, transparent), transparent 70%),
+  radial-gradient(34vmax 30vmax at 88% 12%, color-mix(in srgb, #f7ad19 11%, transparent), transparent 70%),
+  radial-gradient(38vmax 34vmax at 70% 92%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 70%); animation: drift 34s ease-in-out infinite alternate; }
+:root[data-theme="dark"] body::before { background:
+  radial-gradient(40vmax 34vmax at 12% 18%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 70%),
+  radial-gradient(34vmax 30vmax at 88% 12%, color-mix(in srgb, #f7ad19 7%, transparent), transparent 70%),
+  radial-gradient(38vmax 34vmax at 70% 92%, color-mix(in srgb, var(--sky) 9%, transparent), transparent 70%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body::before { background:
+  radial-gradient(40vmax 34vmax at 12% 18%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 70%),
+  radial-gradient(34vmax 30vmax at 88% 12%, color-mix(in srgb, #f7ad19 7%, transparent), transparent 70%),
+  radial-gradient(38vmax 34vmax at 70% 92%, color-mix(in srgb, var(--sky) 9%, transparent), transparent 70%); } }
+.app, .content { background: transparent; }
+
+/* hero art */
+.hero2 { max-width: none; }
+.hero2 h1, .hero2 p, .hero2 .cta, .hero2 .how-steps { max-width: 740px; }
+.hero2 p { max-width: 600px; }
+.hero-art { position: absolute; right: 0; top: -6px; width: 300px; height: auto; overflow: visible; z-index: 0; }
+@media (max-width: 1180px) { .hero-art { display: none; } }
+.ha-blob { fill: color-mix(in srgb, var(--sky) 55%, transparent); transform-origin: 150px 160px; animation: breathe 7s ease-in-out infinite; }
+.ha-orbit { fill: none; stroke: var(--brand); stroke-width: 1.5; stroke-dasharray: 3 10; stroke-linecap: round; opacity: 0.7; transform-origin: 150px 160px; animation: orbit 60s linear infinite; }
+.ha-float { animation: float 6s ease-in-out infinite; }
+.ha-f2 { animation-duration: 7.5s; animation-delay: -2s; }
+.ha-f3 { animation-duration: 5s; animation-delay: -1s; }
+.ha-f4 { animation-duration: 8.5s; animation-delay: -3.5s; }
+.ha-paper { fill: var(--panel); stroke: color-mix(in srgb, var(--brand) 55%, var(--line)); stroke-width: 1.5; filter: drop-shadow(0 10px 18px color-mix(in srgb, var(--ink) 18%, transparent)); }
+.ha-line { fill: color-mix(in srgb, var(--brand) 40%, var(--line)); transform-box: fill-box; transform-origin: left; animation: line-in 700ms var(--ease) both; }
+.ha-line.amber { fill: #f7ad19; }
+.ha-beam { animation: scan 3.8s ease-in-out 1.2s infinite; }
+.ha-shield { filter: drop-shadow(0 10px 16px color-mix(in srgb, var(--ink) 30%, transparent)); transform-box: fill-box; transform-origin: center; animation: pop 600ms var(--spring) 500ms both; }
+.ha-check { fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 80; stroke-dashoffset: 80; animation: check-draw 700ms var(--ease) 1s forwards; }
+.ha-coin { fill: #f7ad19; stroke: #f27f0c; stroke-width: 2; }
+.ha-coin-t { fill: #442303; font: 700 17px var(--font-sans); }
+.ha-ring { fill: none; stroke: #f27f0c; stroke-width: 3.5; }
+
+/* call-to-action pulses gently so the eye lands on it */
+.hero2 .cta .btn:first-child, .hero2 .cta button:first-child { animation: glow-pulse 2.8s ease-out 1.4s infinite; }
+
+/* cursor spotlight on cards and tiles, 3D tilt on the big ones (set by lib/flair.ts) */
+.card:hover, .scn-card:hover, .recent:hover, .stat:hover, .tour-step:hover, .capture:hover:not(:disabled) { background-image: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--brand) 16%, transparent), transparent 70%); }
+.how .card:hover { background-image: none; }
+.scn-card, .recent { transform-style: preserve-3d; will-change: transform; }
+.scn-card:hover, .recent:hover { transform: perspective(800px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-3px); transition-duration: 90ms, 90ms, 90ms, var(--calm); }
+a.btn:hover, button.btn:hover { background-image: radial-gradient(90px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.28), transparent 70%); }
+
+/* icons wiggle, numbers pop, avatars and thumbnails wake up */
+.sidebar nav a:hover .ico { animation: wiggle 500ms var(--ease); }
+.stat:hover .n { transform: scale(1.06); }
+.stat .n { display: inline-block; transform-origin: left; transition: transform var(--calm) var(--spring); }
+.thumb, .avatar { transition: transform var(--calm) var(--spring), box-shadow var(--calm) var(--ease); }
+.thumb:hover { transform: scale(1.04) rotate(-1deg); box-shadow: var(--lift); }
+.brand-name .dot { display: inline-block; animation: breathe 3.5s ease-in-out infinite; }
+
+/* things below the fold arrive as you scroll to them (lib/flair.ts adds .rs, then .rs-in) */
+.rs { opacity: 0; transform: translateY(22px); }
+.rs.rs-in { opacity: 1; transform: none; transition: opacity 600ms var(--ease), transform 600ms var(--ease); }
+.how > .rs:nth-child(2) { transition-delay: 90ms; }
+.how > .rs:nth-child(3) { transition-delay: 180ms; }
+
+/* a thin Amber to Orange bar under the top bar fills as the page scrolls (browsers with scroll timelines) */
+@supports (animation-timeline: scroll()) {
+  .topbar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: linear-gradient(90deg, #f7ad19, #f27f0c); transform: scaleX(0); transform-origin: left; animation: progress linear both; animation-timeline: scroll(root); }
+}
+
+/* less motion: no loops, no decoration movement, nothing that follows the pointer */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-iteration-count: 1 !important; }
+  body::before, .hero-art *, .hero2 .cta .btn, .hero2 .cta button, .brand-name .dot, .topbar::after { animation: none !important; }
+  .ha-check { stroke-dashoffset: 0; }
+  .ha-line { transform: none; }
+  .rs { opacity: 1; transform: none; }
+}
+:root[data-theme="dark"] .ha-blob { fill: color-mix(in srgb, var(--brand) 32%, transparent); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ha-blob { fill: color-mix(in srgb, var(--brand) 32%, transparent); } }
