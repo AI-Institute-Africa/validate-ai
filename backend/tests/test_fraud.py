@@ -2,6 +2,7 @@
 
 import io
 import uuid
+from datetime import timedelta
 
 import httpx
 import numpy as np
@@ -11,6 +12,7 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.entitlements import outbox
 from app.models import FraudAlert, OutboxEvent
+from app.normalise.fields import date_candidates
 from tests.conftest import dmy, ecocash_fields, login, make_receipt
 from tests.test_flow import TXN, _import, _obligation, _stmt_row, _submit
 
@@ -199,10 +201,17 @@ def test_money_never_arrived_after_statement_coverage(client):
     ob = _obligation(client, sub)
     claim = _submit(client, sub, ob, make_receipt(ecocash_fields(), meta={"Software": "Canva"}))
     assert _internal(client, claim["claim_id"])["risk_level"] == "medium"
-    # statements now cover well past the receipt's date, with no matching payment. The receipt date
-    # reads two ways when its day is 12 or less (12/11 is also 11 Dec), and the later reading is
-    # the one that counts, so cover more than a year to hold on any day the suite runs.
-    _import(client, rev, [_stmt_row(txn="OTHER-1", amount="15.00", date=dmy("10:00", 400))])
+    # Statements now cover well past the receipt's date, with no matching payment. A receipt date
+    # reads two ways when its day is 12 or less (12/11 is also 11 Dec) and the later reading is the
+    # one that counts, so work the cover date out from the receipt's own readings instead of
+    # guessing a margin: this then holds on whatever day the suite runs.
+    latest = max(date_candidates(ecocash_fields()["date"]))
+    covered_to = latest + timedelta(days=10)
+    _import(
+        client,
+        rev,
+        [_stmt_row(txn="OTHER-1", amount="15.00", date=f"{covered_to:%d/%m/%Y} 10:00")],
+    )
     c = _internal(client, claim["claim_id"])
     assert "NO_CREDIT_FOUND" in c["reason_codes"]
     assert {"NO_CREDIT_AFTER_STATEMENT", "EDITING_SOFTWARE"} <= _codes(c)

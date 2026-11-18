@@ -220,6 +220,17 @@ cd frontend && npm run build
 python e2e/smoke.py http://127.0.0.1:5173       # Playwright smoke test against a seeded stack
 ```
 
+The five browser scripts that drive the standalone demo (`demo_tour`, `offline_retry`, `queue_undo`,
+`bulk`, `bulk_approve`) run in CI as the `browser` job. To run them yourself:
+
+```bash
+cd backend && python -m app.demo --no-browser --port 8000 &    # the demo, as a person runs it
+sh frontend/e2e/run_demo_suite.sh http://127.0.0.1:8000        # needs `playwright install chromium`
+```
+
+The runner resets the demo before each script, so the order never matters and one script's changes
+(a rejected claim, auto-approve switched off) cannot decide another's result.
+
 ## Integrating Cognify
 
 1. `POST /obligations` for each invoice or instalment. The response carries a **payment code**
