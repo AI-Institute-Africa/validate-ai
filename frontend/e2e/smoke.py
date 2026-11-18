@@ -19,7 +19,7 @@ with sync_playwright() as p:
 
     # no login screen: the app silently picks up a dev session
     page.goto(f"{base}/")
-    expect(page.get_by_role("heading", name="Know that a payment, or a person, is real")).to_be_visible()
+    expect(page.get_by_role("heading", name="Match every payment proof to the bank record")).to_be_visible()
     page.get_by_role("link", name="Verify a payment").click()
     expect(page.get_by_role("heading", name="Verify a payment")).to_be_visible()
     expect(page.get_by_role("button", name="Take a photo")).to_be_visible()
@@ -44,6 +44,8 @@ with sync_playwright() as p:
     page.screenshot(path=f"{out}/4-alerts.png", full_page=True)
 
     # replay: run the active policy over past claims, and read reader / fraud accuracy
+    # Replay now sits under Insights, with Exposure, Scorecard, Exchange rate and Compliance
+    page.get_by_role("link", name="Insights").click()
     page.get_by_role("link", name="Replay & accuracy").click()
     expect(page.get_by_role("heading", name="Readers vs confirmed payments")).to_be_visible()
     page.get_by_role("button", name="Replay active policy").click()

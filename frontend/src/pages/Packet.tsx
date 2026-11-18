@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api, money } from "../api";
+import { Menu } from "../components/Menu";
 import { Loading, PageHeader, Reasons } from "../ui";
 import "./review.css";
 
@@ -39,7 +40,7 @@ export default function PacketPage() {
       <PageHeader
         title="Audit packet"
         sub={`Claim ${p.claim.claim_id.slice(0, 8)} · exported ${new Date(p.exported_at).toLocaleString()} by ${p.exported_by}`}
-        actions={<span className="no-print"><button type="button" onClick={() => window.print()}>Print</button> <button type="button" className="secondary" onClick={save}>Save JSON</button> <Link className="btn secondary" to={`/claims/${p.claim.claim_id}`}>← Claim</Link></span>}
+        actions={<span className="no-print"><Menu label="Export" items={[{ label: "Print", onSelect: () => window.print() }, { label: "Save JSON", onSelect: save }]} /> <Link className="btn secondary" to={`/claims/${p.claim.claim_id}`}>← Claim</Link></span>}
       />
       <div className="card">
         <h3>Claim</h3>

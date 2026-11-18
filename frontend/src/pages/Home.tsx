@@ -102,20 +102,26 @@ export function ScenarioPanel({ info, compact = false, quiet = false, footer }: 
         <p className="muted">{info.pitch}</p>
       </div>
       <div className="scn-body">
-        {!result && (
+        {(!result || !compact) && (
           <div className="scn-actions">
-            <button type="button" className={quiet ? "secondary lg" : "lg"} disabled={run.isPending} onClick={() => run.mutate()}>
-              {run.isPending ? "Running…" : <><Icon name="play" size={14} /> Run this story</>}
+            {/* one run button: it starts the story, and once there is an outcome it replays it */}
+            <button
+              type="button"
+              className={result ? "secondary" : quiet ? "secondary lg" : "lg"}
+              disabled={run.isPending}
+              onClick={() => {
+                if (result) {
+                  setResult(null);
+                  run.reset();
+                } else {
+                  run.mutate();
+                }
+              }}
+            >
+              {run.isPending ? "Running…" : result ? <><Icon name="refresh" size={14} /> Run again</> : <><Icon name="play" size={14} /> Run this story</>}
             </button>
             {run.isPending && <span className="muted small">Acting as the payer, then the system…</span>}
             {run.isError && <span className="error">{(run.error as Error).message}</span>}
-          </div>
-        )}
-        {result && !compact && (
-          <div className="scn-actions">
-            <button type="button" className="secondary" disabled={run.isPending} onClick={() => { setResult(null); run.reset(); }}>
-              <Icon name="refresh" size={14} /> Run it again
-            </button>
           </div>
         )}
       </div>
@@ -201,12 +207,66 @@ function Stats() {
   );
 }
 
+// Two sample case files, written as ledger rows: what was read, what it was matched to, what was decided.
+// Illustrative values; the reason codes and states are the real ones the product uses.
+const CASES: { title: string; state: string; rows: [string, string, string][]; reasons: string[] }[] = [
+  {
+    title: "Clear case: approved by the rules",
+    state: "APPROVED",
+    rows: [
+      ["Amount", "120.00 USD", "120.00 USD"],
+      ["Reference", "TX-48213", "TX-48213"],
+      ["Paid to", "Greenfield School", "Greenfield School"],
+    ],
+    reasons: ["AUTO_APPROVED"],
+  },
+  {
+    title: "Doubtful case: sent to a person",
+    state: "PENDING_REVIEW",
+    rows: [
+      ["Amount", "120.00 USD", "100.00 USD"],
+      ["Reference", "TX-48214", "TX-48214"],
+      ["Paid to", "Greenfield School", "Greenfield School"],
+    ],
+    reasons: ["AMOUNT_MISMATCH"],
+  },
+];
+
+function CaseFiles() {
+  return (
+    <div className="casefiles">
+      {CASES.map((c) => (
+        <article className="casefile" key={c.title}>
+          <header>
+            <h3>{c.title}</h3>
+            <StateChip state={c.state} />
+          </header>
+          <table>
+            <thead>
+              <tr><th /><th>Receipt says</th><th>Bank record says</th></tr>
+            </thead>
+            <tbody>
+              {c.rows.map(([k, a, b]) => (
+                <tr key={k} className={a === b ? "" : "differs"}>
+                  <th scope="row">{k}</th>
+                  <td className="data">{a}</td>
+                  <td className="data">{b}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Reasons codes={c.reasons} />
+        </article>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const demo = demoInfo();
   const [step, setStep] = useState(0);
   const [seen, setSeen] = useState<Set<number>>(new Set());
   const [group, setGroup] = useState<"all" | "payments" | "identity">("all");
-  const [started, setStarted] = useState(false);
   const scenarios = demo?.scenarios ?? [];
   const byId = new Map(scenarios.map((s) => [s.id, s]));
   const tour = TOUR.map((id) => byId.get(id)).filter(Boolean) as ScenarioInfo[];
@@ -223,23 +283,20 @@ export default function Home() {
     <div>
       <section className="hero2">
         <HeroArt />
-        <h1>Know that a payment, or a person, is real. In seconds.</h1>
+        <h1>Match every payment proof to the bank record. Check every ID against its holder.</h1>
         <p>
-          Validate reads receipts and identity documents and checks them against the money. The clear cases are
-          approved by fixed rules; anything doubtful goes to a person, with the reasons.
+          Validate reads the receipt or document and compares it with the bank credit or the ID. When every rule
+          passes it approves; when one fails, a reviewer gets the case with the exact reason.
         </p>
         <div className="cta">
           <button
             type="button"
             className="btn lg"
-            onClick={() => {
-              setStarted(true);
-              setTimeout(() => document.getElementById("tour")?.scrollIntoView({ behavior: "smooth" }), 50);
-            }}
+            onClick={() => document.getElementById(demo ? "tour" : "decisions")?.scrollIntoView({ behavior: "smooth" })}
           >
-            Start the 3-minute tour
+            {demo ? "Run a live case" : "See how a case is decided"}
           </button>
-          <Link className="btn secondary lg" to="/verify">Try it yourself</Link>
+          <Link className="btn secondary lg" to="/verify">Try it on your own payment</Link>
         </div>
         <ol className="how-steps" aria-label="How it works">
           <li><b>It reads</b>Two readers pull the facts from the picture.</li>
@@ -253,19 +310,10 @@ export default function Home() {
       {demo ? (
         <>
           <div className="section-title" id="tour">
-            <h2>Guided tour</h2>
-            <span className="muted small">Short stories. Each one runs the real product and shows what happened.</span>
+            <h2>Live cases</h2>
+            <span className="muted small">You are the administrator. Each case runs the real product end to end; use the menu at the top right to switch to the payer or reviewer.</span>
           </div>
-          {!started && (
-            <div className="card">
-              <p style={{ marginBottom: 14 }}>
-                You are signed in as the <b>administrator</b>. Use the menu at the top right to step into the
-                payer's or the reviewer's seat at any time.
-              </p>
-              <button type="button" onClick={() => setStarted(true)}>Begin</button>
-            </div>
-          )}
-          {started && current && (
+          {current && (
             <div className="tour">
               <ol className="tour-steps" aria-label="Tour steps">
                 {tour.map((t, i) => (
@@ -282,14 +330,11 @@ export default function Home() {
               </ol>
               <div>
                 <ScenarioPanel key={current.id} info={current} />
-                <div className="tour-nav">
-                  <button type="button" className="secondary" disabled={step === 0} onClick={() => go(step - 1)}>Back</button>
-                  {step < tour.length - 1 ? (
+                {step < tour.length - 1 && (
+                  <div className="tour-nav">
                     <button type="button" onClick={() => go(step + 1)}>Next story</button>
-                  ) : (
-                    <Link className="btn" to="/verify">Now try it yourself</Link>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -304,7 +349,7 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <div className="grid cols-2 reveal">
+          <div className="grid reveal">
             {more.map((s) => (
               <ScenarioPanel key={s.id} info={s} quiet />
             ))}
@@ -317,23 +362,15 @@ export default function Home() {
         </div>
       )}
 
-      <div className="section-title">
-        <h2>How a decision is made</h2>
-      </div>
-      <div className="how">
-        <div className="card">
-          <h3>The picture is only a claim</h3>
-          <p className="muted">A receipt can be edited in seconds, so on its own it never settles anything. The bank record, an alert from the merchant, or a checked document does.</p>
-        </div>
-        <div className="card">
-          <h3>Fixed rules, written down</h3>
-          <p className="muted">Automatic approval is a short list of checks anyone can read. It never rejects. If one fails, a person gets the case with the exact reason.</p>
-        </div>
-        <div className="card">
-          <h3>Every step is on record</h3>
-          <p className="muted">Decisions are append-only. A sample of automatic ones is checked by a person, and the overturn rate decides whether to widen the limits.</p>
-        </div>
-      </div>
+      <section className="section" id="decisions">
+        <h2>How a case is decided</h2>
+        <p className="muted">
+          A receipt can be edited in seconds, so it never settles anything alone: the bank record does. Approval is a
+          short list of fixed checks. It never rejects; a failed check sends the case to a person. Every decision is
+          kept on record, and a sample of automatic ones is re-checked by a person.
+        </p>
+      </section>
+      <CaseFiles />
       {demo && (
         <p className="muted small" style={{ marginTop: 28 }}>
           In this demo the readers and face matcher are simulated and understand only the sample documents it

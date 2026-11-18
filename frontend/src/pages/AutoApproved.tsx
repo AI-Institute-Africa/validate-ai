@@ -48,6 +48,7 @@ export default function AutoApproved() {
   const rate = d.summary.overturn_rate;
   return (
     <section className="rv">
+      <div className="rv-topbar"><Link to="/queue">← Review queue</Link></div>
       <PageHeader
         title="Auto-approved"
         sub="Claims the rules approved without a person. A sample goes in front of a reviewer, and the overturn rate decides whether the limit may rise."
