@@ -29,6 +29,9 @@ selfie, an edited passport). Each one runs the real product and explains what ha
 the payer's, reviewer's, approver's or administrator's seat from the menu at the top right, try your
 own samples, and press **Reset demo data** to start over. See [`docs/demo.md`](docs/demo.md).
 
+Brand colours (chosen, not yet applied to the console), with contrast rules for using them:
+[`docs/brand/colours.md`](docs/brand/colours.md).
+
 By default every allocation needs a finance reviewer, and the reviewer can only confirm a credit
 that passes every hard gate. Four optional features are **off until an organisation's payment
 policy turns them on**, and none of them lets the AI decide:
