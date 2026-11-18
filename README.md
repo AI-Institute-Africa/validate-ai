@@ -155,8 +155,10 @@ score** from explainable signals:
 - the vision model's own observations
 - payer history and velocity
 - *(planned)* trained detectors for AI-generated and forged proofs, deepfake and cloned faces and
-  re-photographed duplicates, run locally with no outside AI and starting in shadow mode:
-  [`docs/authenticity-detectors.md`](docs/authenticity-detectors.md)
+  re-photographed duplicates, run locally with no outside AI and starting in shadow mode. The framework, the
+  near-duplicate, image and face detectors and a numpy-only training loop (`backend/training/detect/`) are built; no
+  trained model ships, and the deep-learning trainer is written but not yet run:
+  [`docs/authenticity-detectors.md`](docs/authenticity-detectors.md), [`docs/training-data.md`](docs/training-data.md)
 
 Suspected fakes (score 60+) go to admins under **Suspected fakes**, through the console badge
 plus a webhook and/or email. They cannot be confirmed until an admin marks them *confirmed fake*

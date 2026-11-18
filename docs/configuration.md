@@ -208,8 +208,8 @@ Trained detectors for fake and AI-generated receipts and IDs, deepfake faces and
 - policy `detect_enabled_kinds` (default all): `receipt`, `doc`, `face`, `duplicate`, `text`.
 - policy `detect_thresholds`: per-detector score at or above which it escalates; set from the model card's measured
   false-flag rate, not guessed. Unset means the threshold in `manifest.json`; with neither, the detector never escalates.
-- `manifest.json` per detector: `file`, `version`, `sha256`, `label` (what a high score means), `threshold`, `uncertain_band`,
-  `input.size`, `input.channels` (any of `rgb`, `noise`, `fft`, `ela`, in order) and `tta` (1 to 5 views averaged; default 1).
+- `manifest.json` per detector: `file`, `version`, `sha256`, `format` (`onnx`, the default, or `npz-linear` for the classical numpy
+  model), `label` (what a high score means), `threshold`, `uncertain_band`, `input.size`, `input.channels` (any of `rgb`, `noise`, `fft`, `ela`, in order) and `tta` (1 to 5 views averaged; default 1).
 - `GET /admin/detectors` (admin): mode, manifest state and each detector's version, hash and load state.
 - policy `fraud_weights` also accepts `NEAR_DUPLICATE_EMBEDDING`, `AI_GENERATED_SUSPECTED`, `DEEPFAKE_SUSPECTED`,
   `SYNTHETIC_FACE_SUSPECTED`, `FORGED_POP_SUSPECTED` and `AI_TEXT_SUSPECTED` (0 switches one off).

@@ -16,6 +16,7 @@ from app.detect.base import DETECT_KINDS, LABELS
 
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 MANIFEST_NAME = "manifest.json"
+FORMATS = ("onnx", "npz-linear")
 
 
 class ManifestError(ValueError):
@@ -34,6 +35,7 @@ class Entry:
     channels: tuple[str, ...] = ("rgb",)
     threshold: float | None = None
     uncertain_band: tuple[float, float] | None = None
+    format: str = "onnx"  # onnx, or npz-linear (the classical numpy model)
     tta: int = 1  # test-time augmentation: how many mild views to average (1 = just the image)
     card: str | None = None  # pointer to the model card
     extra: dict[str, Any] = field(default_factory=dict)
@@ -83,6 +85,9 @@ def load_manifest(folder: str | Path) -> dict[str, Entry]:
             if thr is not None and not 0.0 < float(thr) <= 1.0:
                 raise ManifestError(f"{kind}: threshold must be above 0 and at most 1")
             inp = d.get("input", {})
+            fmt = str(d.get("format", "onnx"))
+            if fmt not in FORMATS:
+                raise ManifestError(f"{kind}: format must be one of {', '.join(FORMATS)}")
             tta = int(d.get("tta", 1))
             if not 1 <= tta <= 5:
                 raise ManifestError(f"{kind}: tta must be between 1 and 5")
@@ -98,6 +103,7 @@ def load_manifest(folder: str | Path) -> dict[str, Entry]:
                 threshold=None if thr is None else float(thr),
                 uncertain_band=None if band is None else (float(band[0]), float(band[1])),
                 tta=tta,
+                format=fmt,
                 card=d.get("card"),
             )
         except KeyError as exc:

@@ -51,6 +51,33 @@ def audit_packet(claim_id: uuid.UUID, db: DB, p: AuditRead) -> dict:
     return data
 
 
+@router.get("/admin/training/detector-labels")
+def training_detector_labels(db: DB, p: Admin, since: datetime | None = None) -> Response:
+    """Authenticity labels (confirmed fake / not fake) as JSON lines; needs consent on record."""
+    cfg = load_policy(db, p.org_id).config
+    try:
+        ref = training.require_consent(cfg)
+    except training.ConsentMissing as exc:
+        raise HTTPException(403, {"code": "CONSENT_MISSING", "message": str(exc)}) from exc
+    rows = list(training.detector_labels(db, p.org_id, since))
+    audit(
+        db,
+        actor=p.actor,
+        action="training.exported",
+        entity_type="organisation",
+        entity_id=p.org_id,
+        org_id=p.org_id,
+        after={"rows": len(rows), "consent_ref": ref, "kind": "detector_labels"},
+    )
+    db.commit()
+    body = "\n".join(json.dumps(r, ensure_ascii=False) for r in rows)
+    return Response(
+        content=body + ("\n" if rows else ""),
+        media_type="application/x-ndjson",
+        headers={"X-Consent-Ref": ref, "X-Row-Count": str(len(rows))},
+    )
+
+
 @router.get("/admin/training/corrections")
 def training_corrections(db: DB, p: Admin, since: datetime | None = None) -> Response:
     """Reviewer corrections as JSON lines; needs consent on record in the policy."""

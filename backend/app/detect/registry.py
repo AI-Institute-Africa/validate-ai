@@ -10,6 +10,7 @@ from functools import lru_cache
 from app.core.config import Settings, get_settings
 from app.detect.base import DETECT_KINDS, Detector, DetectorResult, skipped
 from app.detect.image_detector import OnnxImageDetector
+from app.detect.linear_model import NpzScorer
 from app.detect.manifest import Entry, ManifestError, load_manifest
 from app.detect.near_duplicate import NearDuplicateDetector
 from app.detect.onnx_runtime import ModelUnavailable, OnnxEmbedder, OnnxScorer
@@ -54,7 +55,8 @@ def _build(model_dir: str, scan_limit: int = 20000, days: int = 180) -> dict[str
             out[kind] = UnavailableDetector(kind, "not_implemented", entry.name)
         else:
             try:
-                out[kind] = OnnxImageDetector(entry, OnnxScorer(entry))
+                scorer = NpzScorer(entry) if entry.format == "npz-linear" else OnnxScorer(entry)
+                out[kind] = OnnxImageDetector(entry, scorer)
             except ModelUnavailable as exc:
                 log.warning("detector %s not loaded: %s", kind, exc)
                 out[kind] = UnavailableDetector(kind, str(exc), entry.name)
