@@ -20,7 +20,11 @@ describe("dictionaries", () => {
     it(`${lang}: nothing is signed off that does not exist, and a flagged draft is never live`, () => {
       for (const k of REVIEWED_KEYS[lang]) {
         expect(DICTS[lang][k], `signed-off key ${k} has no text`).toBeDefined();
-        expect(FLAGGED_DRAFTS[lang][k], `signed-off key ${k} is also flagged`).toBeUndefined();
+        // A key can be signed off after a bad draft was replaced; only the old wording stays out.
+        const flagged = FLAGGED_DRAFTS[lang][k];
+        if (flagged) {
+          expect(DICTS[lang][k], `signed-off key ${k} is still the flagged wording`).not.toBe(flagged.text);
+        }
       }
       for (const [k, f] of Object.entries(FLAGGED_DRAFTS[lang])) {
         // the old wording stays out; a fresh draft may take its place (still unreviewed)

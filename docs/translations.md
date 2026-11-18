@@ -19,29 +19,31 @@ message can cost someone money or trust, so nothing unreviewed is shown.
   `REVIEWED_KEYS` in `src/lib/i18nGate.ts`. That string is then shown even while the language is off.
 - A language is switched on as a whole (`REVIEWED` in the same file) only when every string is signed
   off. Tests enforce this: a signed-off key must have text, a flagged draft can never be live, and a
-  language marked reviewed must be complete.
-- Staging can preview drafts with `VITE_ALLOW_UNREVIEWED_TRANSLATIONS=true`. Never in production.
+  language marked reviewed must be complete. **Both Shona and Ndebele are now signed off and live.**
+- Staging can still preview drafts with `VITE_ALLOW_UNREVIEWED_TRANSLATIONS=true`. Never in production.
 
 ## Where things stand
-Every payer-facing string (247) now has a Shona and a Ndebele draft, written in plain wording. That covers
+Every payer-facing string (251) now has a Shona and a Ndebele draft, written in plain wording. That covers
 the payment and ID pages, the sidebar and page chrome, status names, file problems, and the messages the server
 sends about a payment (each message has a neutral key, so the screen can translate it without the server
 revealing why).
-None is signed off, so payers still see English. The admin and reviewer pages stay in English on purpose,
-and so do the demo-only parts (sample buttons, the demo banner).
+A fluent reviewer has now signed off every string in both languages, and both are live; the signed-off
+sheets are `frontend/i18n-review/sn.csv` and `nd.csv`, and the keys are in `REVIEWED_KEYS`. The admin and
+reviewer pages stay in English on purpose, and so do the demo-only parts (sample buttons, the demo banner).
 
 Messages sent outside the console (WhatsApp replies, and the approve / reject / ask-for-more texts) are in
 `backend/app/claims/messages.py`, in the same three languages and under the same rule: a WhatsApp payer
-texts `shona` or `ndebele` (or `english`) to choose, but they are answered in English until that language is
-switched on (`POPS_PAYER_MESSAGE_LANGUAGES_LIVE=["sn"]` once a fluent reviewer has signed the text off) or the
-string is added to `REVIEWED`. Staging can preview drafts with `POPS_ALLOW_DRAFT_PAYER_MESSAGES=true`; production
-refuses to start with it. The reason sentences are the same words as the console's (a test keeps them in step).
+texts `shona` or `ndebele` (or `english`) to choose. Both languages are now live by default
+(`POPS_PAYER_MESSAGE_LANGUAGES_LIVE=["sn","nd"]`); set that variable to a shorter list to hold one back,
+or add a signed-off key to `REVIEWED` to enable just that string. Staging can preview drafts with
+`POPS_ALLOW_DRAFT_PAYER_MESSAGES=true`; production refuses to start with it. The reason sentences are the
+same words as the console's (a test keeps them in step).
 Still English only: the header lines of the downloadable summary file and anything a reviewer types by hand.
-To preview the drafts on a test site: set `VITE_ALLOW_UNREVIEWED_TRANSLATIONS=true`, or run
+To preview a future draft on a test site: set `VITE_ALLOW_UNREVIEWED_TRANSLATIONS=true`, or run
 `localStorage.setItem('validate-allow-draft-translations','1')` in the browser and pick the language.
 
 ## What was found wrong in the earlier drafts
 An automated audit (not a fluent speaker) flagged four earlier drafts: Shona `hero.title` and `form.trust`,
-and Ndebele `form.trust` and `result.green.note`. All the earlier drafts were then replaced. The old wording
-is kept in `FLAGGED_DRAFTS` so it is not reused. The new drafts were also written without a fluent speaker,
-so a person must check them before they go live.
+and Ndebele `form.trust` and `result.green.note`. All the earlier drafts were then replaced, and the old
+wording is kept in `FLAGGED_DRAFTS` so it is not reused. The replacements were checked and signed off by a
+fluent reviewer before either language went live.
