@@ -44,7 +44,7 @@ const EMPTY_ICONS: Record<string, string> = { "✓": "check", "🔔": "bell", "�
 
 export function EmptyState({ icon = "✓", title, children, action }: { icon?: string; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="card empty-state">
+    <div className="empty-state">
       <div className="empty-glyph" aria-hidden>
         <Icon name={EMPTY_ICONS[icon] ?? icon} size={26} />
       </div>
@@ -72,8 +72,8 @@ export function Reasons({ codes, empty }: { codes: string[]; empty?: string }) {
     <ul className="reasons-list">
       {codes.map((c) => (
         <li key={c}>
-          <code className="reason-code">{c}</code>
           <span>{reasonText(c)}</span>
+          <code className="reason-code">{c}</code>
         </li>
       ))}
     </ul>
