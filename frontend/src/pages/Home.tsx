@@ -126,6 +126,50 @@ export function ScenarioPanel({ info, compact = false, quiet = false, footer }: 
   );
 }
 
+function HeroArt() {
+  return (
+    <svg className="hero-art" viewBox="0 0 300 320" aria-hidden focusable="false">
+      <defs>
+        <linearGradient id="ha-beam" x1="0" x2="1">
+          <stop offset="0" stopColor="#429ebd" stopOpacity="0" />
+          <stop offset="0.5" stopColor="#429ebd" stopOpacity="0.85" />
+          <stop offset="1" stopColor="#429ebd" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="ha-shield" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#429ebd" />
+          <stop offset="1" stopColor="#053f5c" />
+        </linearGradient>
+        <clipPath id="ha-clip"><rect x="62" y="52" width="136" height="176" rx="14" /></clipPath>
+      </defs>
+      <circle className="ha-blob" cx="150" cy="160" r="128" />
+      <circle className="ha-orbit" cx="150" cy="160" r="142" />
+      <g className="ha-float ha-f1">
+        <rect className="ha-paper" x="62" y="52" width="136" height="176" rx="14" />
+        <g clipPath="url(#ha-clip)">
+          <rect className="ha-line" x="82" y="82" width="70" height="8" rx="4" />
+          <rect className="ha-line" x="82" y="104" width="96" height="6" rx="3" style={{ animationDelay: "120ms" }} />
+          <rect className="ha-line" x="82" y="120" width="84" height="6" rx="3" style={{ animationDelay: "220ms" }} />
+          <rect className="ha-line" x="82" y="136" width="90" height="6" rx="3" style={{ animationDelay: "320ms" }} />
+          <rect className="ha-line amber" x="82" y="166" width="52" height="10" rx="5" style={{ animationDelay: "420ms" }} />
+          <rect className="ha-beam" x="62" y="52" width="136" height="26" fill="url(#ha-beam)" />
+        </g>
+      </g>
+      <g className="ha-float ha-f2">
+        <path className="ha-shield" d="M196 150 l44 16 v36 c0 24 -18 40 -44 52 c-26 -12 -44 -28 -44 -52 v-36 z" fill="url(#ha-shield)" />
+        <path className="ha-check" d="M174 206 l16 16 l32 -34" />
+      </g>
+      <g className="ha-float ha-f3"><circle className="ha-coin" cx="240" cy="64" r="17" /><text x="240" y="70" textAnchor="middle" className="ha-coin-t">$</text></g>
+      <g className="ha-float ha-f4"><circle className="ha-ring" cx="44" cy="206" r="11" /></g>
+      <g className="ha-float ha-f2"><circle cx="262" cy="130" r="5" fill="#429ebd" /><circle cx="30" cy="110" r="4" fill="#f7ad19" /><circle cx="110" cy="286" r="5" fill="#f27f0c" /></g>
+      <g className="ha-float ha-f4">
+        <circle cx="86" cy="262" r="20" fill="#9fe7f5" stroke="#429ebd" strokeWidth="2" />
+        <circle cx="86" cy="256" r="6.5" fill="#053f5c" />
+        <path d="M73 274 c2 -9 24 -9 26 0" fill="#053f5c" />
+      </g>
+    </svg>
+  );
+}
+
 function Figure({ n, label }: { n: number | undefined; label: string }) {
   const shown = useCountUp(n);
   return (
@@ -178,6 +222,7 @@ export default function Home() {
   return (
     <div>
       <section className="hero2">
+        <HeroArt />
         <h1>Know that a payment, or a person, is real. In seconds.</h1>
         <p>
           Validate reads receipts and identity documents and checks them against the money. The clear cases are
