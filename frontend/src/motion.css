@@ -122,3 +122,59 @@ a:not(.btn):not(.skip-link):hover { background-size: 100% 1.5px; }
 .modal { animation-duration: 320ms; animation-timing-function: var(--spring); }
 .toast { animation-timing-function: var(--spring); }
 .skeleton-line { background-image: linear-gradient(90deg, var(--line) 25%, color-mix(in srgb, var(--sky) 50%, var(--line)) 50%, var(--line) 75%); background-size: 200% 100%; }
+
+/* ── polish: depth and brand character ────────────────────
+   Amber and Orange are used here only as decoration (bars, dots, glows), never as text. */
+
+/* a short Amber to Orange bar anchors every page title */
+.page-head h1::after, .hero2 h1::after { content: ""; display: block; width: 44px; height: 4px; margin-top: 12px; border-radius: 4px; background: linear-gradient(90deg, #f7ad19, #f27f0c); transform-origin: left; animation: sweep 700ms var(--ease) 200ms both; }
+.hero2 h1::after { width: 64px; margin-top: 18px; }
+
+/* hero: a soft Sky and Blue glow behind the headline */
+.hero2 { position: relative; isolation: isolate; }
+.hero2::before { content: ""; position: absolute; z-index: -1; inset: -80px -200px auto -120px; height: 460px; background: radial-gradient(ellipse 60% 70% at 25% 45%, color-mix(in srgb, var(--sky) 55%, transparent), transparent 100%), radial-gradient(ellipse 45% 55% at 80% 30%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 100%); pointer-events: none; animation: fade 900ms var(--ease) both; -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 30%, transparent 100%); mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 30%, transparent 100%); }
+:root[data-theme="dark"] .hero2::before { background: radial-gradient(ellipse 60% 70% at 25% 45%, color-mix(in srgb, var(--brand) 30%, transparent), transparent 100%), radial-gradient(ellipse 45% 55% at 80% 30%, color-mix(in srgb, var(--sky) 10%, transparent), transparent 100%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hero2::before { background: radial-gradient(ellipse 60% 70% at 25% 45%, color-mix(in srgb, var(--brand) 30%, transparent), transparent 100%), radial-gradient(ellipse 45% 55% at 80% 30%, color-mix(in srgb, var(--sky) 10%, transparent), transparent 100%); } }
+
+/* "how" steps: a node on the rule, step number in the accent colour */
+.hero2 .how-steps li::after { content: ""; position: absolute; top: -4px; right: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--brand); transition: transform var(--calm) var(--spring), background var(--quick) var(--ease); }
+.hero2 .how-steps li:hover::after { transform: scale(1.8); background: var(--hot); }
+.hero2 .how-steps li:nth-child(2)::after { background: #f7ad19; }
+.hero2 .how-steps li:nth-child(3)::after { background: #f27f0c; }
+.how .card::before { font-weight: 700; }
+.how .card { transition: border-color var(--calm) var(--ease); }
+.how .card:hover { border-top-color: var(--brand); }
+
+/* surfaces: gentle elevation instead of hairline-only */
+.card { border-radius: 12px; box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent), 0 6px 18px color-mix(in srgb, var(--ink) 5%, transparent); }
+.how .card, .scn { box-shadow: none; }
+.table-wrap { box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent), 0 6px 18px color-mix(in srgb, var(--ink) 5%, transparent); background: var(--panel); border: 1px solid var(--line); }
+thead th { background: color-mix(in srgb, var(--sky) 22%, var(--panel)); }
+.stat .n { color: var(--accent); }
+
+/* primary buttons: inner highlight and a tinted shadow so they read as raised */
+button:not(.ghost):not(.secondary):not(.link):not(.danger):not(.persona-btn):not(.persona-item):not(.tour-step):not(.menu-btn):not(.rv-sort):not(.seg button):not(.rv-pill):not(.rv-tab):not(:disabled),
+a.btn:not(.secondary) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 2px 6px color-mix(in srgb, var(--brand) 35%, transparent); }
+button.lg, a.btn.lg { letter-spacing: 0.005em; }
+
+/* sidebar: brighter active item with a brand bar, brand mark gets a gentle lift */
+.sidebar nav a.active { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 35%, transparent); }
+.sidebar nav a.active::before { background: linear-gradient(180deg, #f7ad19, #f27f0c); width: 4px; left: -12px; }
+.sidebar .brand .brand-mark, .sidebar .brand svg, .sidebar .brand > :first-child { transition: transform var(--calm) var(--spring); }
+.sidebar .brand:hover > :first-child { transform: rotate(-6deg) scale(1.08); }
+.nav-title { color: color-mix(in srgb, var(--muted) 85%, var(--brand)); }
+
+/* topbar: a faint brand line under the bar */
+.topbar { border-bottom-color: color-mix(in srgb, var(--brand) 25%, var(--line)); }
+
+/* selection and scrollbars carry the brand too */
+::selection { background: var(--sky); color: var(--ink); }
+html { scrollbar-color: color-mix(in srgb, var(--brand) 55%, var(--line)) transparent; }
+
+/* dark mode: active nav item reads as brand blue, not grey */
+:root[data-theme="dark"] .sidebar nav a.active { background: color-mix(in srgb, var(--brand) 32%, transparent); }
+:root[data-theme="dark"] .sidebar nav a:hover { background: color-mix(in srgb, var(--brand) 20%, transparent); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sidebar nav a.active { background: color-mix(in srgb, var(--brand) 32%, transparent); }
+  :root:not([data-theme="light"]) .sidebar nav a:hover { background: color-mix(in srgb, var(--brand) 20%, transparent); }
+}
