@@ -72,7 +72,7 @@ button, a.btn { position: relative; overflow: hidden; transition: background var
 button:hover:not(:disabled), a.btn:hover { transform: translateY(-1px); box-shadow: var(--lift); }
 button:active:not(:disabled), a.btn:active { transform: translateY(1px) scale(0.985); box-shadow: none; }
 button.ghost:hover:not(:disabled), button.secondary:hover:not(:disabled), a.btn.secondary:hover { background: color-mix(in srgb, var(--sky) 35%, transparent); border-color: var(--brand); }
-button.link:hover, .seg button:hover, .tour-step:hover, .rv-tab:hover, .persona-item:hover, .lang-switch:hover { transform: none; box-shadow: none; }
+button.link:hover, .seg button:hover, .tour-step:hover, .rv-tab:hover, .rv-pill:hover, .rv-sort:hover, .persona-btn:hover, .persona-item:hover, .menu-btn:hover, .lang-switch:hover, .toast button:hover { transform: none; box-shadow: none; }
 /* a sheen sweeps across primary buttons on hover */
 button:not(.ghost):not(.secondary):not(.link):not(.danger):not(.persona-btn):not(.persona-item):not(.tour-step):not(.menu-btn):not(.rv-sort)::after,
 a.btn:not(.secondary)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%); transform: translateX(-120%); pointer-events: none; }
@@ -80,7 +80,8 @@ button:hover:not(:disabled)::after, a.btn:hover::after { transform: translateX(1
 
 /* cards and tiles rise toward the pointer */
 .card, .scn, .scn-card, .recent, .capture { transition: border-color var(--quick) var(--ease), background var(--quick) var(--ease), transform var(--calm) var(--ease), box-shadow var(--calm) var(--ease); }
-.card:hover, .scn-card:hover, .recent:hover { border-color: var(--brand); transform: translateY(-2px); box-shadow: var(--lift); }
+.card:hover { border-color: color-mix(in srgb, var(--brand) 60%, var(--line)); }
+.scn-card:hover, .recent:hover, a.card:hover { border-color: var(--brand); transform: translateY(-2px); box-shadow: var(--lift); }
 .how .card:hover { transform: none; box-shadow: none; border-color: var(--line); }
 .stat { transition: background var(--quick) var(--ease); }
 .stat:hover { background: color-mix(in srgb, var(--sky) 22%, transparent); }
@@ -112,10 +113,9 @@ tr.rv-click { cursor: pointer; }
 .seg button:hover:not(.on) { color: var(--accent); border-bottom-color: var(--brand); }
 .rv-field:hover, .rv .candidate:hover { background: color-mix(in srgb, var(--sky) 28%, var(--panel)); }
 
-/* links get an underline that draws in */
-a:not(.btn):not(.skip-link) { text-decoration: none; background: linear-gradient(currentColor, currentColor) 0 100% / 0 1.5px no-repeat; transition: color var(--quick) var(--ease), background-size var(--calm) var(--ease); }
-a:not(.btn):not(.skip-link):hover { background-size: 100% 1.5px; }
-.sidebar nav a, .demo-bar a, .brand a, a.brand { background-image: none; }
+/* plain in-text links get an underline that draws in (not nav, cards or buttons, which carry a class) */
+main :is(p, li, td, dd, small, label, .muted) a:not([class]) { text-decoration: none; background-image: linear-gradient(currentColor, currentColor); background-repeat: no-repeat; background-position: 0 100%; background-size: 0 1.5px; transition: color var(--quick) var(--ease), background-size var(--calm) var(--ease); }
+main :is(p, li, td, dd, small, label, .muted) a:not([class]):hover { background-size: 100% 1.5px; }
 
 /* a status badge pops once when it arrives; springier surfaces */
 .chip2 { animation: pop 380ms var(--spring) both; }
@@ -215,6 +215,7 @@ body::before { content: ""; position: fixed; inset: -10vmax; z-index: -1; pointe
 .hero2 p { max-width: 600px; }
 .hero-art { position: absolute; right: 0; top: -6px; width: 300px; height: auto; overflow: visible; z-index: 0; }
 @media (max-width: 1180px) { .hero-art { display: none; } }
+@media (min-width: 1181px) { .hero2 h1, .hero2 p { max-width: min(740px, calc(100% - 330px)); } .hero2 p { max-width: min(600px, calc(100% - 330px)); } }
 .ha-blob { fill: color-mix(in srgb, var(--sky) 55%, transparent); transform-origin: 150px 160px; animation: breathe 7s ease-in-out infinite; }
 .ha-orbit { fill: none; stroke: var(--brand); stroke-width: 1.5; stroke-dasharray: 3 10; stroke-linecap: round; opacity: 0.7; transform-origin: 150px 160px; animation: orbit 60s linear infinite; }
 .ha-float { animation: float 6s ease-in-out infinite; }
