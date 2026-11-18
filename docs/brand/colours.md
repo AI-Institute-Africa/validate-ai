@@ -6,10 +6,10 @@ Five colours, each with a ten-step ladder from light to dark. The palette was ma
 [iColorpalette](https://icolorpalette.com/p/535768) and chosen as the Validate palette; the image is kept
 here as the reference. Every hex value below was checked against the pixels of that image.
 
-> **Status: chosen, not yet applied.** The console today uses a different, green accent
-> (`--accent: #0e6b58` in `frontend/src/tokens.css`). Nothing in the product, the proposal or the demo has
-> been recoloured to this palette yet. This page records the decision and how to use the colours safely, so the
-> change can be made once and consistently.
+> **Status: applied to the console.** `frontend/src/tokens.css` carries the palette: Ink for text, Sky-tinted
+> surfaces, Blue step 7 (`#2e6e84`) as the accent so white button text passes (brand Blue `#429ebd` is `--brand`,
+> used for borders, focus rings and hover glows only). Amber step 8 is the warning text; Orange is `--hot`. Dark mode
+> uses the Ink ladder with Sky as the accent. The proposal, demo art and model cards are not recoloured yet.
 
 ## The five colours
 
@@ -72,11 +72,8 @@ Rules that follow:
 4. **Check dark mode separately.** The Ink ladder gives a dark background (`#032e43`, `#054565`); text on it should be Sky
    or white, and the same contrast table applies.
 
-## Where this should be applied (not done yet)
+## Where this is applied
 
-- `frontend/src/tokens.css`: replace the green accent and the warning colours with the roles above, then re-run the browser
-  tests and re-check contrast on every screen.
-- The proposal document and its PDF, the demo's cover art and the model cards' tables, if they should carry the brand.
-
-If you want the console recoloured, that is a separate, reviewable change: it touches every screen's look and should be checked
-with the screenshots the browser tests already take.
+- `frontend/src/tokens.css`: all colour tokens (light, and both dark blocks). New tokens: `--brand`, `--sky`, `--hot`, `--ink`, `--scrim`, `--lift`, `--spring`.
+- `frontend/src/motion.css`: hover, focus and entrance motion built on these tokens (all disabled by `prefers-reduced-motion`).
+- Still to do: the proposal document and its PDF, the demo's cover art and the model cards' tables, if they should carry the brand.

@@ -2,65 +2,75 @@
    Light is the default. Dark applies when the OS asks for it (before the app loads) or when the theme
    switch sets data-theme (see theme.ts). Change a value here and every page follows.
 
-   Look: warm paper, ink text, one deep-green accent, a serif for headings. Flat surfaces with hairlines;
-   colour is kept for meaning (green fine, amber look, red stop). */
+   Look: pale sky surfaces, ink text, one blue accent, a serif for headings. Flat surfaces with hairlines;
+   colour is kept for meaning (green fine, amber look, red stop). Palette and contrast rules: docs/brand/colours.md.
+   Bright brand colours (--brand, --sky, --hot) are fills, borders and icons only, never small text. */
 @import "@fontsource-variable/inter/wght.css";
 @import "@fontsource-variable/source-serif-4/wght.css";
 
 :root {
   --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-serif: "Source Serif 4 Variable", "Iowan Old Style", Georgia, serif;
-  --bg: #f6f4ef;
-  --panel: #fffefb;
-  --text: #1b2420;
-  --muted: #646b66;
-  --line: #e4e0d6;
-  --accent: #0e6b58;
-  --accent-strong: #0a5445;
+  /* brand */
+  --brand: #429ebd;
+  --sky: #9fe7f5;
+  --hot: #f27f0c;
+  --ink: #053f5c;
+  /* surfaces and text */
+  --bg: #eef9fc;
+  --panel: #ffffff;
+  --text: #053f5c;
+  --muted: #3d6a80;
+  --line: #cfe9f1;
+  --accent: #2e6e84; /* Blue step 7: white text on it is 5.7:1 */
+  --accent-strong: #245869; /* Blue step 8 */
   --on-accent: #ffffff;
   --grad: var(--accent); /* old name, now flat: no gradients */
   --ok: #1d7a4a;
-  --ok-bg: #e7f2ea;
-  --warn: #965a0e;
-  --warn-bg: #f7edd7;
+  --ok-bg: #e0f3e8;
+  --warn: #8a5d04; /* Amber step 8 */
+  --warn-bg: #fdf0cf;
   --bad: #ab3a2e;
-  --bad-bg: #f7e4e0;
+  --bad-bg: #fbe6e2;
+  --scrim: rgba(3, 46, 67, 0.5);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1411;
-    --panel: #161c18;
-    --text: #e9eeea;
-    --muted: #9aa59e;
-    --line: #27302a;
-    --accent: #52c3a4;
-    --accent-strong: #7fd8bf;
-    --on-accent: #0b1511;
-    --ok: #5fcf93;
-    --ok-bg: #12301f;
-    --warn: #e0b25a;
-    --warn-bg: #33260c;
-    --bad: #ef8478;
-    --bad-bg: #3a1b17;
+    --bg: #032e43;
+    --panel: #054565;
+    --text: #e8fbff;
+    --muted: #9fd3e6;
+    --line: #0b5a80;
+    --accent: #9fe7f5;
+    --accent-strong: #ffffff;
+    --on-accent: #032e43;
+    --ok: #6fdba0;
+    --ok-bg: #0c4a3a;
+    --warn: #f7ad19;
+    --warn-bg: #452e02;
+    --bad: #ff9a8e;
+    --bad-bg: #4a1f24;
+    --scrim: rgba(1, 20, 30, 0.65);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f1411;
-  --panel: #161c18;
-  --text: #e9eeea;
-  --muted: #9aa59e;
-  --line: #27302a;
-  --accent: #52c3a4;
-  --accent-strong: #7fd8bf;
-  --on-accent: #0b1511;
-  --ok: #5fcf93;
-  --ok-bg: #12301f;
-  --warn: #e0b25a;
-  --warn-bg: #33260c;
-  --bad: #ef8478;
-  --bad-bg: #3a1b17;
+  --bg: #032e43;
+  --panel: #054565;
+  --text: #e8fbff;
+  --muted: #9fd3e6;
+  --line: #0b5a80;
+  --accent: #9fe7f5;
+  --accent-strong: #ffffff;
+  --on-accent: #032e43;
+  --ok: #6fdba0;
+  --ok-bg: #0c4a3a;
+  --warn: #f7ad19;
+  --warn-bg: #452e02;
+  --bad: #ff9a8e;
+  --bad-bg: #4a1f24;
+  --scrim: rgba(1, 20, 30, 0.65);
   color-scheme: dark;
 }
 
@@ -68,13 +78,15 @@
 :root {
   --radius: 8px;
   --shadow: none;
-  --shadow-lg: 0 12px 32px rgba(27, 36, 32, 0.14);
+  --shadow-lg: 0 12px 32px rgba(5, 63, 92, 0.16);
+  --lift: 0 6px 18px rgba(66, 158, 189, 0.22);
   --sidebar: 236px;
   --topbar: 54px;
   --demo-bar: 30px;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --quick: 140ms;
   --calm: 320ms;
 }
-:root[data-theme="dark"] { --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5); } }
+:root[data-theme="dark"] { --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5); --lift: 0 6px 18px rgba(0, 0, 0, 0.4); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5); --lift: 0 6px 18px rgba(0, 0, 0, 0.4); } }

@@ -61,7 +61,7 @@ main:focus { outline: none; }
   .app { grid-template-columns: 1fr; }
   .sidebar { position: fixed; z-index: 50; top: 0; left: 0; width: min(86vw, 300px); transform: translateX(-102%); transition: transform .2s ease; box-shadow: var(--shadow-lg); background: var(--bg); }
   .sidebar.open { transform: none; }
-  .scrim.show { display: block; position: fixed; inset: 0; z-index: 40; background: rgba(27, 36, 32, .4); }
+  .scrim.show { display: block; position: fixed; inset: 0; z-index: 40; background: var(--scrim); }
   .menu-btn { display: inline-block; }
   .app main { padding: 18px 14px 28px; }
   .topbar { padding: 0 12px; }
@@ -119,7 +119,7 @@ tbody tr:hover td { background: color-mix(in srgb, var(--accent) 4%, var(--panel
 @media (max-width: 900px) { .grid.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .grid.cols-2, .grid.cols-3 { grid-template-columns: 1fr; } }
 .empty-state h2 { font-size: 18px; }
-.overlay { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: rgba(27, 36, 32, 0.5); padding: 20px; }
+.overlay { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: var(--scrim); padding: 20px; }
 .modal { background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 26px; max-width: 420px; text-align: center; }
 .spinner { width: 34px; height: 34px; margin: 0 auto 12px; border: 4px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -22,7 +22,7 @@ export const PERSONAS: Record<PersonaKey, Persona> = {
     role: "submitter",
     email: "amara.payer@demo.validate",
     blurb: "Pays fees and proves who they are",
-    color: "#a0621a",
+    color: "#8a5d04",
     initials: "AP",
   },
   reviewer: {
@@ -32,7 +32,7 @@ export const PERSONAS: Record<PersonaKey, Persona> = {
     role: "reviewer",
     email: "rudo.reviewer@demo.validate",
     blurb: "Works the queue of cases that need a person",
-    color: "#0e6b58",
+    color: "#2e6e84",
     initials: "RR",
   },
   approver: {
@@ -42,7 +42,7 @@ export const PERSONAS: Record<PersonaKey, Persona> = {
     role: "approver",
     email: "kuda.approver@demo.validate",
     blurb: "Second approvals, reversals, manual credits",
-    color: "#496a8f",
+    color: "#aa5908",
     initials: "KA",
   },
   admin: {
@@ -52,7 +52,7 @@ export const PERSONAS: Record<PersonaKey, Persona> = {
     role: "admin",
     email: "tariro.admin@demo.validate",
     blurb: "Sees everything, sets the rules",
-    color: "#1b2420",
+    color: "#053f5c",
     initials: "TA",
   },
 };
