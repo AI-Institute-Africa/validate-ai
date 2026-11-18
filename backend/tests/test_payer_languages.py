@@ -43,7 +43,8 @@ def test_signed_off_languages_are_live_by_default():
 
 def test_language_is_english_until_it_is_switched_on_or_signed_off(monkeypatch):
     s = get_settings()
-    monkeypatch.setattr(s, "payer_message_languages_live", [])  # hold both signed-off languages back
+    # hold both signed-off languages back
+    monkeypatch.setattr(s, "payer_message_languages_live", [])
     assert pm.render("payer.approved", "sn") == pm.TEXTS["payer.approved"]["en"]
     monkeypatch.setattr(s, "payer_message_languages_live", ["sn"])
     assert pm.render("payer.approved", "sn") == pm.TEXTS["payer.approved"]["sn"]
@@ -93,7 +94,8 @@ def test_state_texts_follow_the_claims_language(monkeypatch):
 
 
 def test_a_payer_can_ask_for_a_language_by_name_on_whatsapp(client, graph, session, monkeypatch):  # noqa: F811
-    monkeypatch.setattr(get_settings(), "payer_message_languages_live", [])  # start from the gated case
+    # start from the gated case
+    monkeypatch.setattr(get_settings(), "payer_message_languages_live", [])
     r = _post(client, _text("l1", "Shona"))
     assert r.status_code == 200
     # not switched on: the reply is honest and in English, and the choice is remembered
