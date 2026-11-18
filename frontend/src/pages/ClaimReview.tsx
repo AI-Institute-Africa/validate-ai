@@ -5,6 +5,7 @@ import { API, api, Candidate, Claim, Field, hasRole, money, post, ReviewDetail }
 import { humanize, stateInfo } from "../labels";
 import { useToast, useUndo } from "../toast";
 import { Dialog } from "../components/Dialog";
+import { Menu } from "../components/Menu";
 import { convertMinor, gapBps, isCrossCurrency } from "../lib/fx";
 import { compareRows, lowConfidenceCount, type CompareStatus } from "../lib/comparison";
 import { REJECT_CONSEQUENCES, REJECT_PAYER_MESSAGE, REJECT_REASONS, REQUEST_INFO_NOTE } from "../lib/payerMessages";
@@ -83,16 +84,22 @@ function EvidenceViewer({ detail, hover }: { detail: ReviewDetail; hover: string
         <button type="button" className="ghost small" onClick={() => setView(zoomBy(view, 0.25))} aria-label="Zoom in">＋</button>
         <button type="button" className="ghost small" onClick={() => setView(zoomBy(view, -0.25))} aria-label="Zoom out">－</button>
         <button type="button" className="ghost small" onClick={() => setView(rotateBy(view, 90))} aria-label="Rotate">⟳</button>
-        <label className="small">Brightness
-          <input type="range" min={0.5} max={2.5} step={0.1} value={view.brightness} onChange={(e) => setView(setLevel(view, "brightness", Number(e.target.value)))} />
-        </label>
-        <label className="small">Contrast
-          <input type="range" min={0.5} max={2.5} step={0.1} value={view.contrast} onChange={(e) => setView(setLevel(view, "contrast", Number(e.target.value)))} />
-        </label>
-        {!isDefault(view) && <button type="button" className="ghost small" onClick={() => setView(DEFAULT_VIEW)}>Reset</button>}
-        <button type="button" className="ghost small" onClick={() => setTab(tab === "image" ? "json" : "image")}>
-          {tab === "image" ? "Raw data" : "Image"}
-        </button>
+        {/* zoom and rotate stay at hand; the rest is tucked into one disclosure */}
+        <details className="viewer-adjust">
+          <summary>Adjust{!isDefault(view) ? " •" : ""}</summary>
+          <div className="adjust-body">
+            <label className="small">Brightness
+              <input type="range" min={0.5} max={2.5} step={0.1} value={view.brightness} onChange={(e) => setView(setLevel(view, "brightness", Number(e.target.value)))} />
+            </label>
+            <label className="small">Contrast
+              <input type="range" min={0.5} max={2.5} step={0.1} value={view.contrast} onChange={(e) => setView(setLevel(view, "contrast", Number(e.target.value)))} />
+            </label>
+            {!isDefault(view) && <button type="button" className="ghost small" onClick={() => setView(DEFAULT_VIEW)}>Reset</button>}
+            <button type="button" className="ghost small" onClick={() => setTab(tab === "image" ? "json" : "image")}>
+              {tab === "image" ? "Raw data" : "Image"}
+            </button>
+          </div>
+        </details>
       </div>
       {tab === "json" ? (
         <div>
@@ -363,6 +370,7 @@ export default function ClaimReview() {
   const [rejectReason, setRejectReason] = useState(REJECT_REASONS[0]);
   const [infoMsg, setInfoMsg] = useState("");
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [reprocessOpen, setReprocessOpen] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [discard, setDiscard] = useState(false);
@@ -483,7 +491,8 @@ export default function ClaimReview() {
               ["?", "Show this list"],
             ]}
           />
-          {nextId && <> · <Link to={`/claims/${nextId}`} state={nextState}>Next claim →</Link></>}
+          {/* when there is a decision bar, "Next claim" lives there; this is the only one otherwise */}
+          {nextId && !reviewable && <> · <Link to={`/claims/${nextId}`} state={nextState}>Next claim →</Link></>}
         </span>
       </div>
 
@@ -530,9 +539,6 @@ export default function ClaimReview() {
           <div className="body">
             <div className="lbl">Suggested next step</div>
             <p>{step.text}</p>
-            {step.jump && reviewable && (
-              <button type="button" className="secondary small go" onClick={goDecision}>Go to the decision</button>
-            )}
             {c.reason_codes.includes("SUSPECTED_FAKE") && <p className="small"><Link to="/fraud">Open Suspected fakes</Link></p>}
           </div>
         </div>
@@ -597,38 +603,7 @@ export default function ClaimReview() {
                     </button>
                   </form>
                 </div>
-                <div className="rv-action danger">
-                  <h4>Reject</h4>
-                  <p className="rv-help">Declines this claim. The reason you pick goes in the audit trail.</p>
-                  <div className="inline">
-                    <select value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} aria-label="Reject reason">
-                      {REJECT_REASONS.map((r) => <option key={r} value={r}>{humanize(r)}</option>)}
-                    </select>
-                    <button type="button" className="danger" onClick={() => setRejectOpen(true)}>Reject…</button>
-                  </div>
-                </div>
-                <div className="rv-action">
-                  <h4>Ask the payer for more</h4>
-                  <p className="rv-help">For a blurry photo or a missing detail. {REQUEST_INFO_NOTE}</p>
-                  <form className="inline" onSubmit={(e) => { e.preventDefault(); requestInfoLater(); }}>
-                    <input value={infoMsg} onChange={(e) => setInfoMsg(e.target.value)} placeholder="Message to payer" aria-label="Message to payer" />
-                    <button className="ghost" disabled={infoMsg.length < 3}>Request info</button>
-                  </form>
-                </div>
-                {canReprocess && (
-                  <div className="rv-action">
-                    <h4>Read it again</h4>
-                    <p className="rv-help">Runs the readers and rules again on the saved receipt, for example after a reader was down. The old reading stays in the history.</p>
-                    <button type="button" className="ghost" onClick={() => setReprocessOpen(true)}>Re-read…</button>
-                  </div>
-                )}
-                {onHold && hasRole("approver") && (
-                  <div className="rv-action">
-                    <h4>Release the duplicate hold</h4>
-                    <p className="rv-help">Only if you are sure this is not a repeat. It goes to the normal queue; the duplicate warnings stay visible.</p>
-                    <button type="button" className="ghost" onClick={() => setReleaseOpen(true)}>Release…</button>
-                  </div>
-                )}
+                <p className="rv-help">Not this one? Reject, ask the payer for more, re-read or release a hold from the bar at the bottom of the page.</p>
               </div>
             </div>
           )}
@@ -671,13 +646,26 @@ export default function ClaimReview() {
           </span>
           <button type="button" onClick={() => { goDecision(); setTimeout(() => last4Ref.current?.focus(), 350); }}>Confirm…</button>
           <button type="button" className="danger" onClick={() => setRejectOpen(true)}>Reject…</button>
+          <Menu
+            up
+            label="More"
+            items={[
+              { label: "Ask the payer for more…", onSelect: () => setInfoOpen(true) },
+              { label: "Read it again…", onSelect: () => setReprocessOpen(true), hidden: !canReprocess },
+              { label: "Release the duplicate hold…", onSelect: () => setReleaseOpen(true), hidden: !(onHold && hasRole("approver")) },
+            ]}
+          />
           {nextId && <Link className="btn secondary" to={`/claims/${nextId}`} state={nextState}>Next claim →</Link>}
         </div>
       )}
 
       {rejectOpen && (
         <Dialog title="Reject this claim?" onClose={() => setRejectOpen(false)}>
-          <p>Reason (audit trail only): <strong>{humanize(rejectReason)}</strong></p>
+          <label className="small">Reason (audit trail only)
+            <select value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} aria-label="Reject reason">
+              {REJECT_REASONS.map((r) => <option key={r} value={r}>{humanize(r)}</option>)}
+            </select>
+          </label>
           <label className="small">Note (optional)
             <input value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
@@ -688,6 +676,19 @@ export default function ClaimReview() {
           <div className="dialog-actions">
             <button type="button" className="ghost" onClick={() => setRejectOpen(false)}>Cancel</button>
             <button type="button" className="danger" onClick={rejectLater}>Reject claim</button>
+          </div>
+        </Dialog>
+      )}
+
+      {infoOpen && (
+        <Dialog title="Ask the payer for more" onClose={() => setInfoOpen(false)}>
+          <p className="small">For a blurry photo or a missing detail. {REQUEST_INFO_NOTE}</p>
+          <label className="small">Message to payer
+            <input value={infoMsg} onChange={(e) => setInfoMsg(e.target.value)} autoFocus />
+          </label>
+          <div className="dialog-actions">
+            <button type="button" className="ghost" onClick={() => setInfoOpen(false)}>Cancel</button>
+            <button type="button" disabled={infoMsg.trim().length < 3} onClick={() => { setInfoOpen(false); requestInfoLater(); }}>Request info</button>
           </div>
         </Dialog>
       )}
