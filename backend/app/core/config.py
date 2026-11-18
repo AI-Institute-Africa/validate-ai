@@ -100,7 +100,9 @@ class Settings(BaseSettings):
 
     # languages (besides English) whose outbound messages (WhatsApp, approve/reject texts) a
     # fluent reviewer has signed off and that may be sent; see app/claims/messages.py
-    payer_message_languages_live: list[str] = []
+    # Both drafts were signed off, so they are live by default. Set POPS_PAYER_MESSAGE_LANGUAGES_LIVE
+    # to a smaller list to hold one back without a code change.
+    payer_message_languages_live: list[str] = ["sn", "nd"]
     allow_draft_payer_messages: bool = False  # staging only: send unreviewed drafts
 
     # extraction readers: ollama | donut | fake ; ocr: tesseract | none
