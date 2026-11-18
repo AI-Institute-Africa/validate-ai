@@ -47,7 +47,10 @@ export function installFlair(): void {
     );
   }
 
-  if (typeof IntersectionObserver === "function" && typeof MutationObserver === "function") {
+  // automated browsers (tests, screenshots) get the page fully shown: full-page captures never scroll, so
+  // sections waiting to fade in would be captured blank
+  const automated = typeof navigator !== "undefined" && navigator.webdriver === true;
+  if (!automated && typeof IntersectionObserver === "function" && typeof MutationObserver === "function") {
     const io = new IntersectionObserver(
       (entries) => {
         for (const en of entries) {
