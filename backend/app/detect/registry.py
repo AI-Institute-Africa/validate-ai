@@ -17,7 +17,7 @@ from app.detect.onnx_runtime import ModelUnavailable, OnnxEmbedder, OnnxScorer
 log = logging.getLogger(__name__)
 
 # kinds that load straight from an ONNX image model; the others arrive with their own detector
-IMAGE_KINDS = ("receipt", "doc")
+IMAGE_KINDS = ("receipt", "doc", "face")
 
 
 class UnavailableDetector:

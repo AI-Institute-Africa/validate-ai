@@ -45,10 +45,10 @@ Both thresholds are set per organisation in the payment policy (`fraud_high_scor
 | `PASTED_TEXT` | 25 | The proof is pasted or forwarded text (an SMS copied into the form or sent on WhatsApp). Anyone can type it, so it is only as good as the bank record it matches. Dampened once the money is confirmed. |
 | `ELA_LOCAL_EDIT` | 25 | Image forensics (Error Level Analysis on JPEGs) found a region compressed differently from the rest, as happens when an amount is pasted in. The heatmap is shown to admins. |
 | `REFERENCE_FORMAT_INVALID` | 25 | The reference does not match the provider's known format. |
-| `NEAR_DUPLICATE_EMBEDDING` | 60 | *Planned, `escalate` mode only.* A trained embedding says this image is a re-photographed, cropped or re-rendered copy of an earlier proof that the exact and perceptual hashes missed. Goes to `DUPLICATE_HOLD`. |
-| `AI_GENERATED_SUSPECTED` | 55 | *Planned, `escalate` mode only.* A trained detector scores the image as AI-generated or regenerated, even though no generator metadata survived. Never dampened. |
-| `DEEPFAKE_SUSPECTED`, `SYNTHETIC_FACE_SUSPECTED` | 55 / 50 | *Planned, `escalate` mode only.* Identity checks: a face-swapped, AI-generated or cloned face in a selfie or ID portrait. See [`kyc.md`](kyc.md). |
-| `FORGED_POP_SUSPECTED` | 45 | *Planned, `escalate` mode only.* A trained forgery detector scores the proof as edited or pasted. Counts half once the money is confirmed. |
+| `NEAR_DUPLICATE_EMBEDDING` | via `REUSED_RECEIPT` | *`escalate` mode only.* A trained embedding says this image is a re-photographed, cropped or re-rendered copy of an earlier proof that the exact and perceptual hashes missed. Goes to `DUPLICATE_HOLD` and is scored as `REUSED_RECEIPT`. |
+| `AI_GENERATED_SUSPECTED` | 55 | *`escalate` mode only.* A trained detector scores the image as AI-generated or regenerated, even though no generator metadata survived. Never dampened. |
+| `DEEPFAKE_SUSPECTED`, `SYNTHETIC_FACE_SUSPECTED` | none | *`escalate` mode only.* Identity checks in KYC: a face-swapped, AI-generated or cloned face in a selfie or ID portrait. These are KYC flags (see [`kyc.md`](kyc.md)), not fraud-risk weights. |
+| `FORGED_POP_SUSPECTED` | 45 | *`escalate` mode only.* A trained forgery detector scores the proof as edited or pasted. Counts half once the money is confirmed. |
 | `AI_SUSPECTS_EDITING` | 15 | The vision model noticed visible signs of editing (mismatched fonts, misaligned digits). |
 | `READERS_DISAGREE` | 15 | The two independent readers read different values for a critical field. |
 | `STATUS_NOT_SUCCESS` | 15 | The receipt shows the payment as pending or failed. |

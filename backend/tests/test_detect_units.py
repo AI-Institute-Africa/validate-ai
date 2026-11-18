@@ -7,8 +7,9 @@ import pytest
 from PIL import Image
 
 from app.core.config import ConfigError, Settings, validate_for_startup
-from app.detect import registry
+from app.detect import features, registry
 from app.detect.base import DetectorResult, skipped
+from app.detect.image_detector import OnnxImageDetector, tta_views
 from app.detect.manifest import ManifestError, file_sha256, load_manifest
 from app.detect.near_duplicate import top_matches
 from app.detect.onnx_runtime import ModelUnavailable, OnnxScorer, to_tensor
@@ -20,7 +21,7 @@ def _write(folder, detectors, name="manifest.json"):
     (folder / name).write_text(json.dumps({"detectors": detectors}))
 
 
-def _entry(file="receipt_forgery.onnx", sha=None, **over):
+def _entry_json(file="receipt_forgery.onnx", sha=None, **over):
     return {
         "file": file,
         "version": "v1",
@@ -41,7 +42,7 @@ def test_a_valid_manifest_loads(tmp_path):
     (tmp_path / "receipt_forgery.onnx").write_bytes(b"x")
     _write(
         tmp_path,
-        {"receipt": _entry(threshold=0.7, uncertain_band=[0.4, 0.6], input={"size": 128})},
+        {"receipt": _entry_json(threshold=0.7, uncertain_band=[0.4, 0.6], input={"size": 128})},
     )
     e = load_manifest(tmp_path)["receipt"]
     assert (e.kind, e.label, e.threshold, e.size) == ("receipt", "forged", 0.7, 128)
@@ -51,14 +52,14 @@ def test_a_valid_manifest_loads(tmp_path):
 @pytest.mark.parametrize(
     "bad",
     [
-        {"receipt": _entry(sha="zz")},  # not hex
-        {"receipt": _entry(label="evil")},  # not a known meaning
-        {"receipt": _entry(threshold=0)},
-        {"receipt": _entry(threshold=1.5)},
-        {"receipt": _entry(uncertain_band=[0.7, 0.3])},
-        {"receipt": _entry(file="../outside.onnx")},  # escapes the folder
-        {"receipt": _entry(file="/etc/passwd")},
-        {"banana": _entry()},  # unknown kind
+        {"receipt": _entry_json(sha="zz")},  # not hex
+        {"receipt": _entry_json(label="evil")},  # not a known meaning
+        {"receipt": _entry_json(threshold=0)},
+        {"receipt": _entry_json(threshold=1.5)},
+        {"receipt": _entry_json(uncertain_band=[0.7, 0.3])},
+        {"receipt": _entry_json(file="../outside.onnx")},  # escapes the folder
+        {"receipt": _entry_json(file="/etc/passwd")},
+        {"banana": _entry_json()},  # unknown kind
         {"receipt": {"file": "x.onnx"}},  # missing fields
     ],
 )
@@ -78,7 +79,7 @@ def test_garbage_manifest_is_refused(tmp_path):
 
 
 def test_a_missing_file_or_wrong_hash_is_never_loaded(tmp_path):
-    _write(tmp_path, {"receipt": _entry()})
+    _write(tmp_path, {"receipt": _entry_json()})
     with pytest.raises(ModelUnavailable, match="file_missing"):
         OnnxScorer(load_manifest(tmp_path)["receipt"])
     (tmp_path / "receipt_forgery.onnx").write_bytes(b"not the model that was published")
@@ -101,8 +102,8 @@ def test_registry_reports_why_a_detector_cannot_run(tmp_path):
     _write(
         tmp_path,
         {
-            "receipt": _entry(sha=hashlib.sha256(b"something else").hexdigest()),
-            "face": _entry(file="face.onnx", label="deepfake"),
+            "receipt": _entry_json(sha=hashlib.sha256(b"something else").hexdigest()),
+            "face": _entry_json(file="face.onnx", label="deepfake"),
         },
     )
     s = Settings(_env_file=None, detect_mode="shadow", detect_model_dir=str(tmp_path))
@@ -110,7 +111,7 @@ def test_registry_reports_why_a_detector_cannot_run(tmp_path):
     assert set(dets) == {"receipt", "doc", "face", "duplicate", "text"}
     assert dets["receipt"].score(Image.new("RGB", (8, 8))).skipped == "hash_mismatch"
     assert dets["doc"].score(None).skipped == "no_model"
-    assert dets["face"].score(None).skipped == "not_implemented"
+    assert dets["face"].score(None).skipped == "file_missing"  # the manifest names it; no file
     info = {r["kind"]: r for r in registry.describe(s)["detectors"]}  # type: ignore[union-attr]
     assert info["receipt"]["state"] == "skipped" and info["receipt"]["reason"] == "hash_mismatch"
     assert info["doc"]["reason"] == "no_model"
@@ -153,7 +154,11 @@ def test_a_real_onnx_model_scores_and_is_hash_checked(tmp_path):
     registry.reset()
     _write(
         tmp_path,
-        {"receipt": _entry(sha=file_sha256(path), input={"size": 32}, uncertain_band=[0.6, 0.8])},
+        {
+            "receipt": _entry_json(
+                sha=file_sha256(path), input={"size": 32}, uncertain_band=[0.6, 0.8]
+            )
+        },
     )
     s = Settings(_env_file=None, detect_mode="shadow", detect_model_dir=str(tmp_path))
     r = registry.build_detectors(s)["receipt"].score(Image.new("RGB", (50, 50), (255, 255, 255)))
@@ -270,3 +275,112 @@ def test_top_matches_ranks_by_cosine_and_drops_unrelated_rows():
     assert [g[0] for g in got] == [ids[0], ids[1]]  # the orthogonal row is below the floor
     assert got[0][1] == 1.0 and abs(got[1][1] - 0.8) < 1e-6
     assert top_matches(np.zeros((0, 2), dtype=np.float32), [], np.asarray([1.0, 0.0])) == []
+
+
+# --- forensic channels ----------------------------------------------------------------------------
+
+
+def _noise_image(seed=0, size=96):
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    return Image.fromarray(rng.integers(0, 256, (size, size, 3), dtype=np.uint8))
+
+
+@pytest.mark.parametrize("fn", [features.noise_residual, features.fft_spectrum, features.ela_map])
+def test_each_forensic_channel_is_a_deterministic_plane_in_range(fn):
+    img = _noise_image()
+    a, b = fn(img, 64), fn(img, 64)
+    assert a.shape == (64, 64) and a.dtype.name == "float32"
+    assert float(a.min()) >= 0.0 and float(a.max()) <= 1.0
+    assert (a == b).all()
+
+
+def test_a_flat_picture_has_no_noise_residual_but_noise_has_plenty():
+    import numpy as np
+
+    flat = features.noise_residual(Image.new("RGB", (96, 96), (120, 120, 120)), 64)
+    noisy = features.noise_residual(_noise_image(), 64)
+    assert float(np.abs(flat - 0.5).max()) < 1e-6  # centred on 0.5 with no signal
+    assert float(np.abs(noisy - 0.5).mean()) > 0.1
+
+
+def test_a_periodic_pattern_leaves_a_spectral_peak_away_from_the_centre():
+    import numpy as np
+
+    xs = np.arange(128)
+    stripes = (np.sin(xs * 2 * np.pi / 4)[None, :] * 100 + 128).repeat(128, axis=0)
+    img = Image.fromarray(stripes.astype(np.uint8)).convert("RGB")
+    spec = features.fft_spectrum(img, 128)
+    spec[60:68, 60:68] = 0  # ignore the centre
+    assert float(spec.max()) > 0.5
+
+
+def test_six_channel_input_for_a_forensic_model():
+    t = to_tensor(_noise_image(), 48, ("rgb", "noise", "fft", "ela"))
+    assert t.shape == (1, 6, 48, 48) and t.dtype.name == "float32"
+
+
+# --- test-time augmentation -----------------------------------------------------------------------
+
+
+class _Seq:
+    def __init__(self, values):
+        self.values, self.calls = list(values), 0
+
+    def probability(self, img):
+        v = self.values[self.calls % len(self.values)]
+        self.calls += 1
+        return v
+
+
+def _entry(tta=1):
+    from pathlib import Path
+
+    from app.detect.manifest import Entry
+
+    return Entry(
+        kind="receipt",
+        name="r",
+        file=Path("x"),
+        version="v1",
+        sha256="a" * 64,
+        label="forged",
+        tta=tta,
+    )
+
+
+def test_tta_makes_the_asked_number_of_views_of_the_same_size():
+    img = Image.new("RGB", (120, 90), (255, 255, 255))
+    for n in (1, 2, 3, 5):
+        views = tta_views(img, n)
+        assert len(views) == n and all(v.size == img.size for v in views)
+    assert len(tta_views(Image.new("RGB", (10, 10)), 5)) == 1  # too small to vary safely
+
+
+def test_the_detector_averages_over_its_views_and_says_how_many():
+    d = OnnxImageDetector(_entry(tta=3), _Seq([0.9, 0.6, 0.3]))
+    r = d.score(Image.new("RGB", (120, 90)))
+    assert r.score == pytest.approx(0.6) and r.signals == ["tta:3"]
+    one = OnnxImageDetector(_entry(tta=1), _Seq([0.8])).score(Image.new("RGB", (120, 90)))
+    assert one.score == pytest.approx(0.8) and one.signals == []
+
+
+def test_tta_must_be_between_one_and_five(tmp_path):
+    (tmp_path / "m.onnx").write_bytes(b"x")
+    _write(tmp_path, {"receipt": _entry_json(file="m.onnx", tta=9)})
+    with pytest.raises(ManifestError):
+        load_manifest(tmp_path)
+
+
+def test_the_registry_knows_the_face_kind(tmp_path):
+    registry.reset()
+    (tmp_path / "face.onnx").write_bytes(b"not the model")
+    _write(
+        tmp_path,
+        {"face": _entry_json(file="face.onnx", label="deepfake")},
+    )
+    s = Settings(_env_file=None, detect_mode="shadow", detect_model_dir=str(tmp_path))
+    r = registry.build_detectors(s)["face"].score(Image.new("RGB", (8, 8)))
+    assert r.skipped == "hash_mismatch"  # it tried to load it, and the hash did not match
+    registry.reset()

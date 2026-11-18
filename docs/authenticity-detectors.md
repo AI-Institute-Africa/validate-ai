@@ -9,9 +9,9 @@
 | --- | --- |
 | Detector interface, manifest, ONNX loader, registry, shadow recording, `GET /admin/detectors` (migration 0014) | **built** (no model files ship, so every detector reports `no_model` until you install one) |
 | Near-duplicate detector (embedding, migration 0015) | **built** (needs an embedding model file; none ships) |
-| Receipt / proof-of-payment forgery + AI-generated detector | planned |
-| ID-document forgery + AI-generated detector | planned |
-| Face deepfake / AI clone / presentation-attack detector | planned |
+| Receipt / proof-of-payment forgery + AI-generated detector | **built** (a manifest entry for the generic ONNX image detector; no model ships) |
+| ID-document forgery + AI-generated detector | **built** (same, on the card image in KYC) |
+| Face deepfake / AI clone / presentation-attack detector | **built** (scores the selfie and the ID portrait in KYC; no model ships) |
 | AI-generated text classifier (optional, advisory) | planned |
 | Training, evaluation and export tooling | planned |
 | Console "Authenticity" card, scorecard, demo stories | planned |
@@ -83,7 +83,9 @@ new deployment. Each technique below has a reason; none needs a hosted service.
   receipts, IDs and selfies with contrastive learning (SimCLR or BYOL style) using realistic augmentations:
   crop, blur, JPEG, screen capture, colour change. This gives a domain-specific backbone with no labels
   and no outside model.
-- **Forensic input channels.** The network sees more than RGB: a high-pass **noise residual** (fixed
+- **Forensic input channels (built).** A manifest names the planes a model reads, in order: `rgb` (3), `noise` (the residual, 1), `fft`
+  (the spectrum, 1) and `ela` (error-level analysis, 1), so `["rgb","noise","fft","ela"]` is a 6-channel input. They are
+  deterministic recipes in `app/detect/features.py`, so training and serving prepare the picture identically. The network sees more than RGB: a high-pass **noise residual** (fixed
   SRM-style filters), the **frequency spectrum** (FFT or DCT, where generators and upscalers leave
   periodic artefacts) and the existing ELA map. These transfer across generators better than pixels alone.
 - **Metric learning for duplicates.** The embedding is trained with a contrastive or triplet loss: the same
@@ -135,12 +137,16 @@ Signal weights are starting points to be set from measured precision (they are p
 
 | Signal | Proposed default weight | Dampened when the money is confirmed? |
 | --- | --- | --- |
-| `NEAR_DUPLICATE_EMBEDDING` | 60 | no (reuse is never dampened) |
+| `NEAR_DUPLICATE_EMBEDDING` | counts as `REUSED_RECEIPT` (70) | no (reuse is never dampened) |
 | `AI_GENERATED_SUSPECTED` | 55 | no (like `AI_GENERATED_MARKERS`) |
-| `DEEPFAKE_SUSPECTED` | 55 | n/a (identity checks) |
-| `SYNTHETIC_FACE_SUSPECTED` | 50 | n/a |
+| `DEEPFAKE_SUSPECTED` | none: a KYC flag (sends the verification to `NEEDS_REVIEW`) | n/a |
+| `SYNTHETIC_FACE_SUSPECTED` | none: a KYC flag | n/a |
 | `FORGED_POP_SUSPECTED` | 45 | yes (file-only doubt) |
-| `AI_TEXT_SUSPECTED` | 10 | yes |
+| `AI_TEXT_SUSPECTED` | none yet (the optional text detector is not built) | yes |
+
+KYC verifications have no fraud-risk score: the face and ID-document detectors add their reason codes to the integrity flags, which
+send a verification to a person. Only the claim detectors carry weights. A weight of 0 still switches a signal off (the claim
+still goes to a person; it just adds no score).
 
 ## Settings (planned)
 

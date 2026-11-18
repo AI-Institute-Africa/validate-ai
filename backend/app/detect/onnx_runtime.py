@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
+from app.detect import features
 from app.detect.manifest import Entry, file_sha256
 
 
@@ -25,9 +26,22 @@ def _rgb(img: Image.Image, size: int) -> np.ndarray:
     return arr.transpose(2, 0, 1) / 255.0  # 3 x H x W
 
 
-# Input channels a model may ask for in its manifest. Forensic channels (noise residual, frequency
-# spectrum) are added alongside the detectors that use them.
-CHANNELS: dict[str, Callable[[Image.Image, int], np.ndarray]] = {"rgb": _rgb}
+def _plane(
+    fn: Callable[[Image.Image, int], np.ndarray],
+) -> Callable[[Image.Image, int], np.ndarray]:
+    def one(img: Image.Image, size: int) -> np.ndarray:
+        return fn(img, size)[None, ...]  # 1 x H x W
+
+    return one
+
+
+# Input channels a model may ask for in its manifest: rgb is 3 planes, each forensic channel 1.
+CHANNELS: dict[str, Callable[[Image.Image, int], np.ndarray]] = {
+    "rgb": _rgb,
+    "noise": _plane(features.noise_residual),
+    "fft": _plane(features.fft_spectrum),
+    "ela": _plane(features.ela_map),
+}
 
 
 def to_tensor(img: Image.Image, size: int, channels: tuple[str, ...]) -> np.ndarray:
