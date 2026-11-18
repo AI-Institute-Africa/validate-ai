@@ -336,7 +336,7 @@ input[type="range"] { padding: 0; accent-color: var(--accent); }
   border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--panel);
-  box-shadow: 0 8px 24px rgba(27, 36, 32, 0.14);
+  box-shadow: 0 8px 24px rgba(5, 63, 92, 0.16);
   font-size: 13px;
   animation: toast-in 0.2s ease-out;
 }
@@ -453,7 +453,7 @@ code.key { display: inline-block; padding: 2px 6px; background: var(--panel); bo
 .frame img { display: block; width: 100%; height: auto; }
 .box { position: absolute; border: 2px solid var(--ok); border-radius: 3px; pointer-events: none; }
 .box.warn { border-color: var(--warn); }
-.box.tamper { border-color: var(--bad); background: rgba(220, 38, 38, 0.18); }
+.box.tamper { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 20%, transparent); }
 .box.hot { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--accent); }
 .warn-text { color: var(--warn); }
 td.reasons { font-size: 12px; color: var(--muted); max-width: 360px; }
