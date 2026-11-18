@@ -19,6 +19,9 @@ DEFAULT_FRAUD_WEIGHTS: dict[str, int] = {
     "REUSED_RECEIPT": 70,
     "AMOUNT_EDIT_SUSPECTED": 70,
     "AI_GENERATED_MARKERS": 60,
+    # trained detectors (docs/authenticity-detectors.md); they only occur in escalate mode
+    "AI_GENERATED_SUSPECTED": 55,
+    "FORGED_POP_SUSPECTED": 45,
     "NO_CREDIT_AFTER_STATEMENT": 45,
     "DATE_EDIT_SUSPECTED": 40,
     "WRONG_RECIPIENT": 40,

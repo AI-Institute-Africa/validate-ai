@@ -34,6 +34,8 @@ kyc = ["onnxruntime>=1.18"]
 demo = ["pixeltable-pgserver>=0.7"]
 agent = ["browser-use>=0.1"]
 fxbrowser = ["playwright>=1.48"]
+# deep detector training (backend/training/detect/train_cnn.py); heavy, never in the default image
+detect-train = ["torch>=2.3", "torchvision>=0.18", "onnx>=1.16"]
 training = ["transformers[torch]>=4.40", "torch>=2.3", "sentencepiece>=0.2"]
 observability = [
   "sentry-sdk>=2.0",
