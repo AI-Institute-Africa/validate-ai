@@ -154,12 +154,14 @@ Check both once on a few real photos before relying on it.
 Today liveness is the passive heuristic above and **there is no deepfake, synthetic-face or presentation-attack
 model**. A face-swapped selfie, an AI-generated face or a high-quality screen replay can pass it.
 
-The face detector in [`authenticity-detectors.md`](authenticity-detectors.md) will plug into the same
-`LivenessChecker` seam as an additional signal, trained on our own data and run locally. It reads the aligned face
+The face detector in [`authenticity-detectors.md`](authenticity-detectors.md) is **built** (it ships with no model, so
+it reports `no_model` until you install one). It runs after liveness, trained on our own data and run locally. It reads the aligned face
 crop with noise-residual and frequency channels, and combines with the selfie-to-ID embedding drift the face matcher
 already computes. It reports `DEEPFAKE_SUSPECTED` or `SYNTHETIC_FACE_SUSPECTED`, which send a verification to
 `NEEDS_REVIEW`; it can never move one to `VERIFIED`, and an unavailable model is recorded as skipped, not
-as a pass. Auto-verify requires the check to have run once the detector is in `escalate` mode.
+as a pass. A detector that did not run changes nothing: the existing rules decide exactly as they did without it, so an
+outage never blocks or approves a verification by itself. Both the selfie and the ID portrait are scored, and each score is
+recorded with the model's version and hash.
 
 **Per-group fairness is a gate.** A face detector may only escalate after its false-flag rates have been measured by
 skin tone, age, lighting and phone class on this deployment's own data, with enough samples in each group to

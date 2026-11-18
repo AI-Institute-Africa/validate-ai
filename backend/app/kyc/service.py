@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.security import Principal, Role
+from app.detect import face_hook
 from app.detect import runner as detect_runner
 from app.extraction.readers.base import ReaderUnavailable
 from app.extraction.schema import FieldReading
@@ -441,6 +442,16 @@ def process(session: Session, kyc_id: uuid.UUID) -> None:
                 "results": [r.as_dict() for r in authenticity.results],
             }
         )
+    faces = face_hook.assess_faces(
+        session,
+        selfie_face=fm.selfie_face if fm else None,
+        portrait=fm.portrait_phash_source if fm else None,
+        org_id=kyc.org_id,
+        kyc_id=kyc.kyc_id,
+        cfg=cfg,
+    )
+    if faces.results:
+        checks.append(faces.check())
     kyc.doc_type, kyc.issuing_country = doc_type, country
     kyc.doc_number_hash = docintegrity.doc_number_hash(country, number)
     session.flush()
@@ -453,6 +464,7 @@ def process(session: Session, kyc_id: uuid.UUID) -> None:
     if fm is not None and "MULTIPLE_FACES_IN_SELFIE" in fm.problems:
         flags.append("MULTIPLE_FACES_IN_SELFIE")
     flags += [r for r in authenticity.reasons if r not in flags]  # escalate mode only
+    flags += [r for r in faces.reasons if r not in flags]
     checks.append({"name": "integrity", "ok": not flags, "flags": flags})
 
     idn = idnumbers.check(country, number)

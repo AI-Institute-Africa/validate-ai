@@ -14,11 +14,13 @@ from tests.test_flow import _obligation, _submit
 
 
 class Fake:
-    kind = "receipt"
     name = "fake_receipt"
     default_threshold = 0.7
 
-    def __init__(self, score=0.97, label="forged", skip=None, boom=False, uncertain=False):
+    def __init__(
+        self, score=0.97, label="forged", skip=None, boom=False, uncertain=False, kind="receipt"
+    ):
+        self.kind = kind
         self._r = (score, label, skip, uncertain)
         self._boom = boom
 
@@ -27,9 +29,9 @@ class Fake:
             raise RuntimeError("model crashed")
         score, label, skip, uncertain = self._r
         if skip:
-            return DetectorResult(kind="receipt", detector=self.name, skipped=skip)
+            return DetectorResult(kind=self.kind, detector=self.name, skipped=skip)
         return DetectorResult(
-            kind="receipt",
+            kind=self.kind,
             detector=self.name,
             model_version="t1",
             model_sha256="c" * 64,
@@ -169,7 +171,7 @@ def test_detector_scores_are_append_only(client, session, monkeypatch):
     session.rollback()
 
 
-# --- near-duplicate embeddings -------------------------------------------------------------------
+# --- near-duplicate embeddings ---------------------------------------------------------------
 
 
 class Fixed:
@@ -269,3 +271,190 @@ def test_retention_removes_the_embedding_with_the_file(client, session, monkeypa
     assert retention.purge_payment_data(session)["evidence"] == 1
     session.commit()
     assert session.scalars(select(EvidenceEmbedding)).all() == []
+
+
+# --- risk signals from the trained detectors -------------------------------------------------
+
+
+def _staff_claim(client, claim_id):
+    return client.get(f"/claims/{claim_id}", headers=login(client, "reviewer")).json()
+
+
+def _signal(claim, code):
+    return next((s for s in claim["risk_signals"] if s["code"] == code), None)
+
+
+def test_a_forgery_score_becomes_a_risk_signal_with_the_models_evidence(client, monkeypatch):
+    _mode(monkeypatch, "escalate", Fake(score=0.97, label="forged"))
+    c = _claim(client)
+    s = _signal(c, "FORGED_POP_SUSPECTED")
+    assert s is not None and s["weight"] == 45
+    assert s["evidence"]["detector"] == "fake_receipt" and s["evidence"]["model_version"] == "t1"
+    assert s["evidence"]["score"] == pytest.approx(0.97, abs=1e-3)
+
+
+def test_an_ai_generated_score_is_never_dampened_but_a_forgery_score_is(client, monkeypatch):
+    from tests.test_flow import TXN, _import, _stmt_row
+
+    rev = login(client, "reviewer")
+    _import(client, rev, [_stmt_row()])  # the bank already shows this payment
+    _mode(monkeypatch, "escalate", Fake(score=0.97, label="forged"))
+    forged = _signal(_claim(client, TXN), "FORGED_POP_SUSPECTED")
+    assert forged is not None and forged["weight"] == 22  # 45 halved: the money is confirmed
+    _mode(monkeypatch, "escalate", Fake(score=0.97, label="ai_generated"))
+    other = _signal(_claim(client, "PP251021.1433.B22222"), "AI_GENERATED_SUSPECTED")
+    assert other is not None and other["weight"] == 55
+
+
+def test_a_near_duplicate_hold_now_scores_as_a_reused_receipt(client, monkeypatch):
+    _mode(monkeypatch, "escalate", duplicate=_dup())
+    _, second = _two(client)
+    assert "NEAR_DUPLICATE_EMBEDDING" in second["reason_codes"]
+    assert _signal(second, "REUSED_RECEIPT") is not None
+
+
+def test_a_weight_of_zero_switches_a_detector_signal_off(client, monkeypatch):
+    admin = login(client, "admin")
+    r = client.post(
+        "/admin/policy",
+        headers=admin,
+        json={
+            "version": "no-forged-weight",
+            "config": {"fraud_weights": {"FORGED_POP_SUSPECTED": 0}},
+        },
+    )
+    assert r.status_code == 201, r.text
+    _mode(monkeypatch, "escalate", Fake(score=0.97, label="forged"))
+    c = _claim(client)
+    assert "FORGED_POP_SUSPECTED" in c["reason_codes"]  # still goes to a person ...
+    assert _signal(c, "FORGED_POP_SUSPECTED") is None  # ... but adds no score
+
+
+# --- the face detector in KYC ----------------------------------------------------------------
+
+
+def _face(**kw):
+    return Fake(kind="face", label=kw.pop("label", "deepfake"), **kw)
+
+
+def _kyc(client):
+    from tests.test_kyc import _policy as kyc_policy
+    from tests.test_kyc import _submit as kyc_submit
+
+    kyc_policy(client)
+    return kyc_submit(client, login(client, "submitter"))
+
+
+def test_face_shadow_records_both_faces_and_still_verifies(client, session, monkeypatch):
+    _mode(monkeypatch, "shadow", face=_face(score=0.99))
+    out = _kyc(client)
+    assert out["state"] == "VERIFIED"  # shadow changes nothing
+    rows = [r for r in _rows(session) if r.kind == "face"]
+    assert len(rows) == 2
+    assert {tag for r in rows for tag in r.signals} == {"subject:selfie", "subject:portrait"}
+    assert all(r.kyc_id is not None and r.escalated is False for r in rows)
+
+
+def test_face_escalate_sends_a_deepfake_score_to_a_person(client, monkeypatch):
+    from tests.test_kyc import _detail
+
+    _mode(monkeypatch, "escalate", face=_face(score=0.97))
+    out = _kyc(client)
+    assert out["state"] == "NEEDS_REVIEW"
+    d = _detail(client, login(client, "reviewer"), out["kyc_id"])
+    assert "DEEPFAKE_SUSPECTED" in d["reason_codes"]
+
+
+def test_a_face_detector_that_did_not_run_neither_blocks_nor_approves(client, session, monkeypatch):
+    _mode(monkeypatch, "escalate", face=_face(skip="no_model"))
+    out = _kyc(client)
+    assert out["state"] == "VERIFIED"  # the existing rules decide, exactly as without a detector
+    rows = [r for r in _rows(session) if r.kind == "face"]
+    assert rows and all(r.skipped == "no_model" and not r.escalated for r in rows)
+
+
+# --- a model trained here, scoring a real claim ----------------------------------------------
+
+
+def test_a_model_trained_with_our_own_tooling_scores_a_claim_in_shadow_mode(
+    client, session, monkeypatch, tmp_path
+):
+    from training.detect import demo_loop
+
+    res = demo_loop.run("receipt", tmp_path, n=18, seed=1, scale=0.3)
+    registry.reset()
+    monkeypatch.setattr(get_settings(), "detect_mode", "shadow")
+    monkeypatch.setattr(get_settings(), "detect_model_dir", res["models"])
+    c = _claim(client)
+    assert c["state"] == "AWAITING_FINANCIAL_CONFIRMATION"  # shadow changed nothing
+    rows = [r for r in _rows(session) if r.kind == "receipt"]
+    assert len(rows) == 1 and rows[0].skipped is None
+    assert rows[0].model_version == res["train"]["version"]
+    assert rows[0].model_sha256 == res["train"]["sha256"] and 0.0 <= rows[0].score <= 1.0
+    registry.reset()
+
+
+# --- authenticity labels from administrators' decisions --------------------------------------
+
+
+def _resolved_alert(client, resolution):
+    from tests.test_flow import _import, _stmt_row
+
+    sub, rev, admin = (login(client, r) for r in ("submitter", "reviewer", "admin"))
+    ob = _obligation(client, sub, amount=40000)
+    _import(client, rev, [_stmt_row()])  # the bank says 40.00, the receipt says 400.00
+    _submit(
+        client, sub, ob, make_receipt(ecocash_fields(amount="400.00")), declared_amount="400.00"
+    )
+    alert = client.get("/fraud/alerts", headers=admin).json()[0]
+    r = client.post(
+        f"/fraud/alerts/{alert['alert_id']}/resolve",
+        headers=admin,
+        json={"resolution": resolution, "note": "checked with the payer by phone"},
+    )
+    assert r.status_code == 200, r.text
+    return admin
+
+
+def _consent(client, admin):
+    cfg = client.get("/admin/policy", headers=admin).json()["config"]
+    cfg.update({"training_export_consent": True, "training_consent_ref": "AGR-2026-021"})
+    r = client.post("/admin/policy", headers=admin, json={"version": "consent-d", "config": cfg})
+    assert r.status_code == 201, r.text
+
+
+def test_detector_labels_need_consent_and_carry_fingerprints_not_images(client, monkeypatch):
+    import json
+
+    _mode(monkeypatch, "shadow", Fake(score=0.9))
+    admin = _resolved_alert(client, "confirmed_fake")
+    denied = client.get("/admin/training/detector-labels", headers=admin)
+    assert denied.status_code == 403 and denied.json()["detail"]["code"] == "CONSENT_MISSING"
+    _consent(client, admin)
+    ok = client.get("/admin/training/detector-labels", headers=admin)
+    assert ok.status_code == 200 and ok.headers["X-Consent-Ref"] == "AGR-2026-021"
+    rows = [json.loads(line) for line in ok.text.splitlines()]
+    assert rows and all(r["label"] == "fake" and len(r["evidence_sha256"]) == 64 for r in rows)
+    assert not any(k in rows[0] for k in ("image", "bytes", "name", "payer", "claimant_ref"))
+    assert "AMOUNT_EDIT_SUSPECTED" in rows[0]["risk_signals"]
+    # what the detector said at the time rides along, so disagreements can be found
+    assert rows[0]["detector_scores"][0]["detector"] == "fake_receipt"
+
+
+def test_a_false_positive_is_exported_as_genuine(client):
+    import json
+
+    admin = _resolved_alert(client, "false_positive")
+    _consent(client, admin)
+    rows = [
+        json.loads(line)
+        for line in client.get("/admin/training/detector-labels", headers=admin).text.splitlines()
+    ]
+    assert rows and {r["label"] for r in rows} == {"genuine"}
+
+
+def test_only_admins_may_export_detector_labels(client):
+    assert (
+        client.get("/admin/training/detector-labels", headers=login(client, "reviewer")).status_code
+        == 403
+    )

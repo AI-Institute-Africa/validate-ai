@@ -7,7 +7,7 @@ approve or reject, and a skipped, uncertain or below-threshold result adds nothi
 
 import logging
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -94,6 +94,7 @@ def assess(
     evidence_id: uuid.UUID | None = None,
     settings: Settings | None = None,
     detectors: dict[str, Detector] | None = None,
+    subject_tag: str | None = None,
 ) -> Report:
     s = settings or get_settings()
     report = Report(mode=s.detect_mode)
@@ -104,6 +105,8 @@ def assess(
     if detector is None:
         return report
     result = safe_score(detector, subject)
+    if subject_tag:
+        result = replace(result, signals=[*result.signals, f"subject:{subject_tag}"])
     report.results.append(result)
     threshold = threshold_for(kind, cfg, detector)
     reason = escalation_reason(result, threshold, s.detect_mode)

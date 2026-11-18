@@ -39,7 +39,7 @@ cd backend && python scripts/export_corrections.py --org <org uuid> --out correc
 The synthetic sample set only checks the training pipeline; it is never used to claim accuracy.
 
 
-# Training the authenticity detectors (planned)
+# Training the authenticity detectors
 
 The same consent rules cover the data for the trained detectors in
 [`authenticity-detectors.md`](authenticity-detectors.md). Everything below runs **offline on the customer's own
@@ -55,8 +55,9 @@ Datasets and weights live under `./var/` and are never uploaded; no API is calle
 | **Synthetic fakes we generate** | fake, with the generator recorded | Pasted or inpainted patches, retyped text, re-renders, double JPEG, screen capture, resampling artefacts; for faces: blend or warp swaps, screen replay, print. A model trained on these learns these generators; report its results per generator and never as real-world accuracy. |
 | **Public research datasets** | fake / genuine | **Each licence must be approved by the owner before download** and is listed in `docs/third-party-notices.md`. Evaluation-only datasets are never trained on. |
 
-`export_confirmed.py` (planned) writes evidence SHA-256 and content type, the label, who decided and when, the
-template, and the model scores at the time. **No images and no names**; every export is audited
+`python -m training.detect.export_confirmed` (or `GET /admin/training/detector-labels`) writes evidence SHA-256 and content type,
+the label (`fake` for a confirmed fake, `genuine` for a false positive), the risk signals, when it was decided and what the trained
+detectors scored at the time, so cases where a detector and a person disagreed can be labelled first. **No images and no names**; every export is audited
 (`training.exported`).
 
 ## Method (summary; the full reasons are in `authenticity-detectors.md`)
@@ -87,12 +88,39 @@ generators and checks the live model still flags them; a drop is reported throug
 
 ## Running it
 
+Two tracks. The **classical** one needs only numpy and runs and is tested everywhere. The **deep** one needs PyTorch and
+has **not been run in the build environment**: run it with `--smoke` first.
+
 ```bash
-# laptop or private server, no network needed once the data is in ./var
-cd backend && pip install -e ".[detect-train]"
-python -m training.detect.make_synthetic --out ../var/detect/synthetic        # planned
-python -m training.detect.train --detector receipt --max-minutes 90           # planned
-python -m training.detect.evaluate --detector receipt --card CARD.md          # planned
+cd backend
+
+# the whole classical loop on fictional demo documents, nothing downloaded (about 2 minutes for 240 receipts)
+python -m training.detect.demo_loop --kind receipt --out ../var/detect-demo --n 240
+
+# or step by step, on your own genuine pictures
+python -m training.detect.build_dataset --kind receipt --out ../var/detect/data --source-dir /path/to/genuine/
+python -m training.detect.train_linear  --data ../var/detect/data --kind receipt --out ../var/models/detect
+python -m training.detect.evaluate      --data ../var/detect/data --kind receipt \
+       --model ../var/models/detect --card model-card-receipt.md
+
+# the deep track (heavy; a laptop CPU works for small data, a GPU is faster)
+pip install -e ".[detect-train]"
+python -m training.detect.train_cnn --data ../var/detect/data --kind receipt --out ../var/models/detect --smoke
+python -m training.detect.train_cnn --data ../var/detect/data --kind receipt --out ../var/models/detect --max-minutes 90
+
+# then point the engine at the folder, in shadow mode first
+POPS_DETECT_MODEL_DIR=../var/models/detect POPS_DETECT_MODE=shadow
 ```
 
-The commands are planned and will be added with the code; this page changes from "planned" as they land.
+What the scripts do, and what to read in their output:
+
+- `build_dataset` writes genuine pictures and synthetic forgeries made from each (generators in `training/detect/synth.py`), and an
+  index. Splits are made later, **by source**, so a forgery never lands in a different part from its original.
+- `train_linear` standardises, adds a genuine-only distance, fits a logistic regression, calibrates on the held-out calibration part,
+  picks the escalation threshold for a stated false-flag rate (`--max-false-flag`, default 5%) and the uncertainty band
+  (`--alpha`, default 0.1), trains on evasion-style copies unless `--no-augment`, and writes `linear_<kind>.npz` and a `manifest.json`
+  entry carrying the file's SHA-256. `--max-minutes` bounds the run.
+- `evaluate` measures the test part and the evasion set, with the existing tamper check beside it, and writes a model card. **Read the banner:**
+  results on synthetic data are not real-world accuracy, and a card from them keeps the detector in `shadow` mode.
+- `train_cnn` pretrains on the genuine pictures without labels, fine-tunes, calibrates with the same code as `train_linear`, exports ONNX
+  with the calibration inside, and refuses to install a model whose ONNX output differs from PyTorch's. It resumes from a checkpoint.

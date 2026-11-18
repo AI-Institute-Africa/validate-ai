@@ -19,7 +19,9 @@
 > ([`authenticity-detectors.md`](authenticity-detectors.md)). They follow the same rule: our own models, ONNX on CPU,
 > trained and run on the customer's own server or laptop, loaded from `POPS_DETECT_MODEL_DIR` (never a URL), their
 > SHA-256 and version recorded with every score. Starting weights are either trained from scratch or a backbone the
-> operator downloads once and pins by hash; nothing is called over an API. Each one gets a model card.
+> operator downloads once and pins by hash; nothing is called over an API. Each one gets a model card. A detector's model
+> file is either ONNX or, for the classical baseline, a small `.npz` of numbers loaded without pickle (it cannot run code);
+> `docs/training-data.md` shows how to train either one on your own machine.
 
 The engine's primary reader is a vision-language model (VLM) served through the Ollama API
 (`backend/app/extraction/readers/ollama_vlm.py`). Everything model-specific is configuration:

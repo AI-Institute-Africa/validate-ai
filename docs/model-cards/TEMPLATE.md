@@ -41,6 +41,8 @@ Fill in for the models in `docs/authenticity-detectors.md`. State the test set f
 | Calibration | method, and the abstain ("uncertain") rate |
 | Per-generator results | AUC or recall for each synthetic generator and each public set, so overfitting to a generator is visible |
 | Per-group results (faces) | skin tone, age, lighting, phone class: sample count, false-flag rate, recall; gaps and any group too small to measure |
+| Conformal band | the `uncertain_band` in the manifest, the coverage it was set for (1 - alpha), and the share of calibration pictures that fall inside it |
+| Evasion set | AUC and false-flag rate on re-saved, resized, noised and re-photographed copies |
 | Drift and self-test | last self-test date and result |
 | Acceptance gates met | list each gate from `authenticity-detectors.md` and yes/no |
 

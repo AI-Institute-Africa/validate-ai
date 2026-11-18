@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Evidence, ExtractedField
+from app.models import DetectorScore, Evidence, ExtractedField, FraudAlert
 from app.policy.engine import PolicyConfig
 
 
@@ -68,3 +68,53 @@ def corrections(
             "reason": fix.correction_reason,
             "corrected_at": fix.created_at.isoformat(),
         }
+
+
+def detector_labels(
+    session: Session, org_id: uuid.UUID, since: datetime | None = None, limit: int = 100_000
+) -> Iterator[dict[str, Any]]:
+    """Authenticity labels from what administrators decided about suspected fakes.
+
+    One row per file of a resolved alert: `fake` when it was confirmed as a fake, `genuine` when it
+    was marked not fake (a false positive teaches the detector what NOT to flag as much as a fake
+    teaches it what to flag). Each row also carries what the trained detectors said at the time, so
+    the most disputed cases (a detector sure it was fake that a person cleared, or the reverse) can
+    be labelled first. Fingerprints only: no images, no names; the files themselves are fetched
+    separately, under the same consent.
+    """
+    q = (
+        select(FraudAlert)
+        .where(
+            FraudAlert.org_id == org_id,
+            FraudAlert.status.in_(["confirmed_fake", "false_positive"]),
+        )
+        .order_by(FraudAlert.resolved_at)
+        .limit(limit)
+    )
+    if since is not None:
+        q = q.where(FraudAlert.resolved_at >= since)
+    for alert in session.scalars(q):
+        scores = session.scalars(
+            select(DetectorScore).where(DetectorScore.claim_id == alert.claim_id)
+        ).all()
+        files = session.scalars(select(Evidence).where(Evidence.claim_id == alert.claim_id)).all()
+        for ev in files:
+            yield {
+                "evidence_sha256": ev.sha256,
+                "content_type": ev.content_type,
+                "label": "fake" if alert.status == "confirmed_fake" else "genuine",
+                "source": "fraud_alert",
+                "risk_signals": sorted({str(s.get("code")) for s in alert.signals}),
+                "detector_scores": [
+                    {
+                        "detector": d.detector,
+                        "model_version": d.model_version,
+                        "mode": d.mode,
+                        "score": d.score,
+                        "skipped": d.skipped,
+                    }
+                    for d in scores
+                    if d.evidence_id in (None, ev.evidence_id)
+                ],
+                "decided_at": alert.resolved_at.isoformat() if alert.resolved_at else None,
+            }

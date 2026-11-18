@@ -29,6 +29,9 @@ selfie, an edited passport). Each one runs the real product and explains what ha
 the payer's, reviewer's, approver's or administrator's seat from the menu at the top right, try your
 own samples, and press **Reset demo data** to start over. See [`docs/demo.md`](docs/demo.md).
 
+Brand colours (chosen, not yet applied to the console), with contrast rules for using them:
+[`docs/brand/colours.md`](docs/brand/colours.md).
+
 By default every allocation needs a finance reviewer, and the reviewer can only confirm a credit
 that passes every hard gate. Four optional features are **off until an organisation's payment
 policy turns them on**, and none of them lets the AI decide:
@@ -155,8 +158,10 @@ score** from explainable signals:
 - the vision model's own observations
 - payer history and velocity
 - *(planned)* trained detectors for AI-generated and forged proofs, deepfake and cloned faces and
-  re-photographed duplicates, run locally with no outside AI and starting in shadow mode:
-  [`docs/authenticity-detectors.md`](docs/authenticity-detectors.md)
+  re-photographed duplicates, run locally with no outside AI and starting in shadow mode. The framework, the
+  near-duplicate, image and face detectors and a numpy-only training loop (`backend/training/detect/`) are built; no
+  trained model ships, and the deep-learning trainer is written but not yet run:
+  [`docs/authenticity-detectors.md`](docs/authenticity-detectors.md), [`docs/training-data.md`](docs/training-data.md)
 
 Suspected fakes (score 60+) go to admins under **Suspected fakes**, through the console badge
 plus a webhook and/or email. They cannot be confirmed until an admin marks them *confirmed fake*

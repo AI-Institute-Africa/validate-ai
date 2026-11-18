@@ -9,11 +9,13 @@
 | --- | --- |
 | Detector interface, manifest, ONNX loader, registry, shadow recording, `GET /admin/detectors` (migration 0014) | **built** (no model files ship, so every detector reports `no_model` until you install one) |
 | Near-duplicate detector (embedding, migration 0015) | **built** (needs an embedding model file; none ships) |
-| Receipt / proof-of-payment forgery + AI-generated detector | planned |
-| ID-document forgery + AI-generated detector | planned |
-| Face deepfake / AI clone / presentation-attack detector | planned |
+| Receipt / proof-of-payment forgery + AI-generated detector | **built** (a manifest entry for the generic ONNX image detector; no model ships) |
+| ID-document forgery + AI-generated detector | **built** (same, on the card image in KYC) |
+| Face deepfake / AI clone / presentation-attack detector | **built** (scores the selfie and the ID portrait in KYC; no model ships) |
 | AI-generated text classifier (optional, advisory) | planned |
-| Training, evaluation and export tooling | planned |
+| Training and evaluation tooling: the classical numpy track | **built and tested** (`backend/training/detect/`) |
+| Training tooling: the deep (PyTorch) track | **written, not run**: the build machine has no PyTorch; its first run is its test |
+| Consent-gated export of fake / not-fake decisions | **built** (`GET /admin/training/detector-labels`, `training/detect/export_confirmed.py`) |
 | Console "Authenticity" card, scorecard, demo stories | planned |
 
 ## What problem this solves
@@ -70,6 +72,38 @@ score from 0 to 1, a label, the model version and SHA-256, optional signals and 
 A model that cannot decide reports `DETECTOR_UNCERTAIN` (see *Calibration and abstention*). That is shown
 to the reviewer and never counted as a fake.
 
+## What exists today, honestly
+
+| Method | Status |
+| --- | --- |
+| Forensic input channels (noise residual, spectrum, error-level), test-time averaging | built (`app/detect/features.py`, `image_detector.py`) |
+| **Classical track**: 57 forensic statistics -> logistic regression, plus a genuine-only distance (the one-class idea, cross-fitted so it does not flatter training data), Platt calibration, a conformal uncertainty band, a threshold at a stated false-flag rate, training on evasion-style copies | built, tested, runs on a laptop with numpy only |
+| Synthetic forgery generators, leak-free split by source, evasion split, per-generator and per-group tables, comparison with the existing tamper check | built |
+| **Deep track**: self-supervised contrastive pretraining, supervised CNN on the forensic planes, ONNX export with the calibration baked in, an ONNX Runtime agreement check, optional dynamic int8 quantisation kept only if accuracy barely moves | written (`train_cnn.py`), **not run** here |
+| Genuine-only autoencoder score, distillation from a larger teacher, static int8 quantisation with calibration data | **not built** |
+| Heat-map explanations, a learned combination of rule signals and model scores, scheduled retraining and the offline self-test, drift alerts, a trained text classifier | **not built** |
+
+The rest of this section describes the design the tooling is aimed at; the table above says how much of it exists.
+
+## What the classical baseline measured (synthetic data only)
+
+The numbers below come from `python -m training.detect.demo_loop --kind receipt --n 240`: 240 fictional demo receipts, each
+with three synthetic forgeries, split by source into train, calibration and test (192 test pictures). They describe how well the
+baseline separates **these generators** from **these genuine pictures**; they are not real-world accuracy and will move with the seed and sample size.
+
+| Measure | Classical baseline | Existing hand-written tamper check |
+| --- | --- | --- |
+| AUC on the held-out test part | 0.87 (95% interval 0.82 to 0.91) | 0.57 (0.55 to 0.60) |
+| AUC on the evasion set (re-saved, resized, noised, re-photographed copies) | 0.86 | not measured |
+| Threshold picked for a 5% false-flag rate on the calibration part | wrongly flagged **21%** of genuine test pictures, caught 79% of forged | n/a |
+
+What this says: the learned baseline separates the synthetic forgeries much better than the hand-written check and survives cheap
+re-saving and resizing. It is strong on screen captures, resampling, double JPEG and noise patches (AUC 0.97 to 1.0), weak on
+re-compressed regions (0.48, no better than chance) and inpainting (0.74). The false-flag rate **overshot its 5% target** because
+the threshold was chosen on a small calibration part: a threshold must be re-checked on data the model has not seen before it is
+trusted, and with 60 sources instead of 240 the results were much worse (AUC about 0.8, false flags 40% or more). More, and real, data is
+the main lever.
+
 ## How the models are built (machine learning and deep learning, all local)
 
 The design assumes **few confirmed fakes and many genuine documents**, which is the real situation of a
@@ -83,7 +117,9 @@ new deployment. Each technique below has a reason; none needs a hosted service.
   receipts, IDs and selfies with contrastive learning (SimCLR or BYOL style) using realistic augmentations:
   crop, blur, JPEG, screen capture, colour change. This gives a domain-specific backbone with no labels
   and no outside model.
-- **Forensic input channels.** The network sees more than RGB: a high-pass **noise residual** (fixed
+- **Forensic input channels (built).** A manifest names the planes a model reads, in order: `rgb` (3), `noise` (the residual, 1), `fft`
+  (the spectrum, 1) and `ela` (error-level analysis, 1), so `["rgb","noise","fft","ela"]` is a 6-channel input. They are
+  deterministic recipes in `app/detect/features.py`, so training and serving prepare the picture identically. The network sees more than RGB: a high-pass **noise residual** (fixed
   SRM-style filters), the **frequency spectrum** (FFT or DCT, where generators and upscalers leave
   periodic artefacts) and the existing ELA map. These transfer across generators better than pixels alone.
 - **Metric learning for duplicates.** The embedding is trained with a contrastive or triplet loss: the same
@@ -135,12 +171,16 @@ Signal weights are starting points to be set from measured precision (they are p
 
 | Signal | Proposed default weight | Dampened when the money is confirmed? |
 | --- | --- | --- |
-| `NEAR_DUPLICATE_EMBEDDING` | 60 | no (reuse is never dampened) |
+| `NEAR_DUPLICATE_EMBEDDING` | counts as `REUSED_RECEIPT` (70) | no (reuse is never dampened) |
 | `AI_GENERATED_SUSPECTED` | 55 | no (like `AI_GENERATED_MARKERS`) |
-| `DEEPFAKE_SUSPECTED` | 55 | n/a (identity checks) |
-| `SYNTHETIC_FACE_SUSPECTED` | 50 | n/a |
+| `DEEPFAKE_SUSPECTED` | none: a KYC flag (sends the verification to `NEEDS_REVIEW`) | n/a |
+| `SYNTHETIC_FACE_SUSPECTED` | none: a KYC flag | n/a |
 | `FORGED_POP_SUSPECTED` | 45 | yes (file-only doubt) |
-| `AI_TEXT_SUSPECTED` | 10 | yes |
+| `AI_TEXT_SUSPECTED` | none yet (the optional text detector is not built) | yes |
+
+KYC verifications have no fraud-risk score: the face and ID-document detectors add their reason codes to the integrity flags, which
+send a verification to a person. Only the claim detectors carry weights. A weight of 0 still switches a signal off (the claim
+still goes to a person; it just adds no score).
 
 ## Settings (planned)
 

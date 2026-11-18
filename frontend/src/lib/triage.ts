@@ -17,6 +17,9 @@ export const FLAG_REASONS = new Set([
   "AMOUNT_MISMATCH",
   "SUSPECTED_FAKE",
   "TAMPER_SUSPECTED",
+  "FORGED_POP_SUSPECTED",
+  "AI_GENERATED_SUSPECTED",
+  "NEAR_DUPLICATE_EMBEDDING",
 ]);
 
 export type Bucket = "needs_review" | "flagged";

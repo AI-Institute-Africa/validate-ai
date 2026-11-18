@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.claims.payees import same_payee
 from app.core import observability as obs
 from app.core.audit import audit
+from app.detect.runner import ESCALATION
 from app.extraction import templates
 from app.extraction.agreement import FinalField
 from app.guardrails.rules import active_rules, reason_code
@@ -34,6 +35,7 @@ from app.models import (
     ClaimState,
     Credit,
     Decision,
+    DetectorScore,
     Evidence,
     ExtractedField,
     FraudAlert,
@@ -59,11 +61,13 @@ SUSPECTED_FAKE = "SUSPECTED_FAKE"
 DUPLICATE_REASONS = {
     "DUPLICATE_FILE",
     "DUPLICATE_NEAR_FILE",
+    "NEAR_DUPLICATE_EMBEDDING",
     "DUPLICATE_REFERENCE",
     "REFERENCE_ALREADY_CONSUMED",
 }
 # signals about the file itself; halved when the money is independently confirmed
 FORENSIC_ONLY = {
+    "FORGED_POP_SUSPECTED",
     "EDITING_SOFTWARE",
     "PASTED_TEXT",
     "ELA_LOCAL_EDIT",
@@ -110,6 +114,43 @@ def _meta_text(ev: Evidence | None) -> dict[str, str]:
         if isinstance(v, str):
             out[f"pdf.{k}"] = v
     return out
+
+
+_DETECTOR_SIGNALS = {
+    "FORGED_POP_SUSPECTED": "A trained detector scored this proof as edited or forged.",
+    "AI_GENERATED_SUSPECTED": "A trained detector scored this proof as AI-generated.",
+}
+
+
+def _detector_signals(session: Session, claim: Claim, reasons: set[str], add: Any) -> None:
+    """Signals from the trained detectors, with what the model said as the evidence.
+
+    They exist only when a detector escalated, which only happens in escalate mode, so shadow mode
+    never reaches here.
+    """
+    wanted = [c for c in _DETECTOR_SIGNALS if c in reasons]
+    if not wanted:
+        return
+    rows = session.scalars(
+        select(DetectorScore)
+        .where(DetectorScore.claim_id == claim.claim_id, DetectorScore.escalated.is_(True))
+        .order_by(DetectorScore.created_at.desc())
+    ).all()
+    for code in wanted:
+        row = next((r for r in rows if ESCALATION.get((r.kind, r.label or "")) == code), None)
+        add(
+            code,
+            _DETECTOR_SIGNALS[code],
+            **(
+                {
+                    "detector": row.detector,
+                    "model_version": row.model_version,
+                    "score": None if row.score is None else round(row.score, 3),
+                }
+                if row
+                else {}
+            ),
+        )
 
 
 def _file_signals(ev: Evidence, add: Any) -> None:
@@ -263,6 +304,7 @@ def assess(
     # 3. traces left in the files by editors and image generators (every file of the submission)
     for ev in evs:
         _file_signals(ev, add)
+    _detector_signals(session, claim, reasons, add)
     if "PROOFS_DISAGREE" in reasons:
         add(
             "PROOFS_DISAGREE",
