@@ -19,7 +19,7 @@ with sync_playwright() as p:
 
     # no login screen: the app silently picks up a dev session
     page.goto(f"{base}/")
-    expect(page.get_by_role("heading", name="Know that a payment, or a person, is real")).to_be_visible()
+    expect(page.get_by_role("heading", name="Match every payment proof to the bank record")).to_be_visible()
     page.get_by_role("link", name="Verify a payment").click()
     expect(page.get_by_role("heading", name="Verify a payment")).to_be_visible()
     expect(page.get_by_role("button", name="Take a photo")).to_be_visible()
