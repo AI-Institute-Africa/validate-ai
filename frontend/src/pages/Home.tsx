@@ -296,7 +296,7 @@ export default function Home() {
           >
             {demo ? "Run a live case" : "See how a case is decided"}
           </button>
-          <Link className="btn secondary lg" to="/verify">Verify a payment</Link>
+          <Link className="btn secondary lg" to="/verify">Try it on your own payment</Link>
         </div>
         <ol className="how-steps" aria-label="How it works">
           <li><b>It reads</b>Two readers pull the facts from the picture.</li>

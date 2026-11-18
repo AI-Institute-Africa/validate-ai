@@ -44,6 +44,8 @@ with sync_playwright() as p:
     page.screenshot(path=f"{out}/4-alerts.png", full_page=True)
 
     # replay: run the active policy over past claims, and read reader / fraud accuracy
+    # Replay now sits under Insights, with Exposure, Scorecard, Exchange rate and Compliance
+    page.get_by_role("link", name="Insights").click()
     page.get_by_role("link", name="Replay & accuracy").click()
     expect(page.get_by_role("heading", name="Readers vs confirmed payments")).to_be_visible()
     page.get_by_role("button", name="Replay active policy").click()
