@@ -15,6 +15,7 @@ import Home from "./pages/Home";
 import "./tokens.css";
 import "./styles.css";
 import "./ui.css";
+import "./polish.css";
 import "./motion.css";
 
 // Each page loads on demand, so a payer on a slow phone never downloads the admin console.
