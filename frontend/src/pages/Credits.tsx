@@ -214,7 +214,7 @@ export default function Credits() {
       />
       <CreditsModes />
 
-      <div className="card">
+      <div className="card" style={unclaimed.isLoading ? { minHeight: 320 } : undefined}>
         <h2>Unclaimed credits</h2>
         <p className="rv-help">
           Money received with no claim pointing at it. Payment codes in the narrative suggest the invoice.
@@ -279,7 +279,7 @@ export default function Credits() {
 
       <ManualCredit />
 
-      <div className="card">
+      <div className="card" style={credits.isLoading ? { minHeight: 620 } : undefined}>
         <div className="rv-card-head">
           <h2>All credits</h2>
           <label style={{ flexDirection: "row", alignItems: "center", margin: 0, minHeight: 36 }}>

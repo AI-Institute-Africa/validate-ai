@@ -77,9 +77,16 @@ export function useClaimSender(onSent: (claim: Claim, item: Pending) => void, st
   useEffect(() => {
     void refresh();
     const online = () => void flush();
+    // A phone can miss the online event while the tab is in the background. Retry when it
+    // becomes visible again too; the busy guard and Idempotency-Key keep this safe.
+    const visible = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) void flush();
+    };
     window.addEventListener("online", online);
+    document.addEventListener("visibilitychange", visible);
     return () => {
       window.removeEventListener("online", online);
+      document.removeEventListener("visibilitychange", visible);
       window.clearTimeout(timer.current);
     };
   }, [refresh, flush]);

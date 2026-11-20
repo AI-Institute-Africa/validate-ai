@@ -88,12 +88,12 @@ function AlertCard({ a, admin }: { a: Alert; admin: boolean }) {
         <div className="thumbs">
           {a.preview_url && (
             <a href={`${API}${a.preview_url}`} target="_blank" rel="noreferrer">
-              <img src={`${API}${a.preview_url}`} alt="Submitted proof of payment" />
+              <img src={`${API}${a.preview_url}`} alt="Submitted proof of payment" loading="lazy" decoding="async" />
             </a>
           )}
           {a.forensics_url && (
             <a href={`${API}${a.forensics_url}`} target="_blank" rel="noreferrer" title="Error level analysis: bright patches were compressed differently">
-              <img src={`${API}${a.forensics_url}`} alt="Forensic heatmap" />
+              <img src={`${API}${a.forensics_url}`} alt="Forensic heatmap" loading="lazy" decoding="async" />
               <span className="muted small">ELA heatmap</span>
             </a>
           )}

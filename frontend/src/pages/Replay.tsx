@@ -48,6 +48,23 @@ const CHANGE_LABEL: Record<string, string> = {
 
 const pct = (v: number | null | undefined) => (v == null ? "—" : `${v}%`);
 
+/** Placeholder rows keep the card-table height stable while the accuracy query loads. */
+function SkeletonRows({ labels, count }: { labels: string[]; count: number }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <tr key={i} aria-hidden="true">
+          {labels.map((label) => (
+            <CardCell key={label} label={label}>
+              <span className="skeleton-line" style={{ display: "block", width: "80%" }} />
+            </CardCell>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
 export default function Replay() {
   const [days, setDays] = useState(90);
   const current = useQuery({ queryKey: ["policy"], queryFn: () => api<{ version: string; config: Record<string, unknown> }>("/admin/policy") });
@@ -83,9 +100,10 @@ export default function Replay() {
             When a bank or alert record confirmed a claim, we know what the receipt really said. {acc.data?.readers.confirmed_claims ?? 0} confirmed claims in range.
           </p>
           <h3>By reader</h3>
-          <CardTable caption="Accuracy by reader">
+          <CardTable caption="Accuracy by reader" aria-busy={acc.isLoading}>
             <thead><tr><th>Reader</th><th>Amount</th><th>Reference</th></tr></thead>
             <tbody>
+              {acc.isLoading && <SkeletonRows count={2} labels={["Reader", "Amount", "Reference"]} />}
               {Object.entries(acc.data?.readers.by_reader ?? {}).map(([reader, f]) => (
                 <tr key={reader}>
                   <CardCell label="Reader">{reader}</CardCell>
@@ -96,9 +114,10 @@ export default function Replay() {
             </tbody>
           </CardTable>
           <h3>By channel and provider</h3>
-          <CardTable caption="Accuracy by channel and provider">
+          <CardTable caption="Accuracy by channel and provider" aria-busy={acc.isLoading}>
             <thead><tr><th>Channel / provider</th><th>Claims</th><th>Amount</th><th>Reference</th><th>Both readers agreed</th><th>Corrected</th></tr></thead>
             <tbody>
+              {acc.isLoading && <SkeletonRows count={2} labels={["Channel / provider", "Claims", "Amount", "Reference", "Both readers agreed", "Corrected"]} />}
               {Object.entries(acc.data?.readers.by_channel ?? {}).map(([k, g]) => (
                 <tr key={k}>
                   <CardCell label="Channel / provider">{k}</CardCell>

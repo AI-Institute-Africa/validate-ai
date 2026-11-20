@@ -1,12 +1,12 @@
 # Mobile view plan
 
-**Status: agreed; Phases 0–2 complete.** Minimum supported width is **375 px**, **every page** is
+**Status: agreed; Phases 0–3 complete.** Minimum supported width is **375 px**, **every page** is
 in scope (payer and staff), and an installable PWA / service worker is **out of scope**. The
-`frontend/e2e/mobile.py` gate passes on all 20 routed pages at 375 px with a touch context, then
-drives a sample payment through submit → result → track, checks the ID camera inputs, verifies
-offline submit → online retry, and triages a claim on a phone. At 768 px it checks that evidence and
-the decision bar are readable with no page-level sideways scroll. Staff tables now become cards
-through one shared helper instead of copied CSS.
+`frontend/e2e/mobile.py` gate passes on all 20 routed pages at 375 px and 768 px with a touch
+context, checking overflow, touch targets, visible titles and layout shift. It then drives a sample
+payment through submit → result → track, checks the ID camera inputs, verifies offline submit →
+online retry (including from a backgrounded tab), and triages a claim on a phone. Staff tables become
+cards through one shared helper, and a bundle budget keeps the route split from regressing.
 It follows the existing design tokens
 in [`frontend/src/tokens.css`](../frontend/src/tokens.css) and the contrast rules in
 [`docs/brand/colours.md`](brand/colours.md); it does not propose a new visual language.
@@ -109,38 +109,47 @@ inside a 768 px viewport. `mobile.py` now covers the staff journey: a reviewer o
 claim, exercises the touch annotation control, focuses the last-4 from the decision bar and
 confirms it at 375 px, then checks evidence and overflow at 768 px.
 
-## Workstream D — performance and resilience on phones
+## Workstream D — performance and resilience on phones — **complete**
 
-- Keep route-level code splitting; do not import staff pages into payer bundles. Add a simple per-route
-  bundle-size budget to `frontend/package.json` or CI so the split does not regress.
-- Lazy-load proof thumbnails, avoid rendering full-resolution images in lists, and keep the existing
-  photo downscaling (`frontend/src/lib/imageEdit.ts`). Use `loading="lazy"` and explicit dimensions
-  where the container size is known to avoid layout shift.
-- Make the offline outbox and skeleton states legible on small screens; verify retry after the tab has
-  been backgrounded (a common phone failure mode).
+- Route-level code splitting is kept by `npm run budget` (`frontend/scripts/bundleBudget.mjs`), which
+  runs after `npm run build` in CI. It caps the initial JS/CSS and the largest lazy route chunk, so
+  staff pages cannot creep into the payer shell unnoticed.
+- Proof thumbnails use `loading="lazy"`; the claim viewer reserves the proof's real dimensions from
+  evidence metadata, and ID thumbnails reserve their height. Photo downscaling in
+  `frontend/src/lib/imageEdit.ts` is unchanged. `mobile.py` asserts cumulative layout shift stays
+  below 0.1 on every route.
+- The outbox remains legible at phone width. Returning to a backgrounded tab now retries a waiting
+  upload (the online event can be missed on phones), with the existing Idempotency-Key preventing
+  duplicate claims. `mobile.py` drives that exact backgrounded-tab journey.
 - **Out of scope:** no service worker, manifest or installable PWA. The existing outbox covers
   submit-and-retry; offline shell caching of sensitive evidence would need a separate review.
-- Targets: no page-level horizontal overflow at 375 px; touch interaction stays responsive
-  (INP), no visible layout shift from images, page title and primary action visible without scrolling
-  on the payer landing view.
+- Verified targets: no page-level horizontal overflow at 375/768 px, 44 px touch targets, no visible
+  layout shift from images, and the payer landing title plus primary action visible without scrolling.
+  INP is not measured by this gate; keep interaction responsive by reviewing the manual checklist.
 
-## Workstream E — test and CI
+## Workstream E — test and CI — **complete**
 
-Current coverage: `frontend/e2e/visual_snapshots.py:25` takes 375/768/1360 screenshots but has no
-assertions and is not in CI; `frontend/e2e/offline_retry.py:19` runs one phone-width journey but
-without `is_mobile`/`has_touch`; the rest of `frontend/e2e/run_demo_suite.sh` is desktop-only.
+`frontend/e2e/mobile_asserts.py` is the shared source of truth for `assert_no_horizontal_scroll`,
+`assert_touch_targets`, `assert_visible_title` and the layout-shift check. `mobile.py` runs all of
+them on every routed page at both 375 px and 768 px with `is_mobile=True, has_touch=True` and a real
+device scale factor, then drives the payer and staff journeys. `run_demo_suite.sh` includes
+`mobile.py`, and `.github/workflows/ci.yml` runs that suite in the `browser` job, so the gate blocks
+merges. `frontend/src/lib/focusTrap.test.tsx` covers drawer focus management with Vitest and
+Testing Library. `visual_snapshots.py` remains a documented manual before/after tool; it is not a
+pass/fail gate.
 
-1. Add a shared Playwright helper with `assertNoHorizontalScroll`, `assertTouchTargets` and
-   `assertVisibleTitle` checks; run it across all routes at 375 and 768 px.
-2. Add `frontend/e2e/mobile.py`: home → try a sample → verify payment → track; ID page camera input
-   present; drawer open/close/Escape/focus; offline submit → online retry. Use
-   `is_mobile=True, has_touch=True` and a real device scale factor.
-3. Add the mobile suite to `frontend/e2e/run_demo_suite.sh` (or a dedicated CI `mobile` job) so it
-   gates builds. Keep `visual_snapshots.py` as a documented manual review tool.
-4. Add one Vitest + Testing Library test for drawer focus management, using the already-installed
-   `@testing-library/react` (`frontend/package.json:24`).
-5. Document a 10-minute manual checklist in this file once implemented: notch/landscape, iOS focus
-   zoom, one-handed reach, dark mode, 200 % text size, reduced motion.
+### Manual checklist (about 10 minutes)
+
+Run a story or two in the demo, then check on a real phone if one is available:
+
+- [ ] **Notch and landscape:** safe areas keep the title and actions clear; no content hides under
+      the browser chrome at 375 × 812 and in landscape.
+- [ ] **iOS focus zoom:** tapping an input does not zoom the page (inputs are at least 16 px).
+- [ ] **One-handed reach:** the drawer trigger and primary actions are reachable with a thumb.
+- [ ] **Dark mode:** text, chips and proof boxes stay legible against the dark panels.
+- [ ] **200 % text size:** titles, buttons and card labels wrap without clipping or overlap.
+- [ ] **Reduced motion:** the drawer, tooltips and transitions do not animate when the OS asks for
+      reduced motion.
 
 ## Delivery order
 
@@ -149,14 +158,16 @@ without `is_mobile`/`has_touch`; the rest of `frontend/e2e/run_demo_suite.sh` is
 | 0 — Foundations (Workstream A) — **complete** | Safe areas, touch targets, input zoom, drawer a11y, overflow guardrails, `e2e/mobile.py` gate | **Passing:** `mobile: ok (20 pages at 375px)`; drawer a11y test passes |
 | 1 — Payer flows (B) — **complete** | Verify, ID, track, home/tour, image-to-text | **Passing:** `mobile: ok (20 pages at 375px; payment, track, ID and offline retry)` |
 | 2 — Staff triage (C) — **complete** | Card tables, viewer annotations, decision bar, native dialogs | **Passing:** `mobile: ok (... staff triage; 768px evidence)`; full demo suite green |
-| 3 — Polish and guardrails (D, E) | Performance budget, CI mobile job, manual checklist | Mobile suite runs in CI; no route-level bundle regression |
+| 3 — Polish and guardrails (D, E) — **complete** | Bundle budget, lazy images, shared mobile assertions, backgrounded retry, manual checklist | **Passing:** `mobile: ok (20 pages at 375px and 768px; payment, track, ID, offline and backgrounded retry, staff triage)`; `npm run budget` green in CI |
 
 Phases 0–1 were small, self-contained changes to shared CSS plus one new e2e file. Phase 2 was the
 largest because it touched many pages, and was built on the shared card-table helper it introduced.
+Phase 3 added the guardrails: the same layout assertions run on every route at both widths, and a
+small bundle budget protects the route split.
 
 ## Agreed decisions
 
 1. **Support floor:** 375 px. Smaller widths are not a target.
 2. **Scope:** every page, including the staff console on phones and tablets.
 3. **PWA/offline shell:** ignored for this work. Keep the existing submit-and-retry outbox only.
-4. **Implementation:** Phases 0–2 complete; Phase 3 (performance and CI guardrails) is next.
+4. **Implementation:** Phases 0–3 complete; the mobile view is done.

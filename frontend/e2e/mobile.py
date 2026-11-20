@@ -15,6 +15,13 @@ import uuid
 
 from playwright.sync_api import expect, sync_playwright
 
+from mobile_asserts import (
+    assert_mobile_layout,
+    assert_no_horizontal_scroll,
+    assert_visible_title,
+    install_layout_shift_observer,
+)
+
 base = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000"
 exe = os.environ.get("CHROMIUM_PATH")
 
@@ -74,41 +81,6 @@ PAGES = [
 if claim_id:
     PAGES += [f"/claims/{claim_id}?persona=reviewer", f"/track/{claim_id}?persona=submitter"]
 
-NO_OVERFLOW = """() => {
-  const d = document.documentElement;
-  const overflow = d.scrollWidth - d.clientWidth;
-  const inScroller = (el) => {
-    for (let p = el.parentElement; p; p = p.parentElement) {
-      if (['auto', 'scroll', 'hidden', 'clip'].includes(getComputedStyle(p).overflowX)) return true;
-    }
-    return false;
-  };
-  const offenders = [];
-  if (overflow > 1) {
-    document.querySelectorAll('body *').forEach(el => {
-      const s = getComputedStyle(el);
-      if (s.position === 'fixed' || s.display === 'none' || inScroller(el)) return;
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.right > d.clientWidth + 1) {
-        offenders.push(`${el.tagName.toLowerCase()}.${String(el.className).split(' ').slice(0, 2).join('.')} [${Math.round(r.left)}-${Math.round(r.right)}]`);
-      }
-    });
-  }
-  return { overflow, offenders: offenders.slice(0, 8) };
-}"""
-
-SMALL_TARGETS = """() => {
-  const out = [];
-  document.querySelectorAll('button, a.btn, select, .rv-pill, .rv-tab, .menu-btn').forEach(el => {
-    const s = getComputedStyle(el);
-    if (s.display === 'none' || s.visibility === 'hidden' || el.closest('[inert]')) return;
-    const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) return;
-    if (r.height < 43.5) out.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)}: ${Math.round(r.height)}px`);
-  });
-  return out.slice(0, 10);
-}"""
-
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=exe, args=["--no-sandbox"])
     ctx = browser.new_context(
@@ -118,8 +90,21 @@ with sync_playwright() as p:
         has_touch=True,
     )
     page = ctx.new_page()
+    install_layout_shift_observer(page)
     errors: list[str] = []
     page.on("pageerror", lambda e: errors.append(str(e)))
+
+    # One tablet context is reused for the route sweep and the evidence check below.
+    tablet = browser.new_context(
+        viewport={"width": 768, "height": 1024},
+        device_scale_factor=2,
+        is_mobile=True,
+        has_touch=True,
+    )
+    tpage = tablet.new_page()
+    install_layout_shift_observer(tpage)
+    tablet_errors: list[str] = []
+    tpage.on("pageerror", lambda e: tablet_errors.append(str(e)))
 
     page.goto(f"{base}/?persona=admin")
     assert page.evaluate("matchMedia('(pointer: coarse)').matches"), "context must emulate a touch device"
@@ -147,14 +132,21 @@ with sync_playwright() as p:
     for path in PAGES:
         page.goto(f"{base}{path}")
         page.wait_for_load_state("networkidle")
-        result = page.evaluate(NO_OVERFLOW)
-        assert result["overflow"] <= 1, f"{path}: page scrolls sideways by {result['overflow']}px: {result['offenders']}"
-        small = page.evaluate(SMALL_TARGETS)
-        assert not small, f"{path}: touch targets under 44px: {small}"
+        assert_mobile_layout(page, f"375px {path}")
+
+    for path in PAGES:
+        tpage.goto(f"{base}{path}")
+        tpage.wait_for_load_state("networkidle")
+        assert_mobile_layout(tpage, f"768px {path}")
 
     # Phase 1 journey: home -> sample payment -> result -> track, on a touch phone.
     page.goto(f"{base}/?persona=submitter")
-    page.get_by_role("link", name="Try it on your own payment").click()
+    assert_visible_title(page, "375px payer landing")
+    cta = page.get_by_role("link", name="Try it on your own payment")
+    expect(cta).to_be_visible()
+    cta_box = cta.bounding_box()
+    assert cta_box and cta_box["y"] < page.viewport_size["height"], "payer CTA must be visible without scrolling"
+    cta.click()
     expect(page).to_have_url(re.compile(r"/verify"))
     page.get_by_role("button", name="Paid, bank has it").click()
     submit = page.get_by_role("button", name="Validate this payment")
@@ -193,6 +185,29 @@ with sync_playwright() as p:
     expect(page.locator("body")).to_contain_text("Approved", timeout=40000)
     expect(page.get_by_text("Waiting to send")).to_have_count(0)
     assert len(posted) == 1, posted
+
+    # Same journey, but the tab is backgrounded before the signal returns. A phone often
+    # misses the online event in that state, so returning to the tab must also retry.
+    posted.clear()
+    other = ctx.new_page()
+    other.goto(f"{base}/?persona=submitter")
+    other.wait_for_load_state("networkidle")
+    page.bring_to_front()
+    page.goto(f"{base}/verify?persona=submitter")
+    page.get_by_role("button", name="Paid, bank has it").click()
+    submit = page.get_by_role("button", name="Validate this payment")
+    expect(submit).to_be_enabled(timeout=30000)
+    ctx.set_offline(True)
+    submit.click()
+    expect(page.get_by_text("Waiting to send (1)")).to_be_visible(timeout=15000)
+    other.bring_to_front()
+    page.wait_for_timeout(500)  # let the original tab become hidden
+    ctx.set_offline(False)
+    page.bring_to_front()
+    expect(page.locator("body")).to_contain_text("Approved", timeout=40000)
+    expect(page.get_by_text("Waiting to send")).to_have_count(0)
+    assert len(posted) == 1, posted
+    other.close()
 
     # Phase 2: a reviewer can triage and confirm a matched claim on this 375px phone.
     admin = dev_token("tariro.admin@demo.validate", "admin")
@@ -256,20 +271,10 @@ with sync_playwright() as p:
         expect(toggle).to_have_attribute("aria-pressed", "false")
     # The same evidence must be readable on a 768px tablet, with no page-level sideways scroll.
     # Check it before confirming, while the decision bar is still present.
-    tablet = browser.new_context(
-        viewport={"width": 768, "height": 1024},
-        device_scale_factor=2,
-        is_mobile=True,
-        has_touch=True,
-    )
-    tpage = tablet.new_page()
-    tablet_errors: list[str] = []
-    tpage.on("pageerror", lambda e: tablet_errors.append(str(e)))
     for path in (f"/claims/{claim['claim_id']}?persona=reviewer", "/insights?persona=admin"):
         tpage.goto(f"{base}{path}")
         tpage.wait_for_load_state("networkidle")
-        result = tpage.evaluate(NO_OVERFLOW)
-        assert result["overflow"] <= 1, f"{path}: tablet scrolls sideways by {result['overflow']}px: {result['offenders']}"
+        assert_no_horizontal_scroll(tpage, f"768px evidence {path}")
     tpage.goto(f"{base}/claims/{claim['claim_id']}?persona=reviewer")
     expect(tpage.locator(".viewer-scroll img")).to_be_visible()
     tlegend = tpage.locator(".viewer-legend")
@@ -288,4 +293,4 @@ with sync_playwright() as p:
     assert not errors, errors
     assert not tablet_errors, tablet_errors
     browser.close()
-print(f"mobile: ok ({len(PAGES)} pages at 375px; payment, track, ID, offline retry and staff triage; 768px evidence)")
+print(f"mobile: ok ({len(PAGES)} pages at 375px and 768px; payment, track, ID, offline and backgrounded retry, staff triage)")

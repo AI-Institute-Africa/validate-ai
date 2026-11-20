@@ -54,7 +54,11 @@ function Img({ id, role, label }: { id: string; role: string; label: string }) {
   }, [id, role]);
   return (
     <figure>
-      {src ? <img src={src} alt={label} /> : <div className="skeleton-line" style={{ height: 180, borderRadius: 10 }}>{failed ? "Image not available" : ""}</div>}
+      {src ? (
+        <img src={src} alt={label} height={180} loading="lazy" decoding="async" style={{ maxWidth: "100%", objectFit: "contain" }} />
+      ) : (
+        <div className="skeleton-line" style={{ height: 180, borderRadius: 10 }}>{failed ? "Image not available" : ""}</div>
+      )}
       <figcaption>{label}</figcaption>
     </figure>
   );

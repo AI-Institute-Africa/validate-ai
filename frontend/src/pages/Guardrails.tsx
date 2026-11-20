@@ -371,7 +371,7 @@ function PolicyPanel() {
   }
 
   return (
-    <div className="card">
+    <div className="card" style={current.isLoading || history.isLoading ? { minHeight: 860 } : undefined}>
       <h2>Payment policy</h2>
       <p className="muted small">
         Thresholds the rules and reviewers work to: date window, receiving accounts, per-currency second-approver
@@ -454,9 +454,19 @@ function PolicyPanel() {
       )}
       {retire.error && <p className="error">{(retire.error as Error).message}</p>}
       <h3>History</h3>
-      <CardTable caption="Policy history">
+      <CardTable caption="Policy history" aria-busy={history.isLoading}>
         <thead><tr><th>Version</th><th>Status</th><th>Published by</th><th>When</th><th></th></tr></thead>
         <tbody>
+          {history.isLoading &&
+            Array.from({ length: 3 }, (_, i) => (
+              <tr key={i} aria-hidden="true">
+                {["Version", "Status", "Published by", "When", ""].map((label) => (
+                  <CardCell key={label} label={label}>
+                    {label && <span className="skeleton-line" style={{ display: "block", width: "70%" }} />}
+                  </CardCell>
+                ))}
+              </tr>
+            ))}
           {history.data?.map((v) => (
             <tr key={v.policy_id}>
               <CardCell label="Version"><code>{v.version}</code></CardCell>
@@ -600,21 +610,34 @@ export default function Guardrails() {
       </div>
       {err && <p className="error">{err.message}</p>}
 
-      {reader && (
-        <div className={`card reader ${reader.ai_enabled ? "" : "off"}`}>
-          <strong>AI reader: {reader.ai_enabled ? "on" : "off"}</strong> · model <code>{reader.model}</code>
-          {reader.external && <span className="badge tier-amber">external service</span>}
-          {!reader.ai_enabled && <span className="muted"> · switched off by {reader.disabled_by.join(", ")} — claims are read by OCR only and go to review</span>}
-          {reader.hints.length > 0 && <div className="muted small">Reading hints: {reader.hints.join(" · ")}</div>}
+      {(list.isLoading || reader) && (
+        <div className={`card reader ${reader ? (reader.ai_enabled ? "" : "off") : "loading"}`} aria-busy={!reader || undefined} style={!reader ? { minHeight: 57 } : undefined}>
+          {reader ? (
+            <>
+              <strong>AI reader: {reader.ai_enabled ? "on" : "off"}</strong> · model <code>{reader.model}</code>
+              {reader.external && <span className="badge tier-amber">external service</span>}
+              {!reader.ai_enabled && <span className="muted"> · switched off by {reader.disabled_by.join(", ")} — claims are read by OCR only and go to review</span>}
+              {reader.hints.length > 0 && <div className="muted small">Reading hints: {reader.hints.join(" · ")}</div>}
+            </>
+          ) : (
+            <span className="skeleton-line" style={{ display: "block", width: "55%" }} />
+          )}
         </div>
       )}
 
       <div className="split even">
         <div>
-          <div className="card">
+          <div className="card" style={list.isLoading ? { minHeight: 580 } : undefined}>
             <h2>Locked guardrails</h2>
             <p className="muted small">Enforced in code and the database. They cannot be removed.</p>
             <ul className="locked">
+              {list.isLoading &&
+                Array.from({ length: 7 }, (_, i) => (
+                  <li key={i} aria-hidden="true">
+                    <span className="skeleton-line" style={{ display: "block", width: "55%" }} />
+                    <span className="skeleton-line" style={{ display: "block", width: "90%", marginTop: 6 }} />
+                  </li>
+                ))}
               {list.data?.system.map((g) => (
                 <li key={g.id}>
                   <span className="lock-chip" aria-hidden><Icon name="lock" size={13} /></span> <strong>{g.name}</strong>
@@ -625,12 +648,13 @@ export default function Guardrails() {
             </ul>
           </div>
 
-          <div className="card">
+          <div className="card" style={list.isLoading ? { minHeight: 185 } : undefined}>
             <div className="toolbar">
               <h2>Your guardrails</h2>
               <label className="small check"><input type="checkbox" checked={showRemoved} onChange={(e) => setShowRemoved(e.target.checked)} /> show removed</label>
             </div>
             <p className="muted small">Guardrails only make the pipeline stricter: they can send claims to review, ask for information, distrust a reading, add reading hints or switch the AI off. None can approve.</p>
+            {list.isLoading && <span className="skeleton-line" style={{ display: "block", width: "75%", margin: "12px 0" }} />}
             {list.data?.rules.length === 0 && <p className="muted">No custom guardrails yet. Start from a recommended one below.</p>}
             {list.data?.rules.map((r) => (
               <div key={r.rule_id} className={`rule ${r.enabled ? "" : "disabled"} ${r.removed_at ? "removed" : ""}`}>
@@ -680,8 +704,15 @@ export default function Guardrails() {
         </div>
 
         <div>
-          <div className="card">
+          <div className="card" style={templates.isLoading ? { minHeight: 910 } : undefined}>
             <h2>Recommended</h2>
+            {templates.isLoading &&
+              Array.from({ length: 8 }, (_, i) => (
+                <div key={i} className="rule" aria-hidden="true">
+                  <span className="skeleton-line" style={{ display: "block", width: "45%" }} />
+                  <span className="skeleton-line" style={{ display: "block", width: "90%", marginTop: 6 }} />
+                </div>
+              ))}
             {templates.data?.map((t) => (
               <div key={t.name} className={`rule ${t.kind === "ai_kill_switch" ? "kill" : ""}`}>
                 <div className="row">

@@ -60,6 +60,15 @@ function displayValue(f: Field): string {
   return f.normalised_value ?? f.raw_value ?? "—";
 }
 
+/** Reserve the proof's real box before it loads, so the viewer never jumps. */
+function imageSize(meta: Record<string, unknown>) {
+  const width = Number(meta.width);
+  const height = Number(meta.height);
+  return Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
+    ? { width, height }
+    : {};
+}
+
 function EvidenceViewer({ detail, highlight, selected, onHighlight }: { detail: ReviewDetail; highlight: string | null; selected: string | null; onHighlight: (name: string | null) => void }) {
   const [idx, setIdx] = useState(0);
   const [view, setView] = useState(DEFAULT_VIEW);
@@ -115,7 +124,13 @@ function EvidenceViewer({ detail, highlight, selected, onHighlight }: { detail: 
       ) : (
       <div className="viewer-scroll">
       <div className="frame" style={{ transform: `scale(${view.zoom}) rotate(${view.rotate}deg)`, transformOrigin: "center top" }}>
-        <img src={`${API}${ev.preview_url}`} alt={`Submitted proof of payment ${idx + 1}`} style={{ filter: cssFilter(view) }} />
+        <img
+          src={`${API}${ev.preview_url}`}
+          alt={`Submitted proof of payment ${idx + 1}`}
+          style={{ filter: cssFilter(view) }}
+          {...imageSize(ev.meta)}
+          decoding="async"
+        />
         {showBoxes && boxedFields.map((f) => (
           <div
             key={f.field_id}
