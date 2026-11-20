@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, currentPersona, hasRole, switchPersona, ensureSession } from "./api";
 import { demoInfo, loadDemo, resetDemo } from "./demo";
 import { I18nProvider, LANG_LABELS, langLabel, useI18n, type Lang } from "./i18n";
@@ -42,6 +42,7 @@ const Kyc = lazy(() => import("./pages/Kyc"));
 const KycReview = lazy(() => import("./pages/KycReview"));
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
+const NAV_COLLAPSED_KEY = "validate-nav-collapsed";
 
 function LangSwitch() {
   const { lang, setLang, t } = useI18n();
@@ -61,6 +62,21 @@ function ThemeButton() {
   return (
     <button type="button" className="ghost icon-btn" onClick={cycle} title={label} aria-label={label}>
       <Icon name={choice === "dark" ? "moon" : choice === "light" ? "sun" : "monitor"} size={17} />
+    </button>
+  );
+}
+
+function BackButton() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { t } = useI18n();
+  const label = t("shell.back");
+  // A fresh deep link has no in-app history to return to, so send it home instead of leaving the app.
+  const goBack = () => (location.key === "default" ? navigate("/") : navigate(-1));
+  return (
+    <button type="button" className="ghost back-btn" onClick={goBack} title={label} aria-label={label}>
+      <span className="back-ico"><Icon name="arrow" size={17} /></span>
+      <span className="back-label">{label}</span>
     </button>
   );
 }
@@ -186,7 +202,7 @@ function PersonaMenu({ onReset }: { onReset: () => void }) {
             <>
               <hr />
               <button type="button" role="menuitem" className="persona-item" onClick={() => { setOpen(false); onReset(); }}>
-                <span className="avatar" style={{ background: "var(--muted)", width: 34, height: 34 }} aria-hidden><Icon name="refresh" size={16} /></span>
+                <span className="avatar" style={{ background: "var(--muted)", color: "var(--on-accent)", width: 34, height: 34 }} aria-hidden><Icon name="refresh" size={16} /></span>
                 <span>
                   <b>Reset demo data</b>
                   <span className="d">Wipe everything and start again</span>
@@ -205,11 +221,18 @@ function Shell({ children }: { children: React.ReactNode }) {
   const title = useTitle();
   const toast = useToast();
   const [menu, setMenu] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(NAV_COLLAPSED_KEY) === "1");
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const menuBtn = useRef<HTMLButtonElement>(null);
   const sidebar = useRef<HTMLElement>(null);
   const { pathname } = useLocation();
   useEffect(() => setMenu(false), [pathname]);
+
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem(NAV_COLLAPSED_KEY, next ? "1" : "0");
+  };
 
   // The drawer is the only mobile-only shell element: keep it out of the tab order and the
   // accessibility tree while closed, lock background scroll while open, and close on resize.
@@ -249,7 +272,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const confirmReset = () => setConfirmResetOpen(true);
   const demo = demoInfo();
   return (
-    <div className="app">
+    <div className={`app${collapsed ? " nav-collapsed" : ""}`}>
       <a className="skip-link" href="#main">{t("shell.skip")}</a>
       {demo && (
         <div className="demo-bar" role="note">
@@ -261,7 +284,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       )}
       <aside id="shell-nav" ref={sidebar} className={`sidebar${menu ? " open" : ""}`} aria-label={t("shell.nav")}
         role={menu ? "dialog" : undefined} aria-modal={menu ? true : undefined}>
-        <NavLink to="/" className="brand">
+        <NavLink to="/" className="brand" aria-label="Validate">
           <span className="logo" aria-hidden>V</span>
           <span className="brand-name">Validate</span>
         </NavLink>
@@ -273,9 +296,9 @@ function Shell({ children }: { children: React.ReactNode }) {
               <div className="nav-group" key={g.title}>
                 <div className="nav-title">{g.title}</div>
                 {items.map((i) => (
-                  <NavLink key={i.to} to={i.to} end={i.end ?? i.to === "/"}>
+                  <NavLink key={i.to} to={i.to} end={i.end ?? i.to === "/"} title={collapsed ? i.label : undefined}>
                     <span className="ico"><Icon name={i.icon} size={17} /></span>
-                    {i.label}
+                    <span className="nav-label">{i.label}</span>
                     {i.badge}
                   </NavLink>
                 ))}
@@ -283,11 +306,17 @@ function Shell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+        <button type="button" className="side-toggle" onClick={toggleCollapsed} aria-expanded={!collapsed} aria-controls="shell-nav"
+          title={collapsed ? t("shell.expandMenu") : t("shell.collapseMenu")} aria-label={collapsed ? t("shell.expandMenu") : t("shell.collapseMenu")}>
+          <span className="ico"><Icon name="arrow" size={16} /></span>
+          <span className="side-toggle-label">{collapsed ? t("shell.expandMenu") : t("shell.collapseMenu")}</span>
+        </button>
       </aside>
       <div className={`scrim${menu ? " show" : ""}`} onClick={() => setMenu(false)} />
       <div className="content">
         <header className="topbar">
           <button type="button" ref={menuBtn} className="menu-btn" onClick={() => setMenu(true)} aria-label={t("shell.menu")} aria-controls="shell-nav" aria-expanded={menu}><Icon name="menu" size={18} /></button>
+          <BackButton />
           <span className="crumb">{title}</span>
           <span className="mobile-title">{title}</span>
           <span className="spacer" />

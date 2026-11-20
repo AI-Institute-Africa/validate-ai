@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 export type ThemeChoice = "light" | "dark" | "auto";
 
 const KEY = "validate-theme";
-const media = window.matchMedia("(prefers-color-scheme: dark)");
 
 function stored(): ThemeChoice {
   const v = localStorage.getItem(KEY);
@@ -12,19 +11,21 @@ function stored(): ThemeChoice {
 }
 
 function apply(choice: ThemeChoice) {
-  const resolved = choice === "auto" ? (media.matches ? "dark" : "light") : choice;
-  document.documentElement.dataset.theme = resolved;
+  // "auto" must not pin an attribute: tokens.css follows the OS media query in that case,
+  // so an OS switch from light to dark is picked up immediately, even with no menu open.
+  if (choice === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = choice;
 }
+
+// The theme lives in the persona menu, which is only mounted while that menu is open. Apply the
+// saved choice when this module loads so a stored dark theme is not lost until a user opens it.
+apply(stored());
 
 export function useTheme() {
   const [choice, setChoice] = useState<ThemeChoice>(() => stored());
 
   useEffect(() => {
     apply(choice);
-    if (choice === "auto") {
-      media.addEventListener("change", () => apply("auto"));
-      return () => media.removeEventListener("change", () => apply("auto"));
-    }
   }, [choice]);
 
   const cycle = () => {

@@ -57,6 +57,35 @@ main:focus { outline: none; }
 .topbar .mobile-title { display: none; }
 .topbar .spacer { flex: 1; }
 .menu-btn { display: none; background: transparent; color: var(--text); border: 1px solid var(--line); padding: 6px 10px; font-size: 18px; line-height: 1; }
+.back-btn { display: inline-flex; align-items: center; gap: 7px; padding-inline: 10px; font-size: 13px; white-space: nowrap; }
+.back-btn .back-ico { display: inline-flex; transform: rotate(180deg); }
+.back-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--text) 25%, var(--line)); }
+.side-toggle {
+  display: none; margin-top: auto; align-items: center; gap: 10px;
+  background: transparent; color: var(--muted); border: 1px solid var(--line);
+  padding: 8px 11px; font-size: 12.5px; font-weight: 550; text-align: left;
+}
+.side-toggle:hover:not(:disabled) { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.side-toggle .ico { display: inline-flex; transform: rotate(180deg); }
+@media (min-width: 961px) {
+  .side-toggle { display: flex; }
+  .app.nav-collapsed { --sidebar: 76px; }
+  .app.nav-collapsed .sidebar { padding-inline: 10px; }
+  .app.nav-collapsed .sidebar .brand { justify-content: center; padding-inline: 0; }
+  .app.nav-collapsed .brand-name,
+  .app.nav-collapsed .nav-title { display: none; }
+  /* Keep labels in the accessibility tree while showing only icons. */
+  .app.nav-collapsed .nav-label,
+  .app.nav-collapsed .sidebar nav a .count {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .app.nav-collapsed .sidebar nav a { justify-content: center; padding-inline: 0; }
+  .app.nav-collapsed .sidebar nav a.active::before { left: -10px; }
+  .app.nav-collapsed .side-toggle { justify-content: center; padding-inline: 0; }
+  .app.nav-collapsed .side-toggle-label { display: none; }
+  .app.nav-collapsed .side-toggle .ico { transform: none; }
+}
 .app main { padding: 34px 32px 48px; max-width: 1120px; margin: 0 auto; width: 100%; flex: 1; }
 .app footer { padding: 16px 28px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); text-align: center; }
 .scrim { display: none; }
@@ -87,7 +116,12 @@ main:focus { outline: none; }
 .persona-item span.d { color: var(--muted); font-size: 12px; }
 .persona-menu hr { border: 0; border-top: 1px solid var(--line); margin: 8px 0; }
 .avatar { display: inline-grid; place-items: center; border-radius: 999px; color: #fff; font-weight: 600; flex-shrink: 0; letter-spacing: 0.02em; }
-@media (max-width: 560px) { .persona-btn .lbl { display: none; } .persona-menu { width: min(92vw, 330px); right: -8px; } }
+@media (max-width: 560px) {
+  .persona-btn .lbl { display: none; }
+  .persona-menu { width: min(92vw, 330px); right: -8px; }
+  .back-btn { padding-inline: 8px; }
+  .back-btn .back-label { display: none; }
+}
 
 /* ── buttons: one family ─────────────────────────────── */
 a.btn, button.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 15px; border-radius: 8px; border: 1px solid transparent; background: var(--accent); color: var(--on-accent); font-weight: 550; text-decoration: none; cursor: pointer; transition: background var(--quick) var(--ease), transform var(--quick) var(--ease); }
@@ -200,7 +234,7 @@ tbody tr:hover td { background: color-mix(in srgb, var(--accent) 4%, var(--panel
 .story { list-style: none; margin: 14px 0 6px; padding: 0 0 0 4px; display: grid; gap: 0; }
 .story li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; padding: 7px 0; opacity: 0; animation: rise .35s ease forwards; position: relative; }
 .story li:not(:last-child)::before { content: ""; position: absolute; left: 14px; top: 34px; bottom: -6px; width: 2px; background: var(--line); }
-.story .who { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; background: var(--muted); }
+.story .who { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--on-accent); background: var(--muted); }
 .story .who.sys { background: var(--accent); color: var(--on-accent); }
 .story .txt { padding-top: 3px; }
 .story .txt small { display: block; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
@@ -243,13 +277,13 @@ tbody tr:hover td { background: color-mix(in srgb, var(--accent) 4%, var(--panel
 .compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
 .compare figure { margin: 0; }
 .compare figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; }
-.compare img { width: 100%; max-height: 340px; object-fit: contain; border: 1px solid var(--line); border-radius: 10px; display: block; background: #fff; }
+.compare img { width: 100%; max-height: 340px; object-fit: contain; border: 1px solid var(--line); border-radius: 10px; display: block; background: var(--panel); }
 @media (max-width: 640px) { .compare { grid-template-columns: 1fr; } }
 .meter { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 4px; }
 .meter i { display: block; height: 100%; border-radius: 999px; }
 .checks { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
 .checks li { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
-.checks .mk { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; flex-shrink: 0; margin-top: 1px; }
+.checks .mk { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--on-accent); flex-shrink: 0; margin-top: 1px; }
 .mk.ok { background: var(--ok); } .mk.bad { background: var(--bad); } .mk.na { background: var(--muted); }
 
 /* phones: the page already has its own heading, so give the controls the room */
