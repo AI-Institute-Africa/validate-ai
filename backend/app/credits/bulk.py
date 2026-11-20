@@ -184,7 +184,13 @@ def apply(
     txn_last4: str,
     rows: list[RowIn],
 ) -> tuple[list[RowResult], bool]:
-    """Returns (per-row results, aborted). Commits after each allocation so progress is kept."""
+    """Returns (per-row results, aborted). Commits after each allocation so progress is kept.
+
+    Note: if an abort-code error occurs (LAST4_MISMATCH, FORBIDDEN, SEPARATION_OF_DUTIES,
+    NOT_FOUND), earlier successful rows in the same run have already been committed.
+    The run stops and remaining rows are marked 'skipped'. This is by design for
+    idempotent retries: re-running the same run_id will skip already-allocated rows.
+    """
     credit = session.scalars(
         select(Credit).where(Credit.credit_id == credit_id, Credit.org_id == p.org_id)
     ).first()
