@@ -766,11 +766,15 @@ def evidence_content(
     sig: str,
     db: DB,
     variant: str = Query("preview", pattern="^(preview|original|forensics)$"),
+    p: Principal = Depends(current_principal),
 ) -> Response:
     """Short-lived signed URL; usable from <img> tags without a bearer token."""
     who = evidence_subject(evidence_id, sig)
     if who is None:
         raise HTTPException(403, "link expired or invalid")
+    # For sensitive variants, if the link was issued to a specific user, require that user
+    if variant in ("original", "forensics") and who != "-" and who != p.user_id.hex:
+        raise HTTPException(403, "this link was issued to a different user")
     ev = db.get(Evidence, evidence_id)
     if ev is None:
         raise HTTPException(404)

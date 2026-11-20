@@ -549,6 +549,8 @@ def open_high_alert(session: Session, claim_id: uuid.UUID) -> FraudAlert | None:
 
 def coverage_end(session: Session, org_id: uuid.UUID, accounts: list[str]) -> datetime | None:
     """Latest statement-line time we hold for our receiving accounts."""
+    if not accounts:
+        return None
     return session.scalar(
         select(func.max(Credit.occurred_at)).where(
             Credit.org_id == org_id,

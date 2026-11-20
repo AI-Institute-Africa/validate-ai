@@ -167,10 +167,10 @@ def find_candidates(
     limit: int = 10,
 ) -> list[Candidate]:
     """Pre-filter credits in the organisation, then gate and rank them."""
-    conds: list[ColumnElement[bool]] = [Credit.narrative.ilike(f"%{facts.payment_code}%")]
+    conds: list[ColumnElement[bool]] = [Credit.narrative.ilike("%" + facts.payment_code + "%")]
     if facts.reference:
         conds.append(Credit.reference_norm == facts.reference)
-        conds.append(Credit.narrative.ilike(f"%{facts.reference}%"))
+        conds.append(Credit.narrative.ilike("%" + facts.reference + "%"))
     if facts.amount_minor:
         conds.append(Credit.amount_minor == facts.amount_minor)
     q = select(Credit).where(Credit.org_id == facts.org_id, or_(*conds))
