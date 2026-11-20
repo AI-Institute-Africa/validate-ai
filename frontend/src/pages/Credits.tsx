@@ -4,7 +4,7 @@ import { api, Credit, download, hasRole, money, Obligation, post } from "../api"
 import { humanize } from "../labels";
 import { CreditsModes } from "../components/CreditsModes";
 import { useToast } from "../toast";
-import { Chip, EmptyState, Loading, PageHeader } from "../ui";
+import { Chip, EmptyState, PageHeader } from "../ui";
 import { CardCell, CardTable } from "../components/CardTable";
 import "./review.css";
 
@@ -177,6 +177,22 @@ function AllocateRow({ u, obligations, onDone }: { u: Unclaimed; obligations: Ob
   );
 }
 
+function SkeletonRows({ labels, count }: { labels: string[]; count: number }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <tr key={i} aria-hidden="true">
+          {labels.map((label) => (
+            <CardCell key={label} label={label}>
+              {label && <span className="skeleton-line" style={{ display: "block", width: "75%" }} />}
+            </CardCell>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
 export default function Credits() {
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
@@ -206,6 +222,8 @@ export default function Credits() {
   });
 
   const un = unclaimed.data;
+  const unclaimedLabels = ["Date", "Amount", "Available", "Reference", "Narrative", "Suggested invoice", ""];
+  const creditsLabels = ["Date", "Source", "Provider", "Reference", "Amount", "Available", "Status", "Account", "Payer"];
   return (
     <section className="rv">
       <PageHeader
@@ -214,15 +232,20 @@ export default function Credits() {
       />
       <CreditsModes />
 
-      <div className="card" style={unclaimed.isLoading ? { minHeight: 320 } : undefined}>
+      <div className="card">
         <h2>Unclaimed credits</h2>
         <p className="rv-help">
           Money received with no claim pointing at it. Payment codes in the narrative suggest the invoice.
           Allocate it to an invoice here when the payer will not send a proof; if a claim is already waiting on the
           invoice, confirm it from the review queue instead.
         </p>
-        {unclaimed.isLoading && <Loading lines={3} />}
         {unclaimed.error && <p className="error">{(unclaimed.error as Error).message}</p>}
+        {unclaimed.isLoading && (
+          <CardTable caption="Unclaimed credits" aria-busy="true">
+            <thead><tr><th>Date</th><th className="num">Amount</th><th className="num">Available</th><th>Reference</th><th>Narrative</th><th>Suggested invoice</th><th /></tr></thead>
+            <tbody><SkeletonRows labels={unclaimedLabels} count={3} /></tbody>
+          </CardTable>
+        )}
         {un?.length === 0 && (
           <div className="rv-inline-empty">Nothing unclaimed. Every credit is matched to a claim or an invoice.</div>
         )}
@@ -279,15 +302,20 @@ export default function Credits() {
 
       <ManualCredit />
 
-      <div className="card" style={credits.isLoading ? { minHeight: 620 } : undefined}>
+      <div className="card">
         <div className="rv-card-head">
           <h2>All credits</h2>
           <label style={{ flexDirection: "row", alignItems: "center", margin: 0, minHeight: 36 }}>
             <input type="checkbox" style={{ width: "auto" }} checked={onlyOpen} onChange={(e) => setOnlyOpen(e.target.checked)} /> only with unallocated balance
           </label>
         </div>
-        {credits.isLoading && <Loading lines={4} />}
         {credits.error && <p className="error">{(credits.error as Error).message}</p>}
+        {credits.isLoading && (
+          <CardTable caption="All credits" aria-busy="true">
+            <thead><tr><th>Date</th><th>Source</th><th>Provider</th><th>Reference</th><th className="num">Amount</th><th className="num">Available</th><th>Status</th><th>Account</th><th>Payer</th></tr></thead>
+            <tbody><SkeletonRows labels={creditsLabels} count={8} /></tbody>
+          </CardTable>
+        )}
         {credits.data?.length === 0 && (
           <EmptyState icon="🏦" title="No credits yet">Import a statement or record a payment above. Run a story from Home to fill this.</EmptyState>
         )}
