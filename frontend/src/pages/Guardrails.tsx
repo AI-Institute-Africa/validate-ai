@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, del, hasRole, post, type ShadowScorecard } from "../api";
 import { Dialog } from "../components/Dialog";
+import { ConfirmDialog, ReasonDialog } from "../components/ActionDialog";
+import { CardCell, CardTable } from "../components/CardTable";
 import { describePolicyRisks, needsAcknowledgement, type Risk } from "../lib/policyRisks";
 import { useToast } from "../toast";
 
@@ -452,23 +454,21 @@ function PolicyPanel() {
       )}
       {retire.error && <p className="error">{(retire.error as Error).message}</p>}
       <h3>History</h3>
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>Version</th><th>Status</th><th>Published by</th><th>When</th><th></th></tr></thead>
-          <tbody>
-            {history.data?.map((v) => (
-              <tr key={v.policy_id}>
-                <td><code>{v.version}</code></td>
-                <td>{v.active ? "active" : "retired"}</td>
-                <td>{v.created_by}</td>
-                <td>{new Date(v.created_at).toLocaleString()}</td>
-                <td>{v.active && <button className="ghost small" onClick={() => retire.mutate(v.policy_id)}>Retire</button>}</td>
-              </tr>
-            ))}
-            {history.data?.length === 0 && <tr><td colSpan={5} className="muted">Using the built-in default policy.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <CardTable caption="Policy history">
+        <thead><tr><th>Version</th><th>Status</th><th>Published by</th><th>When</th><th></th></tr></thead>
+        <tbody>
+          {history.data?.map((v) => (
+            <tr key={v.policy_id}>
+              <CardCell label="Version"><code>{v.version}</code></CardCell>
+              <CardCell label="Status">{v.active ? "active" : "retired"}</CardCell>
+              <CardCell label="Published by">{v.created_by}</CardCell>
+              <CardCell label="When">{new Date(v.created_at).toLocaleString()}</CardCell>
+              <CardCell label="">{v.active && <button className="ghost small" onClick={() => retire.mutate(v.policy_id)}>Retire</button>}</CardCell>
+            </tr>
+          ))}
+          {history.data?.length === 0 && <tr><CardCell label="" wide colSpan={5} className="muted">Using the built-in default policy.</CardCell></tr>}
+        </tbody>
+      </CardTable>
     </div>
   );
 }
@@ -512,40 +512,38 @@ function ShadowPanel() {
             Last {card.data.window_days} days · {card.data.proposals} proposals · {card.data.scored} scored
             against a reviewer decision.
           </p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Proposer</th>
-                  <th>Proposals</th>
-                  <th>Scored</th>
-                  <th>Agreement</th>
-                  <th>False approvals</th>
-                  <th>False holds</th>
+          <CardTable caption="Shadow scorecard proposers">
+            <thead>
+              <tr>
+                <th>Proposer</th>
+                <th>Proposals</th>
+                <th>Scored</th>
+                <th>Agreement</th>
+                <th>False approvals</th>
+                <th>False holds</th>
+              </tr>
+            </thead>
+            <tbody>
+              {card.data.proposers.map((p) => (
+                <tr key={p.proposer}>
+                  <CardCell label="Proposer"><code>{p.proposer}</code></CardCell>
+                  <CardCell label="Proposals">{p.proposals}</CardCell>
+                  <CardCell label="Scored">{p.scored}</CardCell>
+                  <CardCell label="Agreement"><span className={rateBadge(p.agreement_rate, false)}>{pct(p.agreement_rate)}</span></CardCell>
+                  <CardCell label="False approvals">
+                    <span className={rateBadge(p.false_approval_rate, true)}>
+                      {pct(p.false_approval_rate)} ({p.false_approvals})
+                    </span>
+                  </CardCell>
+                  <CardCell label="False holds">
+                    <span className={rateBadge(p.false_hold_rate, true)}>
+                      {pct(p.false_hold_rate)} ({p.false_holds})
+                    </span>
+                  </CardCell>
                 </tr>
-              </thead>
-              <tbody>
-                {card.data.proposers.map((p) => (
-                  <tr key={p.proposer}>
-                    <td><code>{p.proposer}</code></td>
-                    <td>{p.proposals}</td>
-                    <td>{p.scored}</td>
-                    <td><span className={rateBadge(p.agreement_rate, false)}>{pct(p.agreement_rate)}</span></td>
-                    <td>
-                      <span className={rateBadge(p.false_approval_rate, true)}>
-                        {pct(p.false_approval_rate)} ({p.false_approvals})
-                      </span>
-                    </td>
-                    <td>
-                      <span className={rateBadge(p.false_hold_rate, true)}>
-                        {pct(p.false_hold_rate)} ({p.false_holds})
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </CardTable>
         </>
       )}
     </div>
@@ -558,6 +556,8 @@ export default function Guardrails() {
   const admin = hasRole("admin");
   const [showRemoved, setShowRemoved] = useState(false);
   const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const [killSwitch, setKillSwitch] = useState<Template | null>(null);
+  const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
   const list = useQuery({ queryKey: ["guardrails", showRemoved], queryFn: () => api<Listing>(`/admin/guardrails?include_removed=${showRemoved}`) });
   const templates = useQuery({ queryKey: ["guardrail-templates"], queryFn: () => api<Template[]>("/admin/guardrails/templates") });
   const refresh = () => qc.invalidateQueries({ queryKey: ["guardrails"] });
@@ -588,9 +588,8 @@ export default function Guardrails() {
   const reader = list.data?.reader;
 
   const addKillSwitch = (t: Template) => {
-    if (t.kind === "ai_kill_switch" && !window.confirm("Switch the AI reader OFF? Claims will be read by OCR only and always go to review."))
-      return;
-    addTemplate.mutate(t);
+    if (t.kind === "ai_kill_switch") setKillSwitch(t);
+    else addTemplate.mutate(t);
   };
 
   return (
@@ -649,10 +648,7 @@ export default function Guardrails() {
                       <button className="ghost small" onClick={() => toggle.mutate(r)}>{r.enabled ? "Disable" : "Enable"}</button>
                       <button
                         className="danger small"
-                        onClick={() => {
-                          const reason = window.prompt(`Why remove "${r.name}"? (kept in the audit log)`);
-                          if (reason && reason.length >= 3) remove.mutate({ id: r.rule_id, reason });
-                        }}
+                        onClick={() => setRemoving({ id: r.rule_id, name: r.name })}
                       >
                         Remove
                       </button>
@@ -713,6 +709,27 @@ export default function Guardrails() {
           <ShadowPanel />
         </div>
       </div>
+      {killSwitch && (
+        <ConfirmDialog
+          title="Switch the AI reader off?"
+          message="Claims will be read by OCR only and always go to a person. You can switch it back on from this page."
+          confirmLabel="Switch AI off"
+          danger
+          onClose={() => setKillSwitch(null)}
+          onConfirm={() => addTemplate.mutate(killSwitch)}
+        />
+      )}
+      {removing && (
+        <ReasonDialog
+          title="Remove this guardrail?"
+          label={`Why remove “${removing.name}”?`}
+          message="The reason is kept in the audit log."
+          confirmLabel="Remove guardrail"
+          danger
+          onClose={() => setRemoving(null)}
+          onConfirm={(reason) => remove.mutate({ id: removing.id, reason })}
+        />
+      )}
     </section>
   );
 }

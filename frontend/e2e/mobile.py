@@ -5,11 +5,13 @@ usable by touch and keyboard. Run against the standalone demo after a reset.
     python e2e/mobile.py http://127.0.0.1:8000
 """
 
+import atexit
 import json
 import os
 import re
 import sys
 import urllib.request
+import uuid
 
 from playwright.sync_api import expect, sync_playwright
 
@@ -24,14 +26,25 @@ def api(path, token=None):
         return json.loads(response.read())
 
 
-def dev_token():
+def dev_token(email="rudo.reviewer@demo.validate", role="reviewer"):
     request = urllib.request.Request(
         f"{base}/api/auth/dev-login",
-        data=json.dumps({"email": "rudo.reviewer@demo.validate", "role": "reviewer"}).encode(),
+        data=json.dumps({"email": email, "role": role}).encode(),
         headers={"Content-Type": "application/json"},
     )
     with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
         return json.loads(response.read())["access_token"]
+
+
+def call_api(method, path, token=None, body=None):
+    request = urllib.request.Request(
+        f"{base}/api{path}",
+        method=method,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {token}"} if token else {})},
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
+        return json.loads(response.read() or "null")
 
 
 reviewer = dev_token()
@@ -181,6 +194,98 @@ with sync_playwright() as p:
     expect(page.get_by_text("Waiting to send")).to_have_count(0)
     assert len(posted) == 1, posted
 
+    # Phase 2: a reviewer can triage and confirm a matched claim on this 375px phone.
+    admin = dev_token("tariro.admin@demo.validate", "admin")
+    policy = call_api("GET", "/admin/policy", admin)
+    call_api("POST", "/admin/policy", admin, {
+        "version": f"mob-{uuid.uuid4().hex[:8]}",
+        "config": {**policy["config"], "auto_approve_enabled": False},
+    })
+
+    def restore_policy():
+        try:
+            call_api("POST", "/admin/policy", admin, {
+                "version": f"res-{uuid.uuid4().hex[:8]}",
+                "config": policy["config"],
+            })
+        except Exception as exc:  # never hide the real test result
+            print(f"could not restore the demo policy: {exc}", file=sys.stderr)
+
+    atexit.register(restore_policy)
+
+    page.goto(f"{base}/verify?persona=submitter")
+    page.get_by_role("button", name="Paid, bank has it").click()
+    submit = page.get_by_role("button", name="Validate this payment")
+    expect(submit).to_be_enabled(timeout=30000)
+    submit.click()
+    mine = []
+    for _ in range(40):  # the claim is read in the background
+        mine = [c for c in api("/review/queue", reviewer) if c["approval_tier"] == "GREEN" and c["candidate_credit_id"]]
+        if mine:
+            break
+        page.wait_for_timeout(1000)
+    assert mine, "no green matched claim reached the review queue"
+    claim = mine[0]
+    detail = api(f"/review/claims/{claim['claim_id']}", reviewer)
+    txn = next(c for c in detail["candidates"] if c["credit"]["credit_id"] == claim["candidate_credit_id"])["credit"]["provider_txn_id"]
+
+    page.goto(f"{base}/claims/{claim['claim_id']}?persona=reviewer")
+    expect(page.get_by_role("region", name="Decision bar")).to_be_visible()
+    legend = page.locator(".viewer-legend")
+    if legend.count():
+        legend.locator("summary").click()
+        boxed = legend.locator(".legend-list button").first
+        boxed_name = boxed.locator("strong").inner_text()
+        boxed.click()
+        expect(page.locator(".box.hot")).to_have_count(1)
+        boxed.click()  # clear it, so the next assertion is about the field button
+        expect(page.locator(".box.hot")).to_have_count(0)
+        # Pick the matching field row: not every extracted field has a proof region.
+        field = page.locator(".rv-field").filter(has=page.locator(".k", has_text=boxed_name)).first
+        field.locator(".show-on-image").click()
+        expect(page.locator(".box.hot")).to_have_count(1)
+    else:
+        # The demo's fake reader records no proof coordinates, so there is no box to
+        # highlight. The touch control must still be present and toggle its state.
+        toggle = page.locator(".rv-field .show-on-image").first
+        expect(toggle).to_have_text("Show on image")
+        toggle.click()
+        expect(toggle).to_have_attribute("aria-pressed", "true")
+        expect(toggle).to_have_text("Hide on image")
+        toggle.click()
+        expect(toggle).to_have_attribute("aria-pressed", "false")
+    # The same evidence must be readable on a 768px tablet, with no page-level sideways scroll.
+    # Check it before confirming, while the decision bar is still present.
+    tablet = browser.new_context(
+        viewport={"width": 768, "height": 1024},
+        device_scale_factor=2,
+        is_mobile=True,
+        has_touch=True,
+    )
+    tpage = tablet.new_page()
+    tablet_errors: list[str] = []
+    tpage.on("pageerror", lambda e: tablet_errors.append(str(e)))
+    for path in (f"/claims/{claim['claim_id']}?persona=reviewer", "/insights?persona=admin"):
+        tpage.goto(f"{base}{path}")
+        tpage.wait_for_load_state("networkidle")
+        result = tpage.evaluate(NO_OVERFLOW)
+        assert result["overflow"] <= 1, f"{path}: tablet scrolls sideways by {result['overflow']}px: {result['offenders']}"
+    tpage.goto(f"{base}/claims/{claim['claim_id']}?persona=reviewer")
+    expect(tpage.locator(".viewer-scroll img")).to_be_visible()
+    tlegend = tpage.locator(".viewer-legend")
+    if tlegend.count():
+        tlegend.locator("summary").click()
+        expect(tlegend.locator(".legend-list button").first).to_be_visible()
+    expect(tpage.get_by_role("region", name="Decision bar")).to_be_visible()
+
+    page.get_by_role("button", name="Confirm…").click()
+    last4 = page.get_by_role("textbox", name="Last four characters of transaction ID")
+    expect(last4).to_be_focused()
+    last4.fill(txn[-4:])
+    page.get_by_role("button", name=re.compile(r"Confirm credit \d+")).click()
+    expect(page.get_by_text(re.compile("Confirmed:"))).to_be_visible(timeout=30000)
+
     assert not errors, errors
+    assert not tablet_errors, tablet_errors
     browser.close()
-print(f"mobile: ok ({len(PAGES)} pages at 375px; payment, track, ID and offline retry)")
+print(f"mobile: ok ({len(PAGES)} pages at 375px; payment, track, ID, offline retry and staff triage; 768px evidence)")

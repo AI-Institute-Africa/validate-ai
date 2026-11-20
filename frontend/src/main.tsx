@@ -20,6 +20,8 @@ import "./ui.css";
 import "./polish.css";
 import "./motion.css";
 import "./mobile.css";
+// Shared action-dialog styling is used by dialogs on pages that do not import ActionDialog.
+import "./components/actionDialog.css";
 
 // Each page loads on demand, so a payer on a slow phone never downloads the admin console.
 const Scan = lazy(() => import("./pages/Scan"));

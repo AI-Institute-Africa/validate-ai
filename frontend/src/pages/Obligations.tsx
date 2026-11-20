@@ -2,22 +2,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, money, Obligation, post } from "../api";
 import { Chip, EmptyState, Loading, PageHeader } from "../ui";
+import { CardCell, CardTable } from "../components/CardTable";
 import "./review.css";
 
 type Balance = { paid_minor: number; outstanding_minor: number; currency: string; payment_status: string };
 
 function BalanceCells({ id }: { id: string }) {
   const q = useQuery({ queryKey: ["balance", id], queryFn: () => api<Balance>(`/obligations/${id}/balance`) });
-  if (!q.data) return <><td className="num">…</td><td className="num">…</td><td /></>;
+  if (!q.data) return <><CardCell label="Paid" className="num">…</CardCell><CardCell label="Outstanding" className="num">…</CardCell><CardCell label="Status" /></>;
   return (
     <>
-      <td className="num">{money(q.data.paid_minor, q.data.currency)}</td>
-      <td className="num">{money(q.data.outstanding_minor, q.data.currency)}</td>
-      <td>
+      <CardCell label="Paid" className="num">{money(q.data.paid_minor, q.data.currency)}</CardCell>
+      <CardCell label="Outstanding" className="num">{money(q.data.outstanding_minor, q.data.currency)}</CardCell>
+      <CardCell label="Status">
         <Chip tone={q.data.payment_status === "paid" ? "ok" : q.data.payment_status === "partially_paid" ? "info" : "neutral"}>
           {q.data.payment_status === "paid" ? "Paid" : q.data.payment_status === "partially_paid" ? "Part-paid" : q.data.payment_status === "unpaid" ? "Unpaid" : q.data.payment_status.replace(/_/g, " ")}
         </Chip>
-      </td>
+      </CardCell>
     </>
   );
 }
@@ -77,24 +78,22 @@ export default function Obligations() {
       )}
       {!!list.data?.length && (
         <div className="card rv-flush">
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Created</th><th>Learner</th><th>Description</th><th className="num">Amount</th><th className="num">Paid</th><th className="num">Outstanding</th><th>Status</th><th>Due</th><th>Payment code</th></tr></thead>
-              <tbody>
-                {list.data.map((o) => (
-                  <tr key={o.obligation_id}>
-                    <td>{new Date(o.created_at).toLocaleDateString()}</td>
-                    <td>{o.learner_ref}</td>
-                    <td>{o.description}</td>
-                    <td className="num">{money(o.amount_minor, o.currency)}</td>
-                    <BalanceCells id={o.obligation_id} />
-                    <td>{o.due_date ? new Date(o.due_date).toLocaleDateString() : ""}</td>
-                    <td><code>{o.payment_code}</code></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="Invoices">
+            <thead><tr><th>Created</th><th>Learner</th><th>Description</th><th className="num">Amount</th><th className="num">Paid</th><th className="num">Outstanding</th><th>Status</th><th>Due</th><th>Payment code</th></tr></thead>
+            <tbody>
+              {list.data.map((o) => (
+                <tr key={o.obligation_id}>
+                  <CardCell label="Created">{new Date(o.created_at).toLocaleDateString()}</CardCell>
+                  <CardCell label="Learner">{o.learner_ref}</CardCell>
+                  <CardCell label="Description">{o.description}</CardCell>
+                  <CardCell label="Amount" className="num">{money(o.amount_minor, o.currency)}</CardCell>
+                  <BalanceCells id={o.obligation_id} />
+                  <CardCell label="Due">{o.due_date ? new Date(o.due_date).toLocaleDateString() : ""}</CardCell>
+                  <CardCell label="Payment code"><code>{o.payment_code}</code></CardCell>
+                </tr>
+              ))}
+            </tbody>
+          </CardTable>
         </div>
       )}
     </section>

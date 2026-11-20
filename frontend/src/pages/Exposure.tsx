@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, hasRole, money } from "../api";
 import { Chip, EmptyState, Loading, PageHeader } from "../ui";
+import { CardCell, CardTable } from "../components/CardTable";
 import "./review.css";
 
 type Report = {
@@ -82,20 +83,18 @@ export default function Exposure() {
         {r.expiring_soon.length === 0 ? (
           <div className="rv-inline-empty">Nothing is about to expire.</div>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Ends</th><th className="num">Exposure</th><th>Claim</th></tr></thead>
-              <tbody>
-                {r.expiring_soon.map((g) => (
-                  <tr key={g.grant_id}>
-                    <td>{new Date(g.expires_at).toLocaleString()}</td>
-                    <td className="num">{money(g.exposure_minor, g.currency)}</td>
-                    <td><Link to={`/claims/${g.claim_id}`}>{g.claim_id.slice(0, 8)}</Link></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="Provisional access ending within 6 hours">
+            <thead><tr><th>Ends</th><th className="num">Exposure</th><th>Claim</th></tr></thead>
+            <tbody>
+              {r.expiring_soon.map((g) => (
+                <tr key={g.grant_id}>
+                  <CardCell label="Ends">{new Date(g.expires_at).toLocaleString()}</CardCell>
+                  <CardCell label="Exposure" className="num">{money(g.exposure_minor, g.currency)}</CardCell>
+                  <CardCell label="Claim"><Link to={`/claims/${g.claim_id}`}>{g.claim_id.slice(0, 8)}</Link></CardCell>
+                </tr>
+              ))}
+            </tbody>
+          </CardTable>
         )}
       </div>
     </section>

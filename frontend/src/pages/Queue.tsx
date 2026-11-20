@@ -7,6 +7,7 @@ import { Chip, EmptyState, Loading, PageHeader, StateChip } from "../ui";
 import { bucketOf, slaOf, SLA_MINUTES, type Bucket } from "../lib/triage";
 import { ariaSort, DEFAULT_SORT, nextSort, sortClaims, type Sort, type SortKey } from "../lib/sortClaims";
 import { ShortcutLegend } from "../components/ShortcutLegend";
+import { CardCell, CardTable } from "../components/CardTable";
 import { pruneSelection, toggle, toggleAll } from "../lib/bulk";
 import { BulkBar } from "./QueueBulk";
 import { RiskBadge } from "./Fraud";
@@ -224,84 +225,82 @@ export default function Queue() {
       )}
       {!!rows?.length && (
         <div className="card rv-flush">
-          <div className="table-wrap">
-            <table className="rv-cards">
-              <thead>
-                <tr>
-                  <th className="sel">
+          <CardTable caption="Review queue">
+            <thead>
+              <tr>
+                <th className="sel">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all listed claims"
+                    checked={rows.length > 0 && rows.every((c) => selected.has(c.claim_id))}
+                    onChange={() => setSelected(toggleAll(selected, rows.map((c) => c.claim_id)))}
+                  />
+                </th>
+                <th aria-sort={ariaSort(sort, "waiting")}><SortBtn k="waiting" label="Waiting" sort={sort} onSort={chooseSort} /></th>
+                <th aria-sort={ariaSort(sort, "status")}><SortBtn k="status" label="Status" sort={sort} onSort={chooseSort} /></th>
+                <th>Claimant</th>
+                <th className="num" aria-sort={ariaSort(sort, "declared")}><SortBtn k="declared" label="Declared" sort={sort} onSort={chooseSort} /></th>
+                <th>Evidence</th>
+                <th title="Level: how careful to be. Risk: fake-receipt signals.">
+                  <SortBtn k="level" label="Level" sort={sort} onSort={chooseSort} /> and <SortBtn k="risk" label="risk" sort={sort} onSort={chooseSort} />
+                </th>
+                <th>Why it is here</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c, i) => (
+                <tr
+                  key={c.claim_id}
+                  data-row={i}
+                  tabIndex={i === cursor ? 0 : -1}
+                  className={`rv-click${i === cursor ? " cursor" : ""}`}
+                  onFocus={() => setCursor(i)}
+                  onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button,input")) nav(`/claims/${c.claim_id}`); }}
+                >
+                  <CardCell label="Select" className="sel">
                     <input
                       type="checkbox"
-                      aria-label="Select all listed claims"
-                      checked={rows.length > 0 && rows.every((c) => selected.has(c.claim_id))}
-                      onChange={() => setSelected(toggleAll(selected, rows.map((c) => c.claim_id)))}
+                      aria-label={`Select ${c.claimant_ref}`}
+                      checked={selected.has(c.claim_id)}
+                      onChange={() => setSelected(toggle(selected, c.claim_id))}
                     />
-                  </th>
-                  <th aria-sort={ariaSort(sort, "waiting")}><SortBtn k="waiting" label="Waiting" sort={sort} onSort={chooseSort} /></th>
-                  <th aria-sort={ariaSort(sort, "status")}><SortBtn k="status" label="Status" sort={sort} onSort={chooseSort} /></th>
-                  <th>Claimant</th>
-                  <th className="num" aria-sort={ariaSort(sort, "declared")}><SortBtn k="declared" label="Declared" sort={sort} onSort={chooseSort} /></th>
-                  <th>Evidence</th>
-                  <th title="Level: how careful to be. Risk: fake-receipt signals.">
-                    <SortBtn k="level" label="Level" sort={sort} onSort={chooseSort} /> and <SortBtn k="risk" label="risk" sort={sort} onSort={chooseSort} />
-                  </th>
-                  <th>Why it is here</th>
+                  </CardCell>
+                  <CardCell label="Waiting">
+                    <Link className="rv-age" to={`/claims/${c.claim_id}`} title={new Date(c.created_at).toLocaleString()}>
+                      {agoText(c.created_at)}
+                    </Link>
+                    {slaOf(c.created_at, Date.now()).level > 0 && (
+                      <Chip tone={slaOf(c.created_at, Date.now()).tone} title={`Waiting longer than ${SLA_LABEL[slaOf(c.created_at, Date.now()).level].replace("+", "")}. Reminders go out at ${SLA_MINUTES.map((m) => m / 60 + " h").join(", ")}.`}>
+                        {SLA_LABEL[slaOf(c.created_at, Date.now()).level]}
+                      </Chip>
+                    )}
+                  </CardCell>
+                  <CardCell label="Status"><StateChip state={c.state} /></CardCell>
+                  <CardCell label="Claimant" className="nowrap">
+                    <span className="data">{c.claimant_ref}</span>
+                    <span className="rv-sub">{c.channel}</span>
+                  </CardCell>
+                  <CardCell label="Declared" className="num">{money(c.declared_amount_minor, c.declared_currency)}</CardCell>
+                  <CardCell label="Evidence"><EvidenceChip tier={c.evidence_tier} compact /></CardCell>
+                  <CardCell label="Level and risk"><span className="rv-chips"><TierBadge tier={c.approval_tier} /><RiskBadge level={c.risk_level} score={c.risk_score} /></span></CardCell>
+                  <CardCell label="Why it is here" wide className="rv-why">
+                    {c.reason_codes.length === 0 ? (
+                      <span className="muted">No problems recorded</span>
+                    ) : (
+                      <>
+                        {reasonText(c.reason_codes[0])}
+                        <div className="rv-codes">
+                          {c.reason_codes.map((r) => (
+                            <code key={r} className="rv-code" title={reasonText(r)}>{r}</code>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </CardCell>
                 </tr>
-              </thead>
-              <tbody>
-                {rows.map((c, i) => (
-                  <tr
-                    key={c.claim_id}
-                    data-row={i}
-                    tabIndex={i === cursor ? 0 : -1}
-                    className={`rv-click${i === cursor ? " cursor" : ""}`}
-                    onFocus={() => setCursor(i)}
-                    onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button,input")) nav(`/claims/${c.claim_id}`); }}
-                  >
-                    <td className="sel" data-label="Select">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${c.claimant_ref}`}
-                        checked={selected.has(c.claim_id)}
-                        onChange={() => setSelected(toggle(selected, c.claim_id))}
-                      />
-                    </td>
-                    <td data-label="Waiting">
-                      <Link className="rv-age" to={`/claims/${c.claim_id}`} title={new Date(c.created_at).toLocaleString()}>
-                        {agoText(c.created_at)}
-                      </Link>
-                      {slaOf(c.created_at, Date.now()).level > 0 && (
-                        <Chip tone={slaOf(c.created_at, Date.now()).tone} title={`Waiting longer than ${SLA_LABEL[slaOf(c.created_at, Date.now()).level].replace("+", "")}. Reminders go out at ${SLA_MINUTES.map((m) => m / 60 + " h").join(", ")}.`}>
-                          {SLA_LABEL[slaOf(c.created_at, Date.now()).level]}
-                        </Chip>
-                      )}
-                    </td>
-                    <td data-label="Status"><StateChip state={c.state} /></td>
-                    <td className="nowrap" data-label="Claimant">
-                      <span className="data">{c.claimant_ref}</span>
-                      <span className="rv-sub">{c.channel}</span>
-                    </td>
-                    <td className="num" data-label="Declared">{money(c.declared_amount_minor, c.declared_currency)}</td>
-                    <td data-label="Evidence"><EvidenceChip tier={c.evidence_tier} compact /></td>
-                    <td data-label="Level and risk"><span className="rv-chips"><TierBadge tier={c.approval_tier} /><RiskBadge level={c.risk_level} score={c.risk_score} /></span></td>
-                    <td className="rv-why" data-label="Why it is here">
-                      {c.reason_codes.length === 0 ? (
-                        <span className="muted">No problems recorded</span>
-                      ) : (
-                        <>
-                          {reasonText(c.reason_codes[0])}
-                          <div className="rv-codes">
-                            {c.reason_codes.map((r) => (
-                              <code key={r} className="rv-code" title={reasonText(r)}>{r}</code>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </CardTable>
         </div>
       )}
       <BulkBar selected={chosen} onClear={() => setSelected(new Set())} />

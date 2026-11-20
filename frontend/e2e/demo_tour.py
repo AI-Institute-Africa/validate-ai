@@ -64,7 +64,10 @@ with sync_playwright() as p:
     page.wait_for_load_state("networkidle")
     expect(page.locator("a", has_text="ID checks").first).to_be_visible()
     page.get_by_role("link", name="ID checks").click()
-    page.locator("tbody tr").first.click()
+    expect(page.get_by_role("heading", name="Identity checks")).to_be_visible()
+    # Target this page's queue table: a bare `tbody tr` can still match the table on
+    # the previous page while React Router is finishing the navigation.
+    page.get_by_role("table", name="Identity checks waiting for a person").locator("tbody tr").first.click()
     expect(page.get_by_text("Why it needs a person")).to_be_visible()
     expect(page.locator(".compare img").first).to_be_visible(timeout=15000)
     page.screenshot(path=f"{out}/3-kyc-review.png", full_page=True)

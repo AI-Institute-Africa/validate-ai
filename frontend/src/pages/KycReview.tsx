@@ -5,6 +5,8 @@ import { api, blobUrl, hasRole, post } from "../api";
 import { CHECKS, DOC_TYPES, FIELD_LABELS } from "../labels";
 import { useToast } from "../toast";
 import { EmptyState, Loading, PageHeader, Reasons, StateChip } from "../ui";
+import { ReasonDialog } from "../components/ActionDialog";
+import { CardCell, CardTable } from "../components/CardTable";
 
 type QueueRow = {
   kyc_id: string;
@@ -84,11 +86,7 @@ function Review({ id, onDone }: { id: string; onDone: () => void }) {
     onSuccess: () => { toast("ok", "Decision recorded."); onDone(); },
     onError: (e) => toast("err", (e as Error).message),
   });
-  const ask = (outcome: string) => {
-    const note = outcome === "VERIFIED" ? window.prompt("Note (optional)") ?? "" : window.prompt("Reason (required, shown in the audit trail)");
-    if (note === null || (outcome !== "VERIFIED" && note.trim().length < 3)) return;
-    decide.mutate({ outcome, note: note.trim() || null });
-  };
+  const [deciding, setDeciding] = useState<string | null>(null);
   if (q.isLoading) return <Loading lines={5} />;
   if (!q.data) return <p className="error">{(q.error as Error)?.message ?? "Not found"}</p>;
   const d = q.data;
@@ -137,31 +135,40 @@ function Review({ id, onDone }: { id: string; onDone: () => void }) {
         </div>
       </div>
       <h3 style={{ marginTop: 14 }}>What was read</h3>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Field</th><th>Chosen value</th><th>Two sources agree</th><th>Each source read</th></tr>
-          </thead>
-          <tbody>
-            {rows.map((k) => (
-              <tr key={k}>
-                <td>{FIELD_LABELS[k]}</td>
-                <td><b>{values[k] ?? "—"}</b></td>
-                <td>{d.fields.agreed[k] ? <span className="chip2 tone-ok">Yes</span> : <span className="chip2 tone-warn">No</span>}</td>
-                <td className="small muted">{Object.entries(d.fields.sources[k] ?? {}).map(([s, x]) => `${s.replace(/^fake_id_/, "").replace(/^id_/, "")}: ${x}`).join(" · ")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CardTable caption="What was read from the ID">
+        <thead>
+          <tr><th>Field</th><th>Chosen value</th><th>Two sources agree</th><th>Each source read</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((k) => (
+            <tr key={k}>
+              <CardCell label="Field">{FIELD_LABELS[k]}</CardCell>
+              <CardCell label="Chosen value"><b>{values[k] ?? "—"}</b></CardCell>
+              <CardCell label="Two sources agree">{d.fields.agreed[k] ? <span className="chip2 tone-ok">Yes</span> : <span className="chip2 tone-warn">No</span>}</CardCell>
+              <CardCell label="Each source read" wide className="small muted">{Object.entries(d.fields.sources[k] ?? {}).map(([s, x]) => `${s.replace(/^fake_id_/, "").replace(/^id_/, "")}: ${x}`).join(" · ")}</CardCell>
+            </tr>
+          ))}
+        </tbody>
+      </CardTable>
       {open && hasRole("reviewer") && (
         <div className="scn-actions" style={{ marginTop: 16 }}>
-          <button type="button" disabled={decide.isPending} onClick={() => ask("VERIFIED")}>Verify</button>
-          <button type="button" className="secondary" disabled={decide.isPending} onClick={() => ask("NEEDS_INFORMATION")}>Ask for new photos</button>
-          <button type="button" className="danger" disabled={decide.isPending} onClick={() => ask("REJECTED")}>Reject</button>
+          <button type="button" disabled={decide.isPending} onClick={() => setDeciding("VERIFIED")}>Verify</button>
+          <button type="button" className="secondary" disabled={decide.isPending} onClick={() => setDeciding("NEEDS_INFORMATION")}>Ask for new photos</button>
+          <button type="button" className="danger" disabled={decide.isPending} onClick={() => setDeciding("REJECTED")}>Reject</button>
         </div>
       )}
       {!open && <p className="muted small" style={{ marginTop: 12 }}>This check is {d.state.toLowerCase().replace(/_/g, " ")}; no decision is pending.</p>}
+      {deciding && (
+        <ReasonDialog
+          title={deciding === "VERIFIED" ? "Verify this identity?" : deciding === "NEEDS_INFORMATION" ? "Ask for new photos?" : "Reject this identity?"}
+          label={deciding === "VERIFIED" ? "Note (optional)" : "Reason (required, shown in the audit trail)"}
+          optional={deciding === "VERIFIED"}
+          confirmLabel={deciding === "VERIFIED" ? "Verify" : deciding === "NEEDS_INFORMATION" ? "Ask for photos" : "Reject"}
+          danger={deciding === "REJECTED"}
+          onClose={() => setDeciding(null)}
+          onConfirm={(note) => decide.mutate({ outcome: deciding, note: note || null })}
+        />
+      )}
     </div>
   );
 }
@@ -170,6 +177,7 @@ export default function KycReview() {
   const qc = useQueryClient();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
+  const [overturning, setOverturning] = useState<{ id: string; ref: string | null } | null>(null);
   const open = params.get("open");
   const setOpen = (id: string | null) => setParams(id ? { open: id } : {}, { replace: true });
   const queue = useQuery({ queryKey: ["kyc-queue"], queryFn: () => api<QueueRow[]>("/kyc/review/queue"), refetchInterval: 20000 });
@@ -192,24 +200,30 @@ export default function KycReview() {
       )}
       {!!queue.data?.length && (
         <div className="card" style={{ padding: 0 }}>
-          <div className="table-wrap">
-            <table style={{ border: 0 }}>
-              <thead>
-                <tr><th>Submitted</th><th>Subject</th><th>Document</th><th>Face match</th><th>Why</th></tr>
-              </thead>
-              <tbody>
-                {queue.data.map((r) => (
-                  <tr key={r.kyc_id} onClick={() => setOpen(r.kyc_id)} style={{ cursor: "pointer", background: open === r.kyc_id ? "color-mix(in srgb, var(--accent) 8%, transparent)" : undefined }}>
-                    <td>{new Date(r.created_at).toLocaleString()}</td>
-                    <td>{r.subject_type}: {r.subject_ref}</td>
-                    <td>{r.doc_type ? DOC_TYPES[r.doc_type] ?? r.doc_type : "?"}</td>
-                    <td>{r.face_score?.toFixed(2) ?? "n/a"}</td>
-                    <td className="small muted">{r.reason_codes.join(", ")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="Identity checks waiting for a person">
+            <thead>
+              <tr><th>Submitted</th><th>Subject</th><th>Document</th><th>Face match</th><th>Why</th></tr>
+            </thead>
+            <tbody>
+              {queue.data.map((r) => (
+                <tr
+                  key={r.kyc_id}
+                  className="rv-click"
+                  tabIndex={0}
+                  aria-label={`Open identity check for ${r.subject_ref}`}
+                  onClick={() => setOpen(r.kyc_id)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(r.kyc_id); } }}
+                  style={{ cursor: "pointer", background: open === r.kyc_id ? "color-mix(in srgb, var(--accent) 8%, transparent)" : undefined }}
+                >
+                  <CardCell label="Submitted">{new Date(r.created_at).toLocaleString()}</CardCell>
+                  <CardCell label="Subject">{r.subject_type}: {r.subject_ref}</CardCell>
+                  <CardCell label="Document">{r.doc_type ? DOC_TYPES[r.doc_type] ?? r.doc_type : "?"}</CardCell>
+                  <CardCell label="Face match">{r.face_score?.toFixed(2) ?? "n/a"}</CardCell>
+                  <CardCell label="Why" wide className="small muted">{r.reason_codes.join(", ")}</CardCell>
+                </tr>
+              ))}
+            </tbody>
+          </CardTable>
         </div>
       )}
       {open && <Review key={open} id={open} onDone={done} />}
@@ -225,31 +239,40 @@ export default function KycReview() {
             {a.summary.verified} verified · {a.summary.sampled} sampled · {a.summary.audited} audited · {a.summary.overturned} overturned
             {a.summary.overturn_rate !== null && <> · overturn rate <b>{(a.summary.overturn_rate * 100).toFixed(1)}%</b></>}
           </p>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Verified</th><th>Subject</th><th>Face match</th><th>Audit</th><th /></tr></thead>
-              <tbody>
-                {a.verifications.length === 0 && <tr><td colSpan={5} className="muted">None yet.</td></tr>}
-                {a.verifications.map((v) => (
-                  <tr key={v.kyc_id}>
-                    <td><button type="button" className="link" onClick={() => setOpen(v.kyc_id)}>{new Date(v.verified_at).toLocaleString()}</button></td>
-                    <td>{v.subject_type}: {v.subject_ref}</td>
-                    <td>{v.face_score?.toFixed(2) ?? "n/a"}</td>
-                    <td>{v.verdict ? `${v.verdict.outcome === "KYC_AUDIT_OK" ? "Correct" : "Overturned"} by ${v.verdict.by}` : v.sampled ? "In the sample: please check" : "Not sampled"}</td>
-                    <td>
-                      {!v.verdict && hasRole("reviewer") && (
-                        <>
-                          <button type="button" className="secondary small" onClick={() => verdict.mutate({ id: v.kyc_id, verdict: "ok", note: null })}>Correct</button>{" "}
-                          <button type="button" className="danger small" onClick={() => { const n = window.prompt("What was wrong?"); if (n && n.trim().length >= 3) verdict.mutate({ id: v.kyc_id, verdict: "overturned", note: n.trim() }); }}>Overturn</button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="Verified automatically">
+            <thead><tr><th>Verified</th><th>Subject</th><th>Face match</th><th>Audit</th><th /></tr></thead>
+            <tbody>
+              {a.verifications.length === 0 && <tr><CardCell label="" wide colSpan={5} className="muted">None yet.</CardCell></tr>}
+              {a.verifications.map((v) => (
+                <tr key={v.kyc_id}>
+                  <CardCell label="Verified"><button type="button" className="link" onClick={() => setOpen(v.kyc_id)}>{new Date(v.verified_at).toLocaleString()}</button></CardCell>
+                  <CardCell label="Subject">{v.subject_type}: {v.subject_ref}</CardCell>
+                  <CardCell label="Face match">{v.face_score?.toFixed(2) ?? "n/a"}</CardCell>
+                  <CardCell label="Audit">{v.verdict ? `${v.verdict.outcome === "KYC_AUDIT_OK" ? "Correct" : "Overturned"} by ${v.verdict.by}` : v.sampled ? "In the sample: please check" : "Not sampled"}</CardCell>
+                  <CardCell label="">
+                    {!v.verdict && hasRole("reviewer") && (
+                      <>
+                        <button type="button" className="secondary small" onClick={() => verdict.mutate({ id: v.kyc_id, verdict: "ok", note: null })}>Correct</button>{" "}
+                        <button type="button" className="danger small" onClick={() => setOverturning({ id: v.kyc_id, ref: v.subject_ref })}>Overturn</button>
+                      </>
+                    )}
+                  </CardCell>
+                </tr>
+              ))}
+            </tbody>
+          </CardTable>
         </div>
+      )}
+      {overturning && (
+        <ReasonDialog
+          title="Overturn this verification?"
+          label="What was wrong?"
+          message={overturning.ref ? `The verification for ${overturning.ref} will be marked overturned. Revoke it separately if it was wrong.` : "The verification will be marked overturned. Revoke it separately if it was wrong."}
+          confirmLabel="Mark overturned"
+          danger
+          onClose={() => setOverturning(null)}
+          onConfirm={(note) => verdict.mutate({ id: overturning.id, verdict: "overturned", note })}
+        />
       )}
     </div>
   );

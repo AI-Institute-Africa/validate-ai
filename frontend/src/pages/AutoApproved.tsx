@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, hasRole, money, post } from "../api";
 import { useToast } from "../toast";
 import { Chip, EmptyState, Loading, PageHeader, StateChip } from "../ui";
+import { ReasonDialog } from "../components/ActionDialog";
+import { CardCell, CardTable } from "../components/CardTable";
 import { agoText } from "./Queue";
 import "./review.css";
 
@@ -38,10 +41,7 @@ export default function AutoApproved() {
     },
     onError: (e) => toast("err", (e as Error).message),
   });
-  const overturn = (id: string) => {
-    const note = window.prompt("What was wrong with this approval?");
-    if (note && note.trim().length >= 3) verdict.mutate({ id, verdict: "overturned", note: note.trim() });
-  };
+  const [overturning, setOverturning] = useState<string | null>(null);
   if (q.error) return <section className="rv"><p className="error">{(q.error as Error).message}</p></section>;
   if (!q.data) return <section className="rv"><PageHeader title="Auto-approved" /><Loading lines={4} /></section>;
   const d = q.data;
@@ -76,44 +76,53 @@ export default function AutoApproved() {
         <EmptyState icon="⚡" title="No automatic approvals yet">When a small, exactly-paid claim is confirmed by the bank record it shows up here. Run a story from Home to fill this.</EmptyState>
       ) : (
         <div className="card rv-flush">
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Approved</th><th className="num">Amount</th><th>Channel</th><th>Audit</th><th /></tr></thead>
-              <tbody>
-                {d.claims.map((r) => (
-                  <tr key={r.claim_id}>
-                    <td>
-                      <Link to={`/claims/${r.claim_id}`} title={new Date(r.approved_at).toLocaleString()}>{agoText(r.approved_at)}</Link>
-                      {r.claim_state && <span className="rv-sub"><StateChip state={r.claim_state} /></span>}
-                    </td>
-                    <td className="num">{money(r.amount_minor, r.currency)}</td>
-                    <td>{r.channel}</td>
-                    <td>
-                      {r.verdict ? (
-                        <>
-                          <Chip tone={r.verdict.outcome === "AUTO_AUDIT_OK" ? "ok" : "bad"}>{r.verdict.outcome === "AUTO_AUDIT_OK" ? "Correct" : "Overturned"}</Chip>
-                          <span className="rv-sub">by {r.verdict.by}{r.verdict.note ? ` — ${r.verdict.note}` : ""}</span>
-                        </>
-                      ) : r.sampled ? (
-                        <Chip tone="warn">In the sample: please check</Chip>
-                      ) : (
-                        <span className="muted">Not sampled</span>
-                      )}
-                    </td>
-                    <td>
-                      {!r.verdict && hasRole("reviewer") && (
-                        <span className="rv-row-actions">
-                          <button className="ghost small" onClick={() => verdict.mutate({ id: r.claim_id, verdict: "ok", note: null })}>Correct</button>
-                          <button className="danger small" onClick={() => overturn(r.claim_id)}>Overturn</button>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="Auto-approved claims">
+            <thead><tr><th>Approved</th><th className="num">Amount</th><th>Channel</th><th>Audit</th><th /></tr></thead>
+            <tbody>
+              {d.claims.map((r) => (
+                <tr key={r.claim_id}>
+                  <CardCell label="Approved">
+                    <Link to={`/claims/${r.claim_id}`} title={new Date(r.approved_at).toLocaleString()}>{agoText(r.approved_at)}</Link>
+                    {r.claim_state && <span className="rv-sub"><StateChip state={r.claim_state} /></span>}
+                  </CardCell>
+                  <CardCell label="Amount" className="num">{money(r.amount_minor, r.currency)}</CardCell>
+                  <CardCell label="Channel">{r.channel}</CardCell>
+                  <CardCell label="Audit">
+                    {r.verdict ? (
+                      <>
+                        <Chip tone={r.verdict.outcome === "AUTO_AUDIT_OK" ? "ok" : "bad"}>{r.verdict.outcome === "AUTO_AUDIT_OK" ? "Correct" : "Overturned"}</Chip>
+                        <span className="rv-sub">by {r.verdict.by}{r.verdict.note ? ` — ${r.verdict.note}` : ""}</span>
+                      </>
+                    ) : r.sampled ? (
+                      <Chip tone="warn">In the sample: please check</Chip>
+                    ) : (
+                      <span className="muted">Not sampled</span>
+                    )}
+                  </CardCell>
+                  <CardCell label="">
+                    {!r.verdict && hasRole("reviewer") && (
+                      <span className="rv-row-actions">
+                        <button className="ghost small" onClick={() => verdict.mutate({ id: r.claim_id, verdict: "ok", note: null })}>Correct</button>
+                        <button className="danger small" onClick={() => setOverturning(r.claim_id)}>Overturn</button>
+                      </span>
+                    )}
+                  </CardCell>
+                </tr>
+              ))}
+            </tbody>
+          </CardTable>
         </div>
+      )}
+      {overturning && (
+        <ReasonDialog
+          title="Overturn this approval?"
+          label="What was wrong with this approval?"
+          message="The reason is kept in the audit trail. Reverse the allocation from the claim page to put the money back."
+          confirmLabel="Mark overturned"
+          danger
+          onClose={() => setOverturning(null)}
+          onConfirm={(note) => verdict.mutate({ id: overturning, verdict: "overturned", note })}
+        />
       )}
     </section>
   );

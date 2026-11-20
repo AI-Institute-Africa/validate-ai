@@ -161,5 +161,45 @@ code.key,
   }
 }
 
+/* ── staff controls at tablet widths (C5) ─────────────────────────────────── */
+@media (max-width: 960px) {
+  /* Unstyled .inline wrappers on reviewer pages should wrap, not clip or stack oddly. */
+  .rv div.inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .rv form.inline,
+  .rv form.inline > *,
+  .rv .rv-tab,
+  .rv .chip2 {
+    min-width: 0;
+  }
+  .rv code,
+  .rv .chip2 {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .rv-tabs { gap: 12px; }
+  .rv-tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .rv .rv-kv { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 721px) and (max-width: 900px) {
+  /* Five insights tabs fit 768px, but translations and counts must not force page scroll. */
+  .rv-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding-bottom: 2px;
+  }
+  .rv-tab {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+  .rv-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+}
+
 /* Layering map: scrim 40 < drawer 50 < toasts 100 < dialogs 200.
    A dialog is only rendered from outside the drawer, so it is always on top. */

@@ -1,0 +1,42 @@
+/* Shared action-dialog bits. Uses the same tokens as the existing modal in review.css so
+   touch replacement dialogs look native to the console and work on every page. */
+
+.ad-message {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.ad-field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 550;
+}
+.ad-field input {
+  width: 100%;
+}
+.ad-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.ad-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--bad);
+}
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+@media (max-width: 560px) {
+  .dialog-actions > button {
+    flex: 1 1 calc(50% - 8px);
+  }
+}

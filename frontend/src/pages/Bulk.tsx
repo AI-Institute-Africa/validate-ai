@@ -4,6 +4,7 @@ import { api, hasRole, money, post, type Credit } from "../api";
 import { CreditsModes } from "../components/CreditsModes";
 import { parseBulk } from "../lib/bulkCsv";
 import { Chip, EmptyState, Loading, PageHeader } from "../ui";
+import { CardCell, CardTable } from "../components/CardTable";
 import "./review.css";
 
 type Row = { index: number; status: string; detail: string | null; obligation_id: string | null; amount_minor: number | null; allocation_id: string | null };
@@ -112,22 +113,20 @@ export default function Bulk() {
 
       {result && (
         <div className="card rv-flush">
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>#</th><th>Code</th><th className="num">Amount</th><th>Result</th><th>Detail</th></tr></thead>
-              <tbody>
-                {result.rows.map((r) => (
-                  <tr key={r.index}>
-                    <td>{r.index + 1}</td>
-                    <td>{parsed?.rows[r.index]?.payment_code}</td>
-                    <td className="num">{r.amount_minor != null ? money(r.amount_minor, credit?.currency) : "—"}</td>
-                    <td><Chip tone={TONE[r.status] ?? "neutral"}>{LABEL[r.status] ?? r.status}</Chip></td>
-                    <td className="muted small">{r.detail}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="Bulk allocation preview">
+            <thead><tr><th>#</th><th>Code</th><th className="num">Amount</th><th>Result</th><th>Detail</th></tr></thead>
+            <tbody>
+              {result.rows.map((r) => (
+                <tr key={r.index}>
+                  <CardCell label="#">{r.index + 1}</CardCell>
+                  <CardCell label="Code">{parsed?.rows[r.index]?.payment_code}</CardCell>
+                  <CardCell label="Amount" className="num">{r.amount_minor != null ? money(r.amount_minor, credit?.currency) : "—"}</CardCell>
+                  <CardCell label="Result"><Chip tone={TONE[r.status] ?? "neutral"}>{LABEL[r.status] ?? r.status}</Chip></CardCell>
+                  <CardCell label="Detail" wide className="muted small">{r.detail}</CardCell>
+                </tr>
+              ))}
+            </tbody>
+          </CardTable>
         </div>
       )}
 

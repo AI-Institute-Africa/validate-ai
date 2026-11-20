@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, money } from "../api";
 import { Loading, PageHeader } from "../ui";
+import { CardCell, CardTable } from "../components/CardTable";
 import "./review.css";
 
 type Card = {
@@ -64,17 +65,19 @@ export default function Scorecard() {
           <p className="muted small">{c.estimate_note}</p>
           <div className="card">
             <h3>Money confirmed per day</h3>
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Date</th><th>Currency</th><th className="num">Confirmed</th></tr></thead>
-                <tbody>
-                  {c.money_confirmed_by_day.map((m) => (
-                    <tr key={`${m.date}-${m.currency}`}><td>{m.date}</td><td>{m.currency}</td><td className="num">{money(m.minor, m.currency)}</td></tr>
-                  ))}
-                  {c.money_confirmed_by_day.length === 0 && <tr><td colSpan={3} className="muted">No money confirmed in this window.</td></tr>}
-                </tbody>
-              </table>
-            </div>
+            <CardTable caption="Money confirmed per day">
+              <thead><tr><th>Date</th><th>Currency</th><th className="num">Confirmed</th></tr></thead>
+              <tbody>
+                {c.money_confirmed_by_day.map((m) => (
+                  <tr key={`${m.date}-${m.currency}`}>
+                    <CardCell label="Date">{m.date}</CardCell>
+                    <CardCell label="Currency">{m.currency}</CardCell>
+                    <CardCell label="Confirmed" className="num">{money(m.minor, m.currency)}</CardCell>
+                  </tr>
+                ))}
+                {c.money_confirmed_by_day.length === 0 && <tr><CardCell label="" wide colSpan={3} className="muted">No money confirmed in this window.</CardCell></tr>}
+              </tbody>
+            </CardTable>
           </div>
         </>
       )}

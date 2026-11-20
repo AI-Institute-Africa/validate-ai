@@ -195,7 +195,7 @@
 .decision-bar { position: sticky; bottom: 0; z-index: 20; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 14px; margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-lg, 0 -4px 16px rgba(0,0,0,.12)); }
 .db-sum { flex: 1; font-variant-numeric: tabular-nums; }
 .payer-msg { margin: 6px 0 10px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--panel); }
-.dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+/* .dialog-actions now lives with the shared action dialogs in components/actionDialog.css. */
 
 .policy-risks { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 6px; }
 .policy-risks li { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); }
@@ -210,30 +210,40 @@
 .viewer-tools { align-items: flex-end; gap: 6px 12px; }
 .viewer-tools label { flex-direction: column; align-items: flex-start; gap: 2px; font-size: 12px; color: var(--muted); }
 .viewer-tools input[type="range"] { width: 96px; }
+.viewer-legend { margin: 10px 0; padding: 6px 10px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.viewer-legend > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+.legend-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 6px; }
+.legend-list button { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); text-align: left; }
+.legend-list button.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+.legend-list button span { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.rv-field .act { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.rv-field .show-on-image[aria-pressed="true"] { border-color: var(--accent); }
 @media (max-width: 720px) {
   .rv-keys { display: none; }
   .rv-facts { grid-template-columns: 1fr 1fr; }
   .decision-bar { gap: 8px; }
   .decision-bar .db-sum { flex-basis: 100%; }
 }
+@media (max-width: 560px) {
+  /* Full-width actions in thumb reach; safe-area padding comes from mobile.css. */
+  .decision-bar {
+    margin-left: -14px;
+    margin-right: -14px;
+    padding-left: 14px;
+    padding-right: 14px;
+    border-radius: 10px 10px 0 0;
+  }
+  .decision-bar > button,
+  .decision-bar > a.btn,
+  .decision-bar .menu > button {
+    flex: 1 1 calc(50% - 8px);
+    width: auto;
+  }
+}
 @media (hover: none) { .rv-keys { display: none; } }
 
-/* narrow screens: each queue row becomes a card instead of a sideways-scrolling table */
-@media (max-width: 720px) {
-  table.rv-cards thead { display: none; }
-  table.rv-cards, table.rv-cards tbody { display: block; }
-  table.rv-cards tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-  table.rv-cards td { display: block; padding: 0; border: 0; text-align: left; min-width: 0; }
-  table.rv-cards td::before { content: attr(data-label); display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 2px; }
-  table.rv-cards td.rv-why { grid-column: 1 / -1; }
-  table.rv-cards td.num { text-align: left; }
-}
-
-@media (max-width: 720px) {
-  .table-wrap table.rv-cards { min-width: 0; width: 100%; }
-  table.rv-cards tr { width: 100%; }
-  table.rv-cards td, table.rv-cards .nowrap { white-space: normal; overflow-wrap: anywhere; }
-}
+/* Responsive card-table layout now lives with the shared <CardTable> component
+   (frontend/src/components/cardTable.css). Keep only queue-specific styling here. */
 
 /* wide screens: reasons and the suggested next step sit side by side, so the receipt is
    on screen sooner */

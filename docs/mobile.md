@@ -1,11 +1,12 @@
 # Mobile view plan
 
-**Status: agreed; Phases 0–1 complete.** Minimum supported width is **375 px**, **every page** is
+**Status: agreed; Phases 0–2 complete.** Minimum supported width is **375 px**, **every page** is
 in scope (payer and staff), and an installable PWA / service worker is **out of scope**. The
 `frontend/e2e/mobile.py` gate passes on all 20 routed pages at 375 px with a touch context, then
-drives a sample payment through submit → result → track, checks the ID camera inputs, and verifies
-offline submit → online retry. Wide tables still scroll inside `.table-wrap` until Phase 2 gives
-them card layouts. Staff triage is next.
+drives a sample payment through submit → result → track, checks the ID camera inputs, verifies
+offline submit → online retry, and triages a claim on a phone. At 768 px it checks that evidence and
+the decision bar are readable with no page-level sideways scroll. Staff tables now become cards
+through one shared helper instead of copied CSS.
 It follows the existing design tokens
 in [`frontend/src/tokens.css`](../frontend/src/tokens.css) and the contrast rules in
 [`docs/brand/colours.md`](brand/colours.md); it does not propose a new visual language.
@@ -36,7 +37,7 @@ Found in the current frontend; the plan extends these rather than replacing them
 | `100dvh` shell for collapsing mobile browser toolbars | `frontend/src/polish.css:14,25` |
 | Off-canvas drawer + scrim below 960 px, closes on route change | `frontend/src/main.tsx:202-204,225-249`, `frontend/src/ui.css:60-68` |
 | Single-column splits at 900 px; grids at 640/900 px | `frontend/src/styles.css:115-118,449-450`, `frontend/src/ui.css:142-143` |
-| Card-as-table pattern, currently only the review queue | `frontend/src/pages/review.css:221-236`, `frontend/src/pages/Queue.tsx:228` |
+| Card-as-table pattern (now a shared `CardTable` used by every reviewer/admin table) | `frontend/src/components/CardTable.tsx`, `frontend/src/components/cardTable.css` |
 | Camera capture on payment proofs and Image to text; photo downscaling | `frontend/src/pages/Scan.tsx:702-707`, `frontend/src/pages/ImageToText.tsx:299`, `frontend/src/lib/imageEdit.ts:54-94` |
 | Offline outbox with automatic retry on `online` | `frontend/src/lib/useClaimSender.ts`, `frontend/src/lib/outbox.ts` |
 | Payer-specific small-screen rules: stepper, capture row, 3-column tracking timeline | `frontend/src/pages/scan.css:71-84`, `frontend/src/pages/track.css:21` |
@@ -99,6 +100,15 @@ submit-and-retry outbox.
 | C4 | Touch alternatives to keyboard shortcuts and native dialogs: visible action buttons are already present in queue/claim review; extend the same pattern to the remaining `window.prompt`/`window.confirm` sites using `Dialog`. | `frontend/src/pages/Queue.tsx:122-156`, `frontend/src/pages/ClaimReview.tsx:447-457`, `frontend/src/components/ShortcutLegend.tsx`, native prompt sites in `KycReview.tsx`, `Guardrails.tsx`, `Compliance.tsx`, `AutoApproved.tsx`, `Alerts.tsx` | No flow requires a hardware keyboard or an OS-native prompt. |
 | C5 | Insights charts and CSV/export controls: confirm they remain legible on 768 px, wrap controls instead of clipping, and keep labels with values when tables become cards. | `frontend/src/pages/Insights.tsx`, `frontend/src/pages/Scorecard.tsx`, `frontend/src/pages/Replay.tsx`, `frontend/src/pages/Compliance.tsx`, `frontend/src/pages/Fx.tsx`, `frontend/src/pages/Exposure.tsx` | No clipped chart legend or export action at 768 px. |
 
+Phase 2 is implemented. `CardTable`/`CardCell` convert all 24 reviewer/admin tables (the payer
+case-file table on Home stays a table). Claim review has a tappable proof legend and “Show on
+image” buttons with hover kept as an enhancement; the decision bar keeps its primary action in
+thumb reach with safe-area padding. All seven `window.prompt`/`window.confirm` sites now use the
+shared `ConfirmDialog`/`ReasonDialog`, and the 721–900 px rules keep tabs, chips, code and tiles
+inside a 768 px viewport. `mobile.py` now covers the staff journey: a reviewer opens a queued
+claim, exercises the touch annotation control, focuses the last-4 from the decision bar and
+confirms it at 375 px, then checks evidence and overflow at 768 px.
+
 ## Workstream D — performance and resilience on phones
 
 - Keep route-level code splitting; do not import staff pages into payer bundles. Add a simple per-route
@@ -138,15 +148,15 @@ without `is_mobile`/`has_touch`; the rest of `frontend/e2e/run_demo_suite.sh` is
 | --- | --- | --- |
 | 0 — Foundations (Workstream A) — **complete** | Safe areas, touch targets, input zoom, drawer a11y, overflow guardrails, `e2e/mobile.py` gate | **Passing:** `mobile: ok (20 pages at 375px)`; drawer a11y test passes |
 | 1 — Payer flows (B) — **complete** | Verify, ID, track, home/tour, image-to-text | **Passing:** `mobile: ok (20 pages at 375px; payment, track, ID and offline retry)` |
-| 2 — Staff triage (C) | Card tables, viewer annotations, decision bar, native dialogs | A reviewer can triage and confirm a claim on a 375 px phone and read evidence on a 768 px tablet |
+| 2 — Staff triage (C) — **complete** | Card tables, viewer annotations, decision bar, native dialogs | **Passing:** `mobile: ok (... staff triage; 768px evidence)`; full demo suite green |
 | 3 — Polish and guardrails (D, E) | Performance budget, CI mobile job, manual checklist | Mobile suite runs in CI; no route-level bundle regression |
 
-Phases 0–1 are small, self-contained changes to shared CSS plus one new e2e file. Phase 2 is the
-largest because it touches many pages; do it after the shared card-table helper exists.
+Phases 0–1 were small, self-contained changes to shared CSS plus one new e2e file. Phase 2 was the
+largest because it touched many pages, and was built on the shared card-table helper it introduced.
 
 ## Agreed decisions
 
 1. **Support floor:** 375 px. Smaller widths are not a target.
 2. **Scope:** every page, including the staff console on phones and tablets.
 3. **PWA/offline shell:** ignored for this work. Keep the existing submit-and-retry outbox only.
-4. **Implementation:** Phases 0–1 complete; Phase 2 (staff triage) is next.
+4. **Implementation:** Phases 0–2 complete; Phase 3 (performance and CI guardrails) is next.

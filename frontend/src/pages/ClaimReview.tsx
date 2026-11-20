@@ -6,6 +6,7 @@ import { humanize, stateInfo } from "../labels";
 import { useToast, useUndo } from "../toast";
 import { Dialog } from "../components/Dialog";
 import { Menu } from "../components/Menu";
+import { CardCell, CardTable } from "../components/CardTable";
 import { convertMinor, gapBps, isCrossCurrency } from "../lib/fx";
 import { compareRows, lowConfidenceCount, type CompareStatus } from "../lib/comparison";
 import { REJECT_CONSEQUENCES, REJECT_PAYER_MESSAGE, REJECT_REASONS, REQUEST_INFO_NOTE } from "../lib/payerMessages";
@@ -59,7 +60,7 @@ function displayValue(f: Field): string {
   return f.normalised_value ?? f.raw_value ?? "—";
 }
 
-function EvidenceViewer({ detail, hover }: { detail: ReviewDetail; hover: string | null }) {
+function EvidenceViewer({ detail, highlight, selected, onHighlight }: { detail: ReviewDetail; highlight: string | null; selected: string | null; onHighlight: (name: string | null) => void }) {
   const [idx, setIdx] = useState(0);
   const [view, setView] = useState(DEFAULT_VIEW);
   const [tab, setTab] = useState<"image" | "json">("image");
@@ -69,6 +70,9 @@ function EvidenceViewer({ detail, hover }: { detail: ReviewDetail; hover: string
   detail.fields.forEach((f) => latest.set(f.name, f));
   // the engine does not say which proof a field came from, so boxes are drawn on the first only
   const showBoxes = idx === 0;
+  const boxedFields = [...latest.values()].filter((f) => f.region);
+  const tamper = highlight === "__tamper__";
+  const selectedTamper = selected === "__tamper__";
   return (
     <div className="viewer">
       {detail.evidence.length > 1 && (
@@ -112,25 +116,24 @@ function EvidenceViewer({ detail, hover }: { detail: ReviewDetail; hover: string
       <div className="viewer-scroll">
       <div className="frame" style={{ transform: `scale(${view.zoom}) rotate(${view.rotate}deg)`, transformOrigin: "center top" }}>
         <img src={`${API}${ev.preview_url}`} alt={`Submitted proof of payment ${idx + 1}`} style={{ filter: cssFilter(view) }} />
-        {showBoxes && [...latest.values()]
-          .filter((f) => f.region)
-          .map((f) => (
-            <div
-              key={f.field_id}
-              className={`box ${f.agreed ? "ok" : "warn"} ${hover === f.name ? "hot" : ""}`}
-              style={{
-                left: `${f.region!.x * 100}%`,
-                top: `${f.region!.y * 100}%`,
-                width: `${f.region!.w * 100}%`,
-                height: `${f.region!.h * 100}%`,
-              }}
-              title={`${f.name}: ${displayValue(f)}`}
-            />
-          ))}
+        {showBoxes && boxedFields.map((f) => (
+          <div
+            key={f.field_id}
+            className={`box ${f.agreed ? "ok" : "warn"} ${highlight === f.name ? "hot" : ""}`}
+            style={{
+              left: `${f.region!.x * 100}%`,
+              top: `${f.region!.y * 100}%`,
+              width: `${f.region!.w * 100}%`,
+              height: `${f.region!.h * 100}%`,
+            }}
+            title={`${f.name}: ${displayValue(f)}`}
+            aria-label={`${humanize(f.name)}: ${displayValue(f)}`}
+          />
+        ))}
         {showBoxes && detail.tamper?.regions.map((r, i) => (
           <div
             key={`tamper-${i}`}
-            className="box tamper"
+            className={`box tamper ${tamper ? "hot" : ""}`}
             style={{
               left: `${r.x * 100}%`,
               top: `${r.y * 100}%`,
@@ -142,6 +145,36 @@ function EvidenceViewer({ detail, hover }: { detail: ReviewDetail; hover: string
         ))}
       </div>
       </div>
+      )}
+      {showBoxes && (boxedFields.length > 0 || (detail.tamper?.regions.length ?? 0) > 0) && (
+        <details className="viewer-legend">
+          <summary>Where each value was found</summary>
+          <div className="legend-list">
+            {boxedFields.map((f) => (
+              <button
+                key={f.field_id}
+                type="button"
+                className={selected === f.name ? "active" : ""}
+                aria-pressed={selected === f.name}
+                onClick={() => onHighlight(selected === f.name ? null : f.name)}
+              >
+                <strong>{humanize(f.name)}</strong>
+                <span>{displayValue(f)}</span>
+              </button>
+            ))}
+            {!!detail.tamper?.regions.length && (
+              <button
+                type="button"
+                className={selectedTamper ? "active" : ""}
+                aria-pressed={selectedTamper}
+                onClick={() => onHighlight(selectedTamper ? null : "__tamper__")}
+              >
+                <strong>Manipulation flags</strong>
+                <span>{detail.tamper.regions.length} region(s), risk flag only</span>
+              </button>
+            )}
+          </div>
+        </details>
       )}
       {!showBoxes && <p className="muted small">Field boxes are shown on Proof 1 only; the engine does not record which proof each value came from.</p>}
       {detail.tamper && (
@@ -215,21 +248,19 @@ function Comparison({ detail, selected }: { detail: ReviewDetail; selected: numb
       <h3>Receipt against the record</h3>
       <p className="rv-help">A mismatch is a reason to look closer, never a verdict. “Not compared” means that check was not done.</p>
       <OfficialRate detail={detail} />
-      <div className="table-wrap">
-        <table className="rv-compare">
-          <thead><tr><th>Value</th><th>On the receipt</th><th>Expected</th><th /></tr></thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.key}>
-                <td>{r.label}</td>
-                <td className="num">{r.observed ?? "—"}</td>
-                <td className="num">{r.expected ?? "—"}</td>
-                <td><Chip tone={CMP_TONE[r.status]} title={r.detail}>{CMP_LABEL[r.status]}</Chip></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CardTable caption="Receipt against the record" className="rv-compare">
+        <thead><tr><th>Value</th><th>On the receipt</th><th>Expected</th><th /></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <CardCell label="Value">{r.label}</CardCell>
+              <CardCell label="On the receipt" className="num">{r.observed ?? "—"}</CardCell>
+              <CardCell label="Expected" className="num">{r.expected ?? "—"}</CardCell>
+              <CardCell label="Status"><Chip tone={CMP_TONE[r.status]} title={r.detail}>{CMP_LABEL[r.status]}</Chip><span className="muted small">{r.detail}</span></CardCell>
+            </tr>
+          ))}
+        </tbody>
+      </CardTable>
       {notPerformed.length > 0 && (
         <details>
           <summary className="small">Checks not performed ({notPerformed.length})</summary>
@@ -240,7 +271,7 @@ function Comparison({ detail, selected }: { detail: ReviewDetail; selected: numb
   );
 }
 
-function Fields({ detail, onHover, claimId }: { detail: ReviewDetail; onHover: (n: string | null) => void; claimId: string }) {
+function Fields({ detail, onHover, selected, onSelect, claimId }: { detail: ReviewDetail; onHover: (n: string | null) => void; selected: string | null; onSelect: (n: string | null) => void; claimId: string }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<string | null>(null);
   const [value, setValue] = useState("");
@@ -264,7 +295,7 @@ function Fields({ detail, onHover, claimId }: { detail: ReviewDetail; onHover: (
           </Chip>
         )}
       </h3>
-      <p className="rv-help">Hover a row to highlight where it was found on the image. Fix anything the readers got wrong; the claim is re-checked.</p>
+      <p className="rv-help">Tap “Show on image” to see where a value was found. Hovering a row does the same with a mouse. Fix anything the readers got wrong; the claim is re-checked.</p>
       <div className="rv-fields">
         {[...latest.values()].map((f) => (
           <div key={f.field_id} className="rv-field" onMouseEnter={() => onHover(f.name)} onMouseLeave={() => onHover(null)}>
@@ -278,6 +309,14 @@ function Fields({ detail, onHover, claimId }: { detail: ReviewDetail; onHover: (
               {f.corrected_by ? `corrected: ${f.correction_reason}` : `${f.extractor} · ${Math.round(f.confidence * 100)}% sure`}
             </span>
             <span className="act">
+              <button
+                type="button"
+                className="ghost small show-on-image"
+                aria-pressed={selected === f.name}
+                onClick={() => onSelect(selected === f.name ? null : f.name)}
+              >
+                {selected === f.name ? "Hide on image" : "Show on image"}
+              </button>
               <button className="ghost small" onClick={() => { setEditing(f.name); setValue(f.raw_value ?? ""); setReason(""); }}>
                 Correct
               </button>
@@ -365,6 +404,7 @@ export default function ClaimReview() {
   const { id = "" } = useParams();
   const nav = useNavigate();
   const qc = useQueryClient();
+  const [highlight, setHighlight] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
   const [last4, setLast4] = useState("");
@@ -548,7 +588,7 @@ export default function ClaimReview() {
 
       {err && !reviewable && <p className="error" role="alert">{err.message}</p>}
       <div className="split">
-        <EvidenceViewer detail={d} hover={hover} />
+        <EvidenceViewer detail={d} highlight={highlight ?? hover} selected={highlight} onHighlight={setHighlight} />
         <div className="stack">
           {c.risk_signals.length > 0 && (
             <div className={`card risk-card risk-${c.risk_level}`}>
@@ -565,7 +605,7 @@ export default function ClaimReview() {
             </div>
           )}
           <Comparison detail={d} selected={selected} />
-          <Fields detail={d} onHover={setHover} claimId={id} />
+          <Fields detail={d} onHover={setHover} selected={highlight} onSelect={setHighlight} claimId={id} />
           <div className="card">
             <h3>Credits that could match</h3>
             <p className="rv-help">Money that arrived in the bank or merchant record. Pick the one that belongs to this payment; only a credit that passes every check can be confirmed.</p>
@@ -646,7 +686,7 @@ export default function ClaimReview() {
               ? `Credit ${selected + 1}: ${money(d.candidates[selected].credit.amount_minor, d.candidates[selected].credit.currency)}${d.candidates[selected].passed ? "" : " (fails a check)"}`
               : "No credit selected"}
           </span>
-          <button type="button" onClick={() => { goDecision(); setTimeout(() => last4Ref.current?.focus(), 350); }}>Confirm…</button>
+          <button type="button" onClick={() => { last4Ref.current?.focus({ preventScroll: true }); goDecision(); }}>Confirm…</button>
           <button type="button" className="danger" onClick={() => setRejectOpen(true)}>Reject…</button>
           <Menu
             up

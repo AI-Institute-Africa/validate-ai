@@ -3,6 +3,8 @@ import { useState } from "react";
 import { api, hasRole, money, post } from "../api";
 import { humanize } from "../labels";
 import { Chip, EmptyState, Loading, PageHeader } from "../ui";
+import { ConfirmDialog } from "../components/ActionDialog";
+import { CardCell, CardTable } from "../components/CardTable";
 import { agoText } from "./Queue";
 import "./review.css";
 
@@ -82,6 +84,7 @@ export default function Alerts() {
   const admin = hasRole("admin");
   const [status, setStatus] = useState("");
   const [newKey, setNewKey] = useState<Source | null>(null);
+  const [deactivating, setDeactivating] = useState<Source | null>(null);
   const sources = useQuery({ queryKey: ["alert-sources"], queryFn: () => api<Source[]>("/alerts/sources"), refetchInterval: 30000 });
   const messages = useQuery({
     queryKey: ["alert-messages", status],
@@ -117,39 +120,37 @@ export default function Alerts() {
         {sources.error && <p className="error">{(sources.error as Error).message}</p>}
         {sources.data?.length === 0 && <div className="rv-inline-empty">No sources yet. {admin ? "Register one below." : "An admin can register one."}</div>}
         {!!sources.data?.length && (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Source</th><th>Kind</th><th>Provider → account</th><th>Allowed senders</th><th>Last check-in</th><th></th></tr></thead>
-              <tbody>
-                {sources.data.map((s) => (
-                  <tr key={s.source_id} className={s.active ? "" : "rv-muted-row"}>
-                    <td><strong>{s.name}</strong></td>
-                    <td>{s.kind === "sms" ? "SMS" : "Email"}{s.kind === "email" && s.require_dkim ? " · DKIM" : ""}</td>
-                    <td>{s.provider} → {s.account_alias}</td>
-                    <td className="small">{s.allowed_senders.join(", ") || "any"}</td>
-                    <td>
-                      {!s.active ? (
-                        <Chip tone="neutral">Deactivated</Chip>
-                      ) : s.last_seen_at ? (
-                        <span title={new Date(s.last_seen_at).toLocaleString()}>{agoText(s.last_seen_at)}</span>
-                      ) : (
-                        <Chip tone="warn">Never checked in</Chip>
-                      )}{" "}
-                      {s.active && s.stale && <Chip tone="bad" title="No heartbeat for a while: the phone or mailbox may be offline">Silent</Chip>}
-                    </td>
-                    <td>
-                      {admin && s.active && (
-                        <span className="rv-row-actions">
-                          <button className="ghost small" onClick={() => rotate.mutate(s.source_id)}>Rotate key</button>
-                          <button className="danger small" onClick={() => window.confirm(`Deactivate ${s.name}?`) && deactivate.mutate(s.source_id)}>Deactivate</button>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="Alert sources">
+            <thead><tr><th>Source</th><th>Kind</th><th>Provider → account</th><th>Allowed senders</th><th>Last check-in</th><th></th></tr></thead>
+            <tbody>
+              {sources.data.map((s) => (
+                <tr key={s.source_id} className={s.active ? "" : "rv-muted-row"}>
+                  <CardCell label="Source"><strong>{s.name}</strong></CardCell>
+                  <CardCell label="Kind">{s.kind === "sms" ? "SMS" : "Email"}{s.kind === "email" && s.require_dkim ? " · DKIM" : ""}</CardCell>
+                  <CardCell label="Provider → account">{s.provider} → {s.account_alias}</CardCell>
+                  <CardCell label="Allowed senders" className="small">{s.allowed_senders.join(", ") || "any"}</CardCell>
+                  <CardCell label="Last check-in">
+                    {!s.active ? (
+                      <Chip tone="neutral">Deactivated</Chip>
+                    ) : s.last_seen_at ? (
+                      <span title={new Date(s.last_seen_at).toLocaleString()}>{agoText(s.last_seen_at)}</span>
+                    ) : (
+                      <Chip tone="warn">Never checked in</Chip>
+                    )}{" "}
+                    {s.active && s.stale && <Chip tone="bad" title="No heartbeat for a while: the phone or mailbox may be offline">Silent</Chip>}
+                  </CardCell>
+                  <CardCell label="">
+                    {admin && s.active && (
+                      <span className="rv-row-actions">
+                        <button className="ghost small" onClick={() => rotate.mutate(s.source_id)}>Rotate key</button>
+                        <button className="danger small" onClick={() => setDeactivating(s)}>Deactivate</button>
+                      </span>
+                    )}
+                  </CardCell>
+                </tr>
+              ))}
+            </tbody>
+          </CardTable>
         )}
         {admin && (
           <div className="rv-sources-add">
@@ -173,30 +174,38 @@ export default function Alerts() {
           <EmptyState icon="🔔" title="No alerts received">When a registered phone or mailbox forwards a payment notification it appears here. Run a story from Home to fill this.</EmptyState>
         )}
         {!!messages.data?.length && (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Received</th><th>What happened</th><th>From</th><th>Read as</th><th>Message</th></tr></thead>
-              <tbody>
-                {messages.data.map((m) => (
-                  <tr key={m.message_id}>
-                    <td className="small"><span title={new Date(m.received_at).toLocaleString()}>{agoText(m.received_at)}</span></td>
-                    <td>
-                      <Chip tone={STATUS_TONE[m.status] ?? "neutral"}>{humanize(m.status)}</Chip>
-                      <div className="muted small">{STATUS_HELP[m.status] ?? ""}{m.reason ? ` (${m.reason})` : ""}</div>
-                    </td>
-                    <td className="small">{m.sender}</td>
-                    <td className="small">
-                      {m.parsed?.amount_minor != null && money(m.parsed.amount_minor, m.parsed.currency)} {m.parsed?.reference && <code>{m.parsed.reference}</code>}
-                      {m.parsed?.payer && <div className="muted">{m.parsed.payer}</div>}
-                    </td>
-                    <td className="small reasons">{m.subject && <strong>{m.subject} — </strong>}{m.body}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="Alerts received">
+            <thead><tr><th>Received</th><th>What happened</th><th>From</th><th>Read as</th><th>Message</th></tr></thead>
+            <tbody>
+              {messages.data.map((m) => (
+                <tr key={m.message_id}>
+                  <CardCell label="Received" className="small"><span title={new Date(m.received_at).toLocaleString()}>{agoText(m.received_at)}</span></CardCell>
+                  <CardCell label="What happened">
+                    <Chip tone={STATUS_TONE[m.status] ?? "neutral"}>{humanize(m.status)}</Chip>
+                    <div className="muted small">{STATUS_HELP[m.status] ?? ""}{m.reason ? ` (${m.reason})` : ""}</div>
+                  </CardCell>
+                  <CardCell label="From" className="small">{m.sender}</CardCell>
+                  <CardCell label="Read as" className="small">
+                    {m.parsed?.amount_minor != null && money(m.parsed.amount_minor, m.parsed.currency)} {m.parsed?.reference && <code>{m.parsed.reference}</code>}
+                    {m.parsed?.payer && <div className="muted">{m.parsed.payer}</div>}
+                  </CardCell>
+                  <CardCell label="Message" wide className="small reasons">{m.subject && <strong>{m.subject} — </strong>}{m.body}</CardCell>
+                </tr>
+              ))}
+            </tbody>
+          </CardTable>
         )}
       </div>
+      {deactivating && (
+        <ConfirmDialog
+          title="Deactivate this source?"
+          message={`“${deactivating.name}” will stop accepting payment alerts until an admin registers it again.`}
+          confirmLabel="Deactivate source"
+          danger
+          onClose={() => setDeactivating(null)}
+          onConfirm={() => deactivate.mutate(deactivating.source_id)}
+        />
+      )}
     </section>
   );
 }

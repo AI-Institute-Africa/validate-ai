@@ -1,0 +1,75 @@
+/* Shared card-table layout for reviewer/admin tables.
+   One source of truth for the responsive table -> card treatment first used by the
+   review queue. Pages import this through <CardTable>, never by copying the rules. */
+
+.table-wrap > table.rv-cards {
+  min-width: 0;
+}
+.rv-cards-caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 720px) {
+  /* Keep the column headers for assistive tech, but stop them taking layout space. */
+  table.rv-cards thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  table.rv-cards,
+  table.rv-cards tbody {
+    display: block;
+    width: 100%;
+  }
+  table.rv-cards tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px 12px;
+    width: 100%;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  table.rv-cards td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  table.rv-cards td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  table.rv-cards td[data-label=""]::before {
+    display: none;
+  }
+  table.rv-cards td[data-span="all"] {
+    grid-column: 1 / -1;
+  }
+  table.rv-cards td.num,
+  table.rv-cards td.nowrap {
+    text-align: left;
+    white-space: normal;
+  }
+}

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, download, post } from "../api";
 import { useToast } from "../toast";
 import { Chip, Loading, PageHeader } from "../ui";
+import { ReasonDialog } from "../components/ActionDialog";
 import "./review.css";
 
 type Overview = {
@@ -27,6 +28,7 @@ export default function Compliance() {
   const [kind, setKind] = useState("breach");
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [reporting, setReporting] = useState<Incident | null>(null);
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["incidents"] });
     qc.invalidateQueries({ queryKey: ["compliance"] });
@@ -83,7 +85,7 @@ export default function Compliance() {
               <div className="inline">
                 <button type="button" className="ghost small" onClick={() => void download(`/admin/incidents/${i.incident_id}/affected.csv`)}>Affected records (CSV)</button>
                 {i.status === "open" && (
-                  <button type="button" className="secondary small" onClick={() => { const ref = window.prompt("The regulator's reference for the report"); if (ref && ref.trim().length >= 3) reported.mutate({ id: i.incident_id, reference: ref.trim() }); }}>Mark as reported</button>
+                  <button type="button" className="secondary small" onClick={() => setReporting(i)}>Mark as reported</button>
                 )}
               </div>
             </li>
@@ -102,6 +104,17 @@ export default function Compliance() {
           <button disabled={title.trim().length < 5 || summary.trim().length < 10 || create.isPending}>Record</button>
         </form>
       </div>
+      {reporting && (
+        <ReasonDialog
+          title="Mark incident as reported"
+          label="Regulator's reference"
+          message={`Record the reference for “${reporting.title}”. It is kept in the incident audit trail.`}
+          placeholder="e.g. REG-2026-001"
+          confirmLabel="Mark as reported"
+          onClose={() => setReporting(null)}
+          onConfirm={(reference) => reported.mutate({ id: reporting.incident_id, reference })}
+        />
+      )}
     </section>
   );
 }

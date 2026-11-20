@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, hasRole, post } from "../api";
 import { useToast } from "../toast";
 import { Chip, Loading, PageHeader } from "../ui";
+import { CardCell, CardTable } from "../components/CardTable";
 import "./review.css";
 
 type Rate = { rate_date: string; pair: string; ask: string; bid: string; mid: string; method: string; source_url: string | null; entered_by: string | null; reason: string | null };
@@ -46,23 +47,24 @@ export default function Fx() {
               <span className="muted small">weekdays, tries hourly during {s.fetch_hours_utc} UTC until the file appears. Weekends carry the last rate forward.</span>
             </p>
             <h3>Recent rates</h3>
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Date</th><th className="num">Ask</th><th className="num">Bid</th><th>How</th><th>Source</th></tr></thead>
-                <tbody>
-                  {s.recent_rates.map((r, i) => (
-                    <tr key={`${r.rate_date}-${i}`}>
-                      <td>{r.rate_date}</td>
-                      <td className="num"><strong>{Number(r.ask).toFixed(4)}</strong></td>
-                      <td className="num">{Number(r.bid).toFixed(4)}</td>
-                      <td>{r.method === "manual" ? <Chip tone="warn" title={r.reason ?? ""}>entered by {r.entered_by}</Chip> : r.method}</td>
-                      <td className="small">{r.source_url ? <a href={r.source_url} target="_blank" rel="noreferrer">RBZ file</a> : "—"}</td>
-                    </tr>
-                  ))}
-                  {s.recent_rates.length === 0 && <tr><td colSpan={5} className="muted">No rate stored yet.</td></tr>}
-                </tbody>
-              </table>
-            </div>
+            <CardTable caption="Recent exchange rates">
+              <thead><tr><th>Date</th><th className="num">Ask</th><th className="num">Bid</th><th>How</th><th>Source</th></tr></thead>
+              <tbody>
+                {s.recent_rates.map((r, i) => (
+                  <tr key={`${r.rate_date}-${i}`}>
+                    <CardCell label="Date">{r.rate_date}</CardCell>
+                    <CardCell label="Ask" className="num"><strong>{Number(r.ask).toFixed(4)}</strong></CardCell>
+                    <CardCell label="Bid" className="num">{Number(r.bid).toFixed(4)}</CardCell>
+                    <CardCell label="How">
+                      {r.method === "manual" ? <Chip tone="warn" title={r.reason ?? ""}>entered by {r.entered_by}</Chip> : r.method}
+                      {r.method === "manual" && r.reason && <div className="muted small">{r.reason}</div>}
+                    </CardCell>
+                    <CardCell label="Source" className="small">{r.source_url ? <a href={r.source_url} target="_blank" rel="noreferrer">RBZ file</a> : "—"}</CardCell>
+                  </tr>
+                ))}
+                {s.recent_rates.length === 0 && <tr><CardCell label="" wide colSpan={5} className="muted">No rate stored yet.</CardCell></tr>}
+              </tbody>
+            </CardTable>
           </div>
           <div className="card">
             <h3>Recent fetches</h3>

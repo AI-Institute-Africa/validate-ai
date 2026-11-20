@@ -5,6 +5,7 @@ import { humanize } from "../labels";
 import { CreditsModes } from "../components/CreditsModes";
 import { useToast } from "../toast";
 import { Chip, EmptyState, Loading, PageHeader } from "../ui";
+import { CardCell, CardTable } from "../components/CardTable";
 import "./review.css";
 
 type ImportResult = {
@@ -156,7 +157,7 @@ function AllocateRow({ u, obligations, onDone }: { u: Unclaimed; obligations: Ob
   });
   return (
     <tr className="allocate-row">
-      <td colSpan={7}>
+      <CardCell label="" wide colSpan={7}>
         <form className="inline" onSubmit={(e) => { e.preventDefault(); run.mutate(); }}>
           <select value={ob} onChange={(e) => setOb(e.target.value)} aria-label="Invoice" required>
             <option value="">Choose invoice…</option>
@@ -171,7 +172,7 @@ function AllocateRow({ u, obligations, onDone }: { u: Unclaimed; obligations: Ob
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note" aria-label="Note" />
           <button disabled={!ob || !last4 || run.isPending}>Allocate</button>
         </form>
-      </td>
+      </CardCell>
     </tr>
   );
 }
@@ -226,33 +227,31 @@ export default function Credits() {
           <div className="rv-inline-empty">Nothing unclaimed. Every credit is matched to a claim or an invoice.</div>
         )}
         {!!un?.length && (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Date</th><th className="num">Amount</th><th className="num">Available</th><th>Reference</th><th>Narrative</th><th>Suggested invoice</th><th /></tr></thead>
-              <tbody>
-                {un.map((u) => (
-                  <Fragment key={u.credit.credit_id}>
-                    <tr>
-                      <td>{new Date(u.credit.occurred_at).toLocaleDateString()}</td>
-                      <td className="num">{money(u.credit.amount_minor, u.credit.currency)}</td>
-                      <td className="num">{money(u.credit.available_minor, u.credit.currency)}</td>
-                      <td><code>{u.credit.provider_txn_id}</code></td>
-                      <td>{u.credit.narrative}</td>
-                      <td>{u.suggested_obligations.map((o) => `${o.learner_ref} (${o.payment_code})`).join(", ") || "—"}</td>
-                      <td>
-                        <button className="ghost small" disabled={!hasRole("approver")} title={hasRole("approver") ? "" : "Needs the approver role under the default policy"} onClick={() => setOpen(open === u.credit.credit_id ? null : u.credit.credit_id)}>
-                          {open === u.credit.credit_id ? "Close" : "Allocate…"}
-                        </button>
-                      </td>
-                    </tr>
-                    {open === u.credit.credit_id && (
-                      <AllocateRow u={u} obligations={obligations.data ?? []} onDone={() => { setOpen(null); refresh(); }} />
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="Unclaimed credits">
+            <thead><tr><th>Date</th><th className="num">Amount</th><th className="num">Available</th><th>Reference</th><th>Narrative</th><th>Suggested invoice</th><th /></tr></thead>
+            <tbody>
+              {un.map((u) => (
+                <Fragment key={u.credit.credit_id}>
+                  <tr>
+                    <CardCell label="Date">{new Date(u.credit.occurred_at).toLocaleDateString()}</CardCell>
+                    <CardCell label="Amount" className="num">{money(u.credit.amount_minor, u.credit.currency)}</CardCell>
+                    <CardCell label="Available" className="num">{money(u.credit.available_minor, u.credit.currency)}</CardCell>
+                    <CardCell label="Reference"><code>{u.credit.provider_txn_id}</code></CardCell>
+                    <CardCell label="Narrative" wide>{u.credit.narrative}</CardCell>
+                    <CardCell label="Suggested invoice" wide>{u.suggested_obligations.map((o) => `${o.learner_ref} (${o.payment_code})`).join(", ") || "—"}</CardCell>
+                    <CardCell label="">
+                      <button className="ghost small" disabled={!hasRole("approver")} title={hasRole("approver") ? "" : "Needs the approver role under the default policy"} onClick={() => setOpen(open === u.credit.credit_id ? null : u.credit.credit_id)}>
+                        {open === u.credit.credit_id ? "Close" : "Allocate…"}
+                      </button>
+                    </CardCell>
+                  </tr>
+                  {open === u.credit.credit_id && (
+                    <AllocateRow u={u} obligations={obligations.data ?? []} onDone={() => { setOpen(null); refresh(); }} />
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </CardTable>
         )}
       </div>
 
@@ -293,26 +292,24 @@ export default function Credits() {
           <EmptyState icon="🏦" title="No credits yet">Import a statement or record a payment above. Run a story from Home to fill this.</EmptyState>
         )}
         {!!credits.data?.length && (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Date</th><th>Source</th><th>Provider</th><th>Reference</th><th className="num">Amount</th><th className="num">Available</th><th>Status</th><th>Account</th><th>Payer</th></tr></thead>
-              <tbody>
-                {credits.data.map((c) => (
-                  <tr key={c.credit_id}>
-                    <td>{new Date(c.occurred_at).toLocaleString()}</td>
-                    <td>{humanize(c.source)}</td>
-                    <td>{c.provider}</td>
-                    <td><code>{c.provider_txn_id}</code></td>
-                    <td className="num">{money(c.amount_minor, c.currency)}</td>
-                    <td className="num">{money(c.available_minor, c.currency)}</td>
-                    <td><Chip tone={c.status === "success" ? "ok" : "warn"} title={c.status === "success" ? "A successful payment that can be matched" : "Not a successful payment, so it cannot be matched"}>{c.status === "success" ? "Received" : humanize(c.status)}</Chip></td>
-                    <td>{c.beneficiary}</td>
-                    <td>{c.payer}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardTable caption="All credits">
+            <thead><tr><th>Date</th><th>Source</th><th>Provider</th><th>Reference</th><th className="num">Amount</th><th className="num">Available</th><th>Status</th><th>Account</th><th>Payer</th></tr></thead>
+            <tbody>
+              {credits.data.map((c) => (
+                <tr key={c.credit_id}>
+                  <CardCell label="Date">{new Date(c.occurred_at).toLocaleString()}</CardCell>
+                  <CardCell label="Source">{humanize(c.source)}</CardCell>
+                  <CardCell label="Provider">{c.provider}</CardCell>
+                  <CardCell label="Reference"><code>{c.provider_txn_id}</code></CardCell>
+                  <CardCell label="Amount" className="num">{money(c.amount_minor, c.currency)}</CardCell>
+                  <CardCell label="Available" className="num">{money(c.available_minor, c.currency)}</CardCell>
+                  <CardCell label="Status"><Chip tone={c.status === "success" ? "ok" : "warn"} title={c.status === "success" ? "A successful payment that can be matched" : "Not a successful payment, so it cannot be matched"}>{c.status === "success" ? "Received" : humanize(c.status)}</Chip></CardCell>
+                  <CardCell label="Account">{c.beneficiary}</CardCell>
+                  <CardCell label="Payer">{c.payer}</CardCell>
+                </tr>
+              ))}
+            </tbody>
+          </CardTable>
         )}
       </div>
 

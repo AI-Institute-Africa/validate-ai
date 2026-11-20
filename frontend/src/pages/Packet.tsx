@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api, money } from "../api";
 import { Menu } from "../components/Menu";
+import { CardCell, CardTable } from "../components/CardTable";
 import { Loading, PageHeader, Reasons } from "../ui";
 import "./review.css";
 
@@ -81,16 +82,19 @@ export default function PacketPage() {
         <h3>Evidence (fingerprints only)</h3>
         <ul className="small">{p.evidence.map((e) => <li key={e.evidence_id}>{e.content_type}, {e.size_bytes} bytes, SHA-256 <code>{e.sha256}</code></li>)}</ul>
         <h3>What was read</h3>
-        <div className="table-wrap">
-          <table className="rv-compare">
-            <thead><tr><th>Field</th><th>Value</th><th>Read by</th><th /></tr></thead>
-            <tbody>
-              {p.fields_read.map((f, i) => (
-                <tr key={i}><td>{f.name}</td><td>{f.raw_value ?? "—"}</td><td>{f.extractor} {f.extractor_version}</td><td>{f.corrected_by ? `corrected by ${f.corrected_by}: ${f.correction_reason}` : f.agreed ? "readers agree" : "not agreed"}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <CardTable caption="What was read from the proof" className="rv-compare">
+          <thead><tr><th>Field</th><th>Value</th><th>Read by</th><th /></tr></thead>
+          <tbody>
+            {p.fields_read.map((f, i) => (
+              <tr key={i}>
+                <CardCell label="Field">{f.name}</CardCell>
+                <CardCell label="Value">{f.raw_value ?? "—"}</CardCell>
+                <CardCell label="Read by">{f.extractor} {f.extractor_version}</CardCell>
+                <CardCell label="Agreement" wide>{f.corrected_by ? `corrected by ${f.corrected_by}: ${f.correction_reason}` : f.agreed ? "readers agree" : "not agreed"}</CardCell>
+              </tr>
+            ))}
+          </tbody>
+        </CardTable>
       </div>
       <div className="card">
         <h3>Money and audit trail</h3>
