@@ -184,7 +184,7 @@ export default function Queue() {
         <button type="button" role="tab" data-bucket="flagged" aria-controls="rv-panel" tabIndex={bucket === "flagged" ? 0 : -1} aria-selected={bucket === "flagged"} className="rv-tab flagged" onClick={() => setBucket("flagged")}>
           Flagged / high risk <span className="rv-tabcount">{counts.flagged}</span>
         </button>
-        <Link className="rv-tab" to="/auto">Auto-verified (audit)</Link>
+        <Link className="rv-tab" to="/queue?view=auto">Auto-approved</Link>
       </div>
       <div className="rv-filters">
         <select value={state} onChange={(e) => setState(e.target.value)} aria-label="Show claims">
@@ -200,7 +200,7 @@ export default function Queue() {
           value={channel}
           onChange={(e) => setChannel(e.target.value)}
         />
-        {filtered && (
+        {filtered && rows?.length !== 0 && (
           <button type="button" className="ghost small" onClick={() => { setState(""); setChannel(""); }}>
             Clear filters
           </button>
@@ -277,7 +277,7 @@ export default function Queue() {
                     </td>
                     <td data-label="Status"><StateChip state={c.state} /></td>
                     <td className="nowrap" data-label="Claimant">
-                      {c.claimant_ref}
+                      <span className="data">{c.claimant_ref}</span>
                       <span className="rv-sub">{c.channel}</span>
                     </td>
                     <td className="num" data-label="Declared">{money(c.declared_amount_minor, c.declared_currency)}</td>

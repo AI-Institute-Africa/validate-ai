@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { api, hasRole, money, post, type Credit } from "../api";
+import { CreditsModes } from "../components/CreditsModes";
 import { parseBulk } from "../lib/bulkCsv";
 import { Chip, EmptyState, Loading, PageHeader } from "../ui";
 import "./review.css";
@@ -69,8 +69,8 @@ export default function Bulk() {
       <PageHeader
         title="Split one payment across invoices"
         sub="For money that arrived in one lump, such as an employer paying for many learners. Every row is checked and allocated exactly like a single allocation."
-        actions={<Link className="btn secondary" to="/credits">← Credits</Link>}
       />
+      <CreditsModes />
       <div className="card">
         <h3>1. Pick the payment</h3>
         {credits.isLoading && <Loading lines={2} />}

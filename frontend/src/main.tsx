@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 import { api, currentPersona, hasRole, switchPersona, ensureSession } from "./api";
 import { demoInfo, loadDemo, resetDemo } from "./demo";
 import { I18nProvider, LANG_LABELS, langLabel, useI18n, type Lang } from "./i18n";
@@ -25,17 +25,13 @@ const ImageToText = lazy(() => import("./pages/ImageToText"));
 const Guardrails = lazy(() => import("./pages/Guardrails"));
 const Fraud = lazy(() => import("./pages/Fraud"));
 const Alerts = lazy(() => import("./pages/Alerts"));
-const Replay = lazy(() => import("./pages/Replay"));
-const Fx = lazy(() => import("./pages/Fx"));
-const Scorecard = lazy(() => import("./pages/Scorecard"));
-const Compliance = lazy(() => import("./pages/Compliance"));
 const Packet = lazy(() => import("./pages/Packet"));
 const Queue = lazy(() => import("./pages/Queue"));
 const ClaimReview = lazy(() => import("./pages/ClaimReview"));
 const Credits = lazy(() => import("./pages/Credits"));
 const Obligations = lazy(() => import("./pages/Obligations"));
-const Exposure = lazy(() => import("./pages/Exposure"));
 const AutoApproved = lazy(() => import("./pages/AutoApproved"));
+const Insights = lazy(() => import("./pages/Insights"));
 const Kyc = lazy(() => import("./pages/Kyc"));
 const KycReview = lazy(() => import("./pages/KycReview"));
 
@@ -86,7 +82,6 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
         { to: "/fraud", icon: "shield", label: "Suspected fakes", min: "reviewer", badge: <Count queryKey="fraud-summary" path="/fraud/alerts/summary" pick={(d) => d.open_high ?? 0} /> },
         { to: "/credits", icon: "bank", label: "Bank credits", min: "reviewer" },
         { to: "/obligations", icon: "file", label: "Invoices", min: "reviewer" },
-        { to: "/auto", icon: "bolt", label: "Auto-approved", min: "reviewer" },
       ],
     },
     {
@@ -100,12 +95,8 @@ function groups(t: (k: string) => string): { title: string; items: Item[] }[] {
       title: "Operations",
       items: [
         { to: "/alerts", icon: "bell", label: "Payment alerts", min: "reviewer" },
-        { to: "/exposure", icon: "chart", label: "Exposure", min: "admin" },
         { to: "/guardrails", icon: "sliders", label: t("nav.guardrails"), min: "admin" },
-        { to: "/replay", icon: "flask", label: "Replay & accuracy", min: "admin" },
-        { to: "/fx", icon: "refresh", label: "Exchange rate", min: "admin" },
-        { to: "/scorecard", icon: "chart", label: "Pilot scorecard", min: "admin" },
-        { to: "/compliance", icon: "lock", label: "Compliance", min: "admin" },
+        { to: "/insights", icon: "chart", label: "Insights", min: "admin" },
       ],
     },
   ];
@@ -121,14 +112,9 @@ const TITLES: [string, string][] = [
   ["/fraud", "Suspected fakes"],
   ["/credits", "Bank credits"],
   ["/obligations", "Invoices"],
-  ["/auto", "Auto-approved"],
   ["/alerts", "Payment alerts"],
-  ["/exposure", "Exposure"],
   ["/guardrails", "Guardrails"],
-  ["/fx", "Exchange rate"],
-  ["/scorecard", "Pilot scorecard"],
-  ["/compliance", "Compliance"],
-  ["/replay", "Replay & accuracy"],
+  ["/insights", "Insights"],
 ];
 
 // pages payers see are translated; staff pages stay in English
@@ -141,6 +127,12 @@ function useTitle(): string {
   const hit = TITLES.find(([p]) => pathname === p || pathname.startsWith(p + "/"));
   if (!hit) return "Validate";
   return TRANSLATED_TITLES[hit[0]] ? t(TRANSLATED_TITLES[hit[0]]) : hit[1];
+}
+
+// /queue shows the claims waiting for a person; ?view=auto shows the ones the rules approved, for audit.
+function QueueRoute() {
+  const [sp] = useSearchParams();
+  return sp.get("view") === "auto" ? <AutoApproved /> : <Queue />;
 }
 
 function PersonaMenu({ onReset }: { onReset: () => void }) {
@@ -179,6 +171,11 @@ function PersonaMenu({ onReset }: { onReset: () => void }) {
               </span>
             </button>
           ))}
+          <hr />
+          <div className="persona-prefs">
+            <LangSwitch />
+            <ThemeButton />
+          </div>
           {demoInfo() && (
             <>
               <hr />
@@ -254,8 +251,6 @@ function Shell({ children }: { children: React.ReactNode }) {
           <button type="button" className="menu-btn" onClick={() => setMenu(true)} aria-label={t("shell.menu")}><Icon name="menu" size={18} /></button>
           <span className="crumb">{title}</span>
           <span className="spacer" />
-          <LangSwitch />
-          <ThemeButton />
           <PersonaMenu onReset={confirmReset} />
         </header>
         <main id="main" tabIndex={-1}>
@@ -295,22 +290,25 @@ void ensureSession()
                     <Route path="/" element={<Home />} />
                     <Route path="/verify" element={<Scan />} />
                     <Route path="/image-to-text" element={<ImageToText />} />
-                    <Route path="/queue" element={<Queue />} />
+                    <Route path="/queue" element={<QueueRoute />} />
                     <Route path="/claims/:id" element={<ClaimReview />} />
                     <Route path="/track/:id" element={<Track />} />
                     <Route path="/credits" element={<Credits />} />
                     <Route path="/credits/bulk" element={<Bulk />} />
                     <Route path="/obligations" element={<Obligations />} />
-                    <Route path="/exposure" element={<Exposure />} />
-                    <Route path="/auto" element={<AutoApproved />} />
+                    <Route path="/insights" element={<Insights />} />
+                    <Route path="/insights/:tab" element={<Insights />} />
+                    {/* old addresses keep working */}
+                    <Route path="/auto" element={<Navigate to="/queue?view=auto" replace />} />
+                    <Route path="/exposure" element={<Navigate to="/insights/exposure" replace />} />
+                    <Route path="/scorecard" element={<Navigate to="/insights/scorecard" replace />} />
+                    <Route path="/replay" element={<Navigate to="/insights/replay" replace />} />
+                    <Route path="/fx" element={<Navigate to="/insights/fx" replace />} />
+                    <Route path="/compliance" element={<Navigate to="/insights/compliance" replace />} />
                     <Route path="/fraud" element={<Fraud />} />
                     <Route path="/guardrails" element={<Guardrails />} />
-                    <Route path="/fx" element={<Fx />} />
-                    <Route path="/scorecard" element={<Scorecard />} />
-                    <Route path="/compliance" element={<Compliance />} />
                     <Route path="/claims/:id/packet" element={<Packet />} />
                     <Route path="/alerts" element={<Alerts />} />
-                    <Route path="/replay" element={<Replay />} />
                     <Route path="/kyc" element={<Kyc />} />
                     <Route path="/kyc/review" element={<KycReview />} />
                     <Route path="*" element={<Navigate to="/" replace />} />

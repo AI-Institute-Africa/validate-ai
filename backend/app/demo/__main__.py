@@ -24,22 +24,45 @@ BACKEND = Path(__file__).resolve().parents[2]
 REPO = BACKEND.parent
 
 
+def _stale(dist: Path, front: Path) -> bool:
+    """True when something the console is built from is newer than the build, so a `git pull` is not
+    followed by the old screens."""
+    built = (dist / "index.html").stat().st_mtime
+    watched = [front / "index.html", front / "package.json", front / "package-lock.json"]
+    src = front / "src"
+    if src.is_dir():
+        watched += [p for p in src.rglob("*") if p.is_file()]
+    return any(p.stat().st_mtime > built for p in watched if p.exists())
+
+
 def _dist() -> Path | None:
-    dist = REPO / "frontend" / "dist"
-    if (dist / "index.html").exists():
+    front = REPO / "frontend"
+    dist = front / "dist"
+    built = (dist / "index.html").exists()
+    if built and not _stale(dist, front):
         return dist
     npm = shutil.which("npm")
-    if npm and (REPO / "frontend" / "package.json").exists():
-        print("Building the console (first run only)...", flush=True)
+    if npm and (front / "package.json").exists():
+        why = "the source changed" if built else "first run"
+        print(f"Building the console ({why})...", flush=True)
         try:
-            front = REPO / "frontend"
             if not (front / "node_modules").exists():
                 subprocess.run([npm, "ci", "--silent"], cwd=front, check=True)  # noqa: S603
             subprocess.run([npm, "run", "build", "--silent"], cwd=front, check=True)  # noqa: S603
         except (subprocess.CalledProcessError, OSError) as exc:
+            if built:
+                print(
+                    f"Could not rebuild the console ({exc}). Serving the older build.", flush=True
+                )
+                return dist
             print(f"Could not build the console ({exc}). Starting API-only.", flush=True)
             return None
         return dist if (dist / "index.html").exists() else None
+    if built:
+        print(
+            "The console source changed but npm was not found. Serving the older build.", flush=True
+        )
+        return dist
     print("The console is not built and npm was not found. Starting API-only.", flush=True)
     return None
 

@@ -606,21 +606,22 @@ export default function Scan() {
                   >
                     <Icon name="refresh" size={13} /> {t("file.retake")}
                   </button>
-                  {file.type.startsWith("image/") && file.type !== "image/heic" && (
-                    <button type="button" className="ghost small" onClick={() => void rotateFirst()}>
-                      <Icon name="rotate" size={13} /> {t("file.rotate")}
-                    </button>
-                  )}
-                  {previewUrl && file.type !== "image/heic" && (
-                    <button type="button" className="ghost small" onClick={() => { setTrim(NO_TRIM); setCropOpen(true); }}>
-                      <Icon name="crop" size={13} /> {t("file.crop")}
-                    </button>
-                  )}
                   <button type="button" className="ghost small" onClick={() => { replaceUploadRef.current = true; uploadRef.current?.click(); }}>
                     {t("file.reupload")}
                   </button>
-                  <button type="button" className="ghost small" onClick={clearFile} aria-label={t("file.remove")}>
-                    <Icon name="close" size={13} />
+                  {/* edit tools are icon-only; the label is the tooltip and the accessible name */}
+                  {file.type.startsWith("image/") && file.type !== "image/heic" && (
+                    <button type="button" className="ghost small icon-only" title={t("file.rotate")} aria-label={t("file.rotate")} onClick={() => void rotateFirst()}>
+                      <Icon name="rotate" size={15} />
+                    </button>
+                  )}
+                  {previewUrl && file.type !== "image/heic" && (
+                    <button type="button" className="ghost small icon-only" title={t("file.crop")} aria-label={t("file.crop")} onClick={() => { setTrim(NO_TRIM); setCropOpen(true); }}>
+                      <Icon name="crop" size={15} />
+                    </button>
+                  )}
+                  <button type="button" className="ghost small icon-only" title={t("file.remove")} aria-label={t("file.remove")} onClick={clearFile}>
+                    <Icon name="close" size={15} />
                   </button>
                 </div>
               </div>
@@ -672,17 +673,14 @@ export default function Scan() {
                         {item.name}: {item.quality_issues.length ? item.quality_issues.join(", ") : t("check.nodetails")}
                       </p>
                     ))}
-                    <div className="inline">
-                      {files.some((f) => f.type.startsWith("image/")) && (
-                        <button type="button" className="secondary" onClick={() => { clearFile(); cameraRef.current?.click(); }}>{t("check.retake")}</button>
-                      )}
-                      <button type="button" className="secondary" onClick={() => { replaceUploadRef.current = true; uploadRef.current?.click(); }}>{t("file.reupload")}</button>
-                      {demo && sampleId && (
+                    {/* Retake and Re-upload are already in the file row above, so they are not repeated here */}
+                    {demo && sampleId && (
+                      <div className="inline">
                         <button type="button" className="secondary" onClick={() => setFileVerified(true)}>
                           Send it anyway (demo)
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     {fileVerified && <span className="muted small">Demo: this sample will be sent as it is, so you can see how the server answers.</span>}
                   </>
                 )}

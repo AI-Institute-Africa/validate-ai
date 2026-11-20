@@ -1,8 +1,8 @@
-import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { api, Credit, download, hasRole, money, Obligation, post } from "../api";
 import { humanize } from "../labels";
+import { CreditsModes } from "../components/CreditsModes";
 import { useToast } from "../toast";
 import { Chip, EmptyState, Loading, PageHeader } from "../ui";
 import "./review.css";
@@ -210,8 +210,8 @@ export default function Credits() {
       <PageHeader
         title="Bank credits"
         sub="The bank and merchant side of every payment. Import statements, record money you saw arrive, and allocate credits that have no claim yet."
-        actions={<Link className="btn secondary" to="/credits/bulk">Split one payment across invoices</Link>}
       />
+      <CreditsModes />
 
       <div className="card">
         <h2>Unclaimed credits</h2>

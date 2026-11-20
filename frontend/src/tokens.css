@@ -11,6 +11,12 @@
 :root {
   --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-serif: "Source Serif 4 Variable", "Iowan Old Style", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  /* type scale: display (page and hero), section, body, label (small caps), data (mono) */
+  --fs-display: clamp(30px, 4.6vw, 44px);
+  --fs-section: 21px;
+  --fs-label: 11px;
+  --fs-data: 13px;
   /* brand */
   --brand: #429ebd;
   --sky: #9fe7f5;

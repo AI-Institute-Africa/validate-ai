@@ -2,6 +2,28 @@
 .scan-split > * { min-width: 0; }
 .scan .card { margin-bottom: 14px; }
 
+/* the payer's steps read as ruled sections of one form, not a stack of boxes:
+   proof, then details. The result card on the right stays a card. */
+.scan .card.dropzone, .scan form.card, .scan .card.tips, .scan .card.scan-sample {
+  background: transparent; background-image: none; box-shadow: none; border-width: 0; border-top: 1px solid var(--text);
+  border-radius: 0; padding: 14px 0 0; margin-bottom: 26px;
+}
+.scan .card.dropzone:hover, .scan form.card:hover, .scan .card.tips:hover, .scan .card.scan-sample:hover { background-image: none; transform: none; }
+.scan .card.dropzone.over { border-top-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.scan .scan-step-title, .scan .card.tips h2 { font-family: var(--font-serif); font-size: var(--fs-section); font-weight: 600; letter-spacing: -0.01em; }
+.scan .card.tips h2 { font-size: 16px; margin-bottom: 6px; }
+
+/* what was read: a ledger of field -> value, values in mono */
+.scan .image-readout { gap: 2px; }
+.scan .image-fields { grid-template-columns: 1fr; gap: 0; }
+.scan .image-fields > div { display: grid; grid-template-columns: minmax(96px, 34%) 1fr; gap: 12px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.scan .image-fields dt { font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+.scan .image-fields dd { margin: 0; font-family: var(--font-mono); font-size: var(--fs-data); font-variant-numeric: tabular-nums; }
+
+/* icon-only edit tools */
+.file-actions button.icon-only { padding: 6px; min-width: 32px; justify-content: center; }
+.file-actions { align-items: center; }
+
 /* 3-step progress */
 .scan-stepper { list-style: none; margin: 0 0 22px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-bottom: 1px solid var(--line); }
 .scan-stepper li { display: flex; align-items: center; gap: 9px; padding: 8px 2px 11px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent; color: var(--muted); font-weight: 550; font-size: 13px; min-width: 0; transition: color var(--quick) var(--ease), border-color var(--calm) var(--ease); }
