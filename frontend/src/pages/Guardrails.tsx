@@ -452,21 +452,23 @@ function PolicyPanel() {
       )}
       {retire.error && <p className="error">{(retire.error as Error).message}</p>}
       <h3>History</h3>
-      <table>
-        <thead><tr><th>Version</th><th>Status</th><th>Published by</th><th>When</th><th></th></tr></thead>
-        <tbody>
-          {history.data?.map((v) => (
-            <tr key={v.policy_id}>
-              <td><code>{v.version}</code></td>
-              <td>{v.active ? "active" : "retired"}</td>
-              <td>{v.created_by}</td>
-              <td>{new Date(v.created_at).toLocaleString()}</td>
-              <td>{v.active && <button className="ghost small" onClick={() => retire.mutate(v.policy_id)}>Retire</button>}</td>
-            </tr>
-          ))}
-          {history.data?.length === 0 && <tr><td colSpan={5} className="muted">Using the built-in default policy.</td></tr>}
-        </tbody>
-      </table>
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>Version</th><th>Status</th><th>Published by</th><th>When</th><th></th></tr></thead>
+          <tbody>
+            {history.data?.map((v) => (
+              <tr key={v.policy_id}>
+                <td><code>{v.version}</code></td>
+                <td>{v.active ? "active" : "retired"}</td>
+                <td>{v.created_by}</td>
+                <td>{new Date(v.created_at).toLocaleString()}</td>
+                <td>{v.active && <button className="ghost small" onClick={() => retire.mutate(v.policy_id)}>Retire</button>}</td>
+              </tr>
+            ))}
+            {history.data?.length === 0 && <tr><td colSpan={5} className="muted">Using the built-in default policy.</td></tr>}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -510,38 +512,40 @@ function ShadowPanel() {
             Last {card.data.window_days} days · {card.data.proposals} proposals · {card.data.scored} scored
             against a reviewer decision.
           </p>
-          <table>
-            <thead>
-              <tr>
-                <th>Proposer</th>
-                <th>Proposals</th>
-                <th>Scored</th>
-                <th>Agreement</th>
-                <th>False approvals</th>
-                <th>False holds</th>
-              </tr>
-            </thead>
-            <tbody>
-              {card.data.proposers.map((p) => (
-                <tr key={p.proposer}>
-                  <td><code>{p.proposer}</code></td>
-                  <td>{p.proposals}</td>
-                  <td>{p.scored}</td>
-                  <td><span className={rateBadge(p.agreement_rate, false)}>{pct(p.agreement_rate)}</span></td>
-                  <td>
-                    <span className={rateBadge(p.false_approval_rate, true)}>
-                      {pct(p.false_approval_rate)} ({p.false_approvals})
-                    </span>
-                  </td>
-                  <td>
-                    <span className={rateBadge(p.false_hold_rate, true)}>
-                      {pct(p.false_hold_rate)} ({p.false_holds})
-                    </span>
-                  </td>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Proposer</th>
+                  <th>Proposals</th>
+                  <th>Scored</th>
+                  <th>Agreement</th>
+                  <th>False approvals</th>
+                  <th>False holds</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {card.data.proposers.map((p) => (
+                  <tr key={p.proposer}>
+                    <td><code>{p.proposer}</code></td>
+                    <td>{p.proposals}</td>
+                    <td>{p.scored}</td>
+                    <td><span className={rateBadge(p.agreement_rate, false)}>{pct(p.agreement_rate)}</span></td>
+                    <td>
+                      <span className={rateBadge(p.false_approval_rate, true)}>
+                        {pct(p.false_approval_rate)} ({p.false_approvals})
+                      </span>
+                    </td>
+                    <td>
+                      <span className={rateBadge(p.false_hold_rate, true)}>
+                        {pct(p.false_hold_rate)} ({p.false_holds})
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>

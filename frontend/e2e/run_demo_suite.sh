@@ -18,7 +18,7 @@ group() { [ -n "${GITHUB_ACTIONS:-}" ] && echo "::group::$1" || echo "== $1"; }
 endgroup() { [ -n "${GITHUB_ACTIONS:-}" ] && echo "::endgroup::"; return 0; }
 
 failed=""
-for t in demo_tour offline_retry queue_undo bulk bulk_approve; do
+for t in demo_tour offline_retry queue_undo bulk bulk_approve mobile; do
   group "$t"
   if curl -fsS --max-time 180 -X POST "$base/api/demo/reset" >/dev/null && "$py" "e2e/$t.py" "$base" "$shots"; then
     echo "PASS $t"

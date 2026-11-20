@@ -215,19 +215,21 @@ function Comparison({ detail, selected }: { detail: ReviewDetail; selected: numb
       <h3>Receipt against the record</h3>
       <p className="rv-help">A mismatch is a reason to look closer, never a verdict. “Not compared” means that check was not done.</p>
       <OfficialRate detail={detail} />
-      <table className="rv-compare">
-        <thead><tr><th>Value</th><th>On the receipt</th><th>Expected</th><th /></tr></thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.key}>
-              <td>{r.label}</td>
-              <td className="num">{r.observed ?? "—"}</td>
-              <td className="num">{r.expected ?? "—"}</td>
-              <td><Chip tone={CMP_TONE[r.status]} title={r.detail}>{CMP_LABEL[r.status]}</Chip></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="table-wrap">
+        <table className="rv-compare">
+          <thead><tr><th>Value</th><th>On the receipt</th><th>Expected</th><th /></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td className="num">{r.observed ?? "—"}</td>
+                <td className="num">{r.expected ?? "—"}</td>
+                <td><Chip tone={CMP_TONE[r.status]} title={r.detail}>{CMP_LABEL[r.status]}</Chip></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {notPerformed.length > 0 && (
         <details>
           <summary className="small">Checks not performed ({notPerformed.length})</summary>

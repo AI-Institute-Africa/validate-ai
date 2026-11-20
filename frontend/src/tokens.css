@@ -89,6 +89,11 @@
   --sidebar: 236px;
   --topbar: 54px;
   --demo-bar: 30px;
+  /* notch / home-indicator insets (requires viewport-fit=cover); 0 on desktop */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --quick: 140ms;

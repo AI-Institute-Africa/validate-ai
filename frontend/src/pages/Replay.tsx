@@ -82,30 +82,34 @@ export default function Replay() {
             When a bank or alert record confirmed a claim, we know what the receipt really said. {acc.data?.readers.confirmed_claims ?? 0} confirmed claims in range.
           </p>
           <h3>By reader</h3>
-          <table>
-            <thead><tr><th>Reader</th><th>Amount</th><th>Reference</th></tr></thead>
-            <tbody>
-              {Object.entries(acc.data?.readers.by_reader ?? {}).map(([reader, f]) => (
-                <tr key={reader}>
-                  <td>{reader}</td>
-                  <td>{pct(f.amount?.accuracy_pct)} <span className="muted small">({f.amount?.correct ?? 0}/{f.amount?.read ?? 0})</span></td>
-                  <td>{pct(f.transaction_id?.accuracy_pct)} <span className="muted small">({f.transaction_id?.correct ?? 0}/{f.transaction_id?.read ?? 0})</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Reader</th><th>Amount</th><th>Reference</th></tr></thead>
+              <tbody>
+                {Object.entries(acc.data?.readers.by_reader ?? {}).map(([reader, f]) => (
+                  <tr key={reader}>
+                    <td>{reader}</td>
+                    <td>{pct(f.amount?.accuracy_pct)} <span className="muted small">({f.amount?.correct ?? 0}/{f.amount?.read ?? 0})</span></td>
+                    <td>{pct(f.transaction_id?.accuracy_pct)} <span className="muted small">({f.transaction_id?.correct ?? 0}/{f.transaction_id?.read ?? 0})</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <h3>By channel and provider</h3>
-          <table>
-            <thead><tr><th>Channel / provider</th><th>Claims</th><th>Amount</th><th>Reference</th><th>Both readers agreed</th><th>Corrected</th></tr></thead>
-            <tbody>
-              {Object.entries(acc.data?.readers.by_channel ?? {}).map(([k, g]) => (
-                <tr key={k}>
-                  <td>{k}</td><td>{g.claims}</td><td>{pct(g.amount_accuracy_pct)}</td><td>{pct(g.reference_accuracy_pct)}</td>
-                  <td>{pct(g.auto_agreed_pct)}</td><td>{pct(g.corrected_pct)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Channel / provider</th><th>Claims</th><th>Amount</th><th>Reference</th><th>Both readers agreed</th><th>Corrected</th></tr></thead>
+              <tbody>
+                {Object.entries(acc.data?.readers.by_channel ?? {}).map(([k, g]) => (
+                  <tr key={k}>
+                    <td>{k}</td><td>{g.claims}</td><td>{pct(g.amount_accuracy_pct)}</td><td>{pct(g.reference_accuracy_pct)}</td>
+                    <td>{pct(g.auto_agreed_pct)}</td><td>{pct(g.corrected_pct)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="card">
@@ -114,16 +118,18 @@ export default function Replay() {
             {acc.data?.fraud.resolved_alerts ?? 0} resolved alerts · {acc.data?.fraud.confirmed_fakes ?? 0} confirmed fakes · overall precision{" "}
             {pct(acc.data?.fraud.overall_precision_pct)} · fakes the score missed: {acc.data?.fraud.fakes_missed_by_score ?? 0}
           </p>
-          <table>
-            <thead><tr><th>Signal</th><th>Confirmed fake</th><th>Cleared</th><th>Precision</th></tr></thead>
-            <tbody>
-              {Object.entries(acc.data?.fraud.by_signal ?? {}).map(([code, s]) => (
-                <tr key={code}>
-                  <td>{code.replace(/_/g, " ").toLowerCase()}</td><td>{s.confirmed_fake}</td><td>{s.cleared}</td><td>{pct(s.precision_pct)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Signal</th><th>Confirmed fake</th><th>Cleared</th><th>Precision</th></tr></thead>
+              <tbody>
+                {Object.entries(acc.data?.fraud.by_signal ?? {}).map(([code, s]) => (
+                  <tr key={code}>
+                    <td>{code.replace(/_/g, " ").toLowerCase()}</td><td>{s.confirmed_fake}</td><td>{s.cleared}</td><td>{pct(s.precision_pct)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <p className="muted small">Low precision: admins keep clearing it — lower its weight. Missed fakes: raise the weights of the signals they show.</p>
         </div>
       </div>
@@ -153,20 +159,22 @@ export default function Replay() {
             <p className="muted small">
               Risk levels now {JSON.stringify(r.risk_levels.now)} → replay {JSON.stringify(r.risk_levels.replay)}
             </p>
-            <table>
-              <thead><tr><th>Claim</th><th>State</th><th>Change</th><th>Risk</th><th>Signals (replay)</th></tr></thead>
-              <tbody>
-                {r.changed_claims.map((c) => (
-                  <tr key={c.claim_id}>
-                    <td><code title={c.claim_id}>{c.claim_id.slice(0, 8)}</code></td>
-                    <td className="small">{c.state.replace(/_/g, " ").toLowerCase()}</td>
-                    <td>{c.changes.map((k) => CHANGE_LABEL[k] ?? k).join("; ")}</td>
-                    <td>{c.risk_now ?? "low"} {c.score_now ?? 0} → {c.risk_replay} {c.score_replay}</td>
-                    <td className="small">{c.signals_replay.join(", ")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Claim</th><th>State</th><th>Change</th><th>Risk</th><th>Signals (replay)</th></tr></thead>
+                <tbody>
+                  {r.changed_claims.map((c) => (
+                    <tr key={c.claim_id}>
+                      <td><code title={c.claim_id}>{c.claim_id.slice(0, 8)}</code></td>
+                      <td className="small">{c.state.replace(/_/g, " ").toLowerCase()}</td>
+                      <td>{c.changes.map((k) => CHANGE_LABEL[k] ?? k).join("; ")}</td>
+                      <td>{c.risk_now ?? "low"} {c.score_now ?? 0} → {c.risk_replay} {c.score_replay}</td>
+                      <td className="small">{c.signals_replay.join(", ")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>

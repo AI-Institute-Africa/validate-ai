@@ -241,20 +241,22 @@ function CaseFiles() {
             <h3>{c.title}</h3>
             <StateChip state={c.state} />
           </header>
-          <table>
-            <thead>
-              <tr><th /><th>Receipt says</th><th>Bank record says</th></tr>
-            </thead>
-            <tbody>
-              {c.rows.map(([k, a, b]) => (
-                <tr key={k} className={a === b ? "" : "differs"}>
-                  <th scope="row">{k}</th>
-                  <td className="data">{a}</td>
-                  <td className="data">{b}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th /><th>Receipt says</th><th>Bank record says</th></tr>
+              </thead>
+              <tbody>
+                {c.rows.map(([k, a, b]) => (
+                  <tr key={k} className={a === b ? "" : "differs"}>
+                    <th scope="row">{k}</th>
+                    <td className="data">{a}</td>
+                    <td className="data">{b}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <Reasons codes={c.reasons} />
         </article>
       ))}

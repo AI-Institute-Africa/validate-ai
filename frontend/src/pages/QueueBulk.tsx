@@ -178,35 +178,37 @@ function ApproveSheet({ claims, onClose, onDone }: { claims: Claim[]; onClose: (
           </p>
           {rows === null && <p className="muted">Checking {claims.length} claims…</p>}
           {rows !== null && (
-            <table className="bulk-table">
-              <thead><tr><th>Claim</th><th>Matched credit</th><th>Last 4</th></tr></thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.claim.claim_id} className={r.el?.ok ? "" : "bulk-skip"}>
-                    <td>{r.claim.claimant_ref}<div className="muted small">{money(r.claim.declared_amount_minor, r.claim.declared_currency)}</div></td>
-                    {r.el?.ok ? (
-                      <>
-                        <td>
-                          {money(r.el.candidate.credit.amount_minor, r.el.candidate.credit.currency)}
-                          <div className="muted small">{new Date(r.el.candidate.credit.occurred_at).toLocaleString()} · {r.el.candidate.credit.narrative ?? r.el.candidate.credit.provider}</div>
-                        </td>
-                        <td>
-                          <input
-                            className="last4"
-                            maxLength={4}
-                            aria-label={`Last 4 characters for ${r.claim.claimant_ref}`}
-                            value={typed[r.claim.claim_id] ?? ""}
-                            onChange={(e) => setTyped({ ...typed, [r.claim.claim_id]: e.target.value })}
-                          />
-                        </td>
-                      </>
-                    ) : (
-                      <td colSpan={2}>Skipped: {r.error ?? (r.el && !r.el.ok ? r.el.why : "")}</td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="table-wrap">
+              <table className="bulk-table">
+                <thead><tr><th>Claim</th><th>Matched credit</th><th>Last 4</th></tr></thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.claim.claim_id} className={r.el?.ok ? "" : "bulk-skip"}>
+                      <td>{r.claim.claimant_ref}<div className="muted small">{money(r.claim.declared_amount_minor, r.claim.declared_currency)}</div></td>
+                      {r.el?.ok ? (
+                        <>
+                          <td>
+                            {money(r.el.candidate.credit.amount_minor, r.el.candidate.credit.currency)}
+                            <div className="muted small">{new Date(r.el.candidate.credit.occurred_at).toLocaleString()} · {r.el.candidate.credit.narrative ?? r.el.candidate.credit.provider}</div>
+                          </td>
+                          <td>
+                            <input
+                              className="last4"
+                              maxLength={4}
+                              aria-label={`Last 4 characters for ${r.claim.claimant_ref}`}
+                              value={typed[r.claim.claim_id] ?? ""}
+                              onChange={(e) => setTyped({ ...typed, [r.claim.claim_id]: e.target.value })}
+                            />
+                          </td>
+                        </>
+                      ) : (
+                        <td colSpan={2}>Skipped: {r.error ?? (r.el && !r.el.ok ? r.el.why : "")}</td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
           {busy && <p role="status">{busy}</p>}
           <div className="dialog-actions">
@@ -223,19 +225,21 @@ function ApproveSheet({ claims, onClose, onDone }: { claims: Claim[]; onClose: (
       {results && (
         <>
           <p role="status"><strong>{summarise(results, "Approved")}</strong></p>
-          <table className="bulk-table">
-            <tbody>
-              {results.map((r) => {
-                const row = rows?.find((x) => x.claim.claim_id === r.id);
-                return (
-                  <tr key={r.id}>
-                    <td>{row?.claim.claimant_ref}</td>
-                    <td className={`bulk-result ${r.ok ? "ok" : "bad"}`}>{r.ok ? "✓" : "✕"} {r.message}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table className="bulk-table">
+              <tbody>
+                {results.map((r) => {
+                  const row = rows?.find((x) => x.claim.claim_id === r.id);
+                  return (
+                    <tr key={r.id}>
+                      <td>{row?.claim.claimant_ref}</td>
+                      <td className={`bulk-result ${r.ok ? "ok" : "bad"}`}>{r.ok ? "✓" : "✕"} {r.message}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           <div className="dialog-actions"><button type="button" onClick={() => { onClose(); onDone(); }}>Close</button></div>
         </>
       )}

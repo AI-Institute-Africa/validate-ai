@@ -32,6 +32,8 @@ own samples, and press **Reset demo data** to start over. See [`docs/demo.md`](d
 Brand colours (chosen, not yet applied to the console), with contrast rules for using them:
 [`docs/brand/colours.md`](docs/brand/colours.md).
 
+Mobile view plan (proposed, not yet implemented): [`docs/mobile.md`](docs/mobile.md).
+
 By default every allocation needs a finance reviewer, and the reviewer can only confirm a credit
 that passes every hard gate. Four optional features are **off until an organisation's payment
 policy turns them on**, and none of them lets the AI decide:

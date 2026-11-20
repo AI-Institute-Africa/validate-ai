@@ -1,0 +1,156 @@
+/* Mobile foundations (Phase 0). Loaded after the shell and page CSS: the coarse-pointer
+   rules use !important so a lazily loaded page stylesheet cannot undo them on a phone.
+   This file only normalises the platform; page-specific layout stays in the page CSS. */
+
+/* ── safe areas ───────────────────────────────────────────────────────────── */
+.demo-bar {
+  padding-top: calc(4px + var(--safe-top));
+  padding-left: calc(14px + var(--safe-left));
+  padding-right: calc(14px + var(--safe-right));
+}
+.topbar {
+  height: calc(var(--topbar) + var(--safe-top));
+  padding-top: var(--safe-top);
+  padding-left: max(clamp(12px, 3vw, 40px), var(--safe-left));
+  padding-right: max(clamp(12px, 3vw, 40px), var(--safe-right));
+}
+.sidebar {
+  padding-top: calc(18px + var(--safe-top));
+  padding-bottom: calc(18px + var(--safe-bottom));
+  padding-left: max(14px, var(--safe-left));
+}
+.overlay {
+  padding: calc(20px + var(--safe-top)) calc(20px + var(--safe-right))
+    calc(20px + var(--safe-bottom)) calc(20px + var(--safe-left));
+}
+
+@media (max-width: 960px) {
+  /* the home hero glow is painted outside its box on desktop; keep it inside on small screens */
+  .hero2 { overflow: hidden; }
+  .hero2::before { left: 0; right: 0; }
+  /* the tour is a horizontal strip on phones: let it scroll instead of widening the page */
+  .tour, .tour > *, .tour-steps, .tour-steps > li, .tour-step { min-width: 0; }
+  .tour-steps { max-width: 100%; grid-auto-columns: minmax(140px, 1fr); }
+  .tour-step > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+  /* case files carry scrollable tables: let the card shrink so the table scrolls, not the page */
+  .casefiles > .casefile { min-width: 0; }
+  .app main {
+    padding-left: max(14px, var(--safe-left));
+    padding-right: max(14px, var(--safe-right));
+    padding-bottom: calc(30px + var(--safe-bottom));
+  }
+  .app footer {
+    padding-left: max(24px, var(--safe-left));
+    padding-right: max(24px, var(--safe-right));
+    padding-bottom: calc(18px + var(--safe-bottom));
+  }
+  /* sticky bottom bars and toasts must clear the home indicator and never cover each other */
+  .decision-bar,
+  .bulk-bar {
+    padding-bottom: calc(10px + var(--safe-bottom));
+  }
+  .toasts {
+    top: calc(var(--topbar) + var(--safe-top) + 10px);
+    bottom: auto;
+    left: calc(8px + var(--safe-left));
+    right: calc(8px + var(--safe-right));
+    max-width: none;
+  }
+}
+@media (max-width: 560px) {
+  .persona-menu { right: calc(-8px + var(--safe-right)); }
+}
+
+/* ── touch targets and iOS focus zoom ────────────────────────────────────── */
+@media (pointer: coarse) {
+  button,
+  a.btn,
+  select,
+  .rv-pill,
+  .rv-tab,
+  .seg button,
+  .lang-switch,
+  .icon-btn,
+  .menu-btn,
+  .tour-step,
+  .rv-topbar a,
+  .sidebar nav a {
+    min-height: 44px !important;
+  }
+  button.small {
+    min-height: 44px !important;
+    padding: 8px 12px;
+  }
+  /* links ignore min-height while inline; make tab links real touch targets */
+  .rv-tab {
+    display: inline-flex !important;
+    align-items: center;
+  }
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    min-height: 44px !important;
+    font-size: 16px !important; /* Safari zooms the page if a focused field is under 16px */
+  }
+  .file-actions button.icon-only {
+    min-width: 44px !important;
+  }
+}
+
+/* ── no page-level horizontal overflow ───────────────────────────────────── */
+.page,
+.rv,
+.grid,
+.grid > *,
+.split,
+.split > *,
+.card,
+.table-wrap,
+.app main {
+  min-width: 0;
+}
+.data,
+.mono,
+.rv-code,
+.reason-code,
+code.key,
+.rv-field .v,
+.rv-facts dd,
+.image-fields dd,
+.reasons-list li {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 960px) {
+  .rv-code,
+  .reason-code {
+    white-space: normal;
+  }
+}
+@media (max-width: 720px) {
+  .rv-why {
+    min-width: 0;
+  }
+}
+
+/* ── touch has no hover: remove effects that would otherwise stick ───────── */
+@media (hover: none) {
+  .card:hover,
+  .scn-card:hover,
+  .recent:hover,
+  .stat:hover,
+  .tour-step:hover,
+  .capture:hover:not(:disabled),
+  .dz:hover,
+  .dropzone:hover,
+  button:hover:not(:disabled),
+  a.btn:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  tbody tr:hover td {
+    background: transparent;
+  }
+}
+
+/* Layering map: scrim 40 < drawer 50 < toasts 100 < dialogs 200.
+   A dialog is only rendered from outside the drawer, so it is always on top. */

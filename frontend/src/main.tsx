@@ -10,13 +10,16 @@ import { ToastProvider, useToast } from "./toast";
 import { useTheme } from "./theme";
 import { Avatar } from "./ui";
 import { Icon } from "./components/Icon";
+import { Dialog } from "./components/Dialog";
 import { installFlair } from "./lib/flair";
+import { useFocusTrap } from "./lib/focusTrap";
 import Home from "./pages/Home";
 import "./tokens.css";
 import "./styles.css";
 import "./ui.css";
 import "./polish.css";
 import "./motion.css";
+import "./mobile.css";
 
 // Each page loads on demand, so a payer on a slow phone never downloads the admin console.
 const Scan = lazy(() => import("./pages/Scan"));
@@ -200,16 +203,48 @@ function Shell({ children }: { children: React.ReactNode }) {
   const title = useTitle();
   const toast = useToast();
   const [menu, setMenu] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const menuBtn = useRef<HTMLButtonElement>(null);
+  const sidebar = useRef<HTMLElement>(null);
   const { pathname } = useLocation();
   useEffect(() => setMenu(false), [pathname]);
+
+  // The drawer is the only mobile-only shell element: keep it out of the tab order and the
+  // accessibility tree while closed, lock background scroll while open, and close on resize.
+  useEffect(() => {
+    const el = sidebar.current;
+    if (!el) return;
+    const mq = window.matchMedia("(max-width: 960px)");
+    const apply = () => {
+      const closedDrawer = mq.matches && !menu;
+      el.toggleAttribute("inert", closedDrawer);
+      if (closedDrawer) el.setAttribute("aria-hidden", "true");
+      else el.removeAttribute("aria-hidden");
+    };
+    const onResize = () => { if (!mq.matches) setMenu(false); };
+    apply();
+    mq.addEventListener("change", apply);
+    mq.addEventListener("change", onResize);
+    return () => {
+      mq.removeEventListener("change", apply);
+      mq.removeEventListener("change", onResize);
+    };
+  }, [menu]);
+  // Must run after the inert effect above: focus cannot move into a panel that is still inert.
+  useFocusTrap(menu, sidebar, () => setMenu(false), menuBtn);
+  useEffect(() => {
+    if (!menu) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [menu]);
+
   const reset = useMutation({
     mutationFn: resetDemo,
     onSuccess: () => window.location.assign("/"),
     onError: (e) => toast("err", (e as Error).message),
   });
-  const confirmReset = () => {
-    if (window.confirm("Wipe all demo data and start again? This takes about 15 seconds.")) reset.mutate();
-  };
+  const confirmReset = () => setConfirmResetOpen(true);
   const demo = demoInfo();
   return (
     <div className="app">
@@ -222,7 +257,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           </span>
         </div>
       )}
-      <aside className={`sidebar${menu ? " open" : ""}`} aria-label={t("shell.nav")}>
+      <aside id="shell-nav" ref={sidebar} className={`sidebar${menu ? " open" : ""}`} aria-label={t("shell.nav")}
+        role={menu ? "dialog" : undefined} aria-modal={menu ? true : undefined}>
         <NavLink to="/" className="brand">
           <span className="logo" aria-hidden>V</span>
           <span className="brand-name">Validate</span>
@@ -249,7 +285,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className={`scrim${menu ? " show" : ""}`} onClick={() => setMenu(false)} />
       <div className="content">
         <header className="topbar">
-          <button type="button" className="menu-btn" onClick={() => setMenu(true)} aria-label={t("shell.menu")}><Icon name="menu" size={18} /></button>
+          <button type="button" ref={menuBtn} className="menu-btn" onClick={() => setMenu(true)} aria-label={t("shell.menu")} aria-controls="shell-nav" aria-expanded={menu}><Icon name="menu" size={18} /></button>
           <span className="crumb">{title}</span>
           <span className="spacer" />
           <PersonaMenu onReset={confirmReset} />
@@ -261,6 +297,15 @@ function Shell({ children }: { children: React.ReactNode }) {
           {t("footer.tag")} {demo ? "Demo build with synthetic data." : ""}
         </footer>
       </div>
+      {confirmResetOpen && (
+        <Dialog title="Reset the demo" onClose={() => setConfirmResetOpen(false)}>
+          <p className="muted">Wipe all demo data and start again? This takes about 15 seconds.</p>
+          <div className="dialog-actions">
+            <button type="button" className="ghost" onClick={() => setConfirmResetOpen(false)}>Cancel</button>
+            <button type="button" className="danger" onClick={() => { setConfirmResetOpen(false); reset.mutate(); }}>Reset demo data</button>
+          </div>
+        </Dialog>
+      )}
       {reset.isPending && (
         <div className="overlay" role="alertdialog" aria-modal="true" aria-labelledby="reset-title" aria-live="polite">
           <div className="modal">
