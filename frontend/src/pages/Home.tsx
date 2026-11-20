@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, hasRole } from "../api";
 import { deliverMoney, demoInfo, runScenario, type ScenarioInfo, type ScenarioResult } from "../demo";
@@ -269,6 +269,7 @@ export default function Home() {
   const [step, setStep] = useState(0);
   const [seen, setSeen] = useState<Set<number>>(new Set());
   const [group, setGroup] = useState<"all" | "payments" | "identity">("all");
+  const firstTourRender = useRef(true);
   const scenarios = demo?.scenarios ?? [];
   const byId = new Map(scenarios.map((s) => [s.id, s]));
   const tour = TOUR.map((id) => byId.get(id)).filter(Boolean) as ScenarioInfo[];
@@ -280,6 +281,15 @@ export default function Home() {
     setSeen((s) => new Set(s).add(step));
     document.getElementById("tour")?.scrollIntoView({ block: "start" });
   };
+
+  // On a phone the steps are a horizontal strip: keep the selected one in view without moving the page.
+  useEffect(() => {
+    if (firstTourRender.current) {
+      firstTourRender.current = false;
+      return;
+    }
+    document.querySelector(".tour-step.on")?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [step]);
 
   return (
     <div>

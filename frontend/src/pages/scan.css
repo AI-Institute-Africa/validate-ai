@@ -32,7 +32,7 @@
 .scan-stepper li.current .num { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .scan-stepper li.done { color: var(--text); }
 .scan-stepper li.done .num { background: transparent; border-color: var(--ok); color: var(--ok); }
-.scan-stepper .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scan-stepper .lbl { min-width: 0; overflow-wrap: anywhere; }
 
 .scan-step-title { display: flex; align-items: center; gap: 10px; font-size: 16px; margin-bottom: 12px; }
 .scan-step-title .num { background: transparent; border-color: var(--accent); color: var(--accent); }
@@ -70,10 +70,24 @@
 
 @media (max-width: 560px) {
   .scan-stepper { gap: 6px; }
-  .scan-stepper li { padding: 8px; gap: 6px; font-size: 12px; }
-  .scan-stepper .num { width: 18px; height: 18px; font-size: 11px; }
+  .scan-stepper li {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-items: start;
+    gap: 4px;
+    padding: 7px 4px 9px;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+  .scan-stepper .num { width: 20px; height: 20px; font-size: 10px; }
+  .scan-stepper .lbl { white-space: normal; }
   .scan .card { padding: 14px; }
   .scan .dropzone.filled { padding: 14px; }
+  .scan .file-row { align-items: flex-start; }
+  .scan .file-row .grow { flex-basis: 100%; order: 2; }
+  .scan .file-row .thumb, .scan .file-row .file-icon { order: 1; }
+  .scan .file-actions { order: 3; width: 100%; }
+  .scan .file-actions button { flex: 1 1 auto; }
   .scan .capture-row { gap: 8px; }
   .scan .capture { flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; flex-wrap: wrap; padding: 10px 12px; }
   .scan .capture .glyph { margin: 0; }
@@ -81,6 +95,10 @@
   .scan .recent { flex-wrap: wrap; gap: 2px 10px; }
   .scan .result-head { flex-direction: column; }
   .scan-chips { justify-content: flex-start; }
+  .scan-result-actions .btn, .scan-result-actions button { flex: 1 1 auto; }
+  .upload-progress { height: 32px; }
+  .outbox li { flex-wrap: wrap; }
+  .outbox li button { flex: 0 0 auto; }
 }
 
 .crop-preview { max-height: 45vh; overflow: hidden; display: grid; place-items: center; background: var(--panel); border-radius: 8px; margin: 8px 0; }
@@ -95,3 +113,15 @@
 .outbox ul { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
 .outbox li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .outbox-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Image to text reuses the capture and file-row pieces above; its result needs room on a phone. */
+.image-to-text .toolbar button { flex: 0 0 auto; }
+.image-to-text .ocr-text { font-size: 13px; }
+@media (max-width: 560px) {
+  .image-to-text .toolbar { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .image-to-text .toolbar .grow { display: none; }
+  .image-to-text .toolbar .badge { justify-self: start; }
+  .image-to-text .toolbar button { width: 100%; }
+  .image-to-text .ocr-text { max-height: none; overflow: visible; font-size: 13px; }
+  .image-to-text .reader-errors li { overflow-wrap: anywhere; }
+}

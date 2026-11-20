@@ -1,14 +1,17 @@
 .claim-steps { list-style: none; margin: 0 0 16px; padding: 12px 0 0; border-top: 1px solid var(--text); display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
-.claim-steps li { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.claim-steps li { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tl-label { min-width: 0; overflow-wrap: anywhere; hyphens: auto; }
 /* log marks are square, like the status stamps */
-.tl-mark { width: 28px; height: 28px; border-radius: 3px; border: 1.5px solid var(--line); display: grid; place-items: center; font-family: var(--font-mono); font-size: 13px; background: var(--panel); }
+.tl-mark { width: 28px; height: 28px; border-radius: 3px; border: 1.5px solid color-mix(in srgb, var(--text) 25%, var(--line)); display: grid; place-items: center; font-family: var(--font-mono); font-size: 13px; font-weight: 700; background: var(--panel); }
 .claim-steps li.done { color: var(--text); }
 .claim-steps li.done .tl-mark { background: var(--ok); border-color: var(--ok); color: var(--on-accent); }
 .claim-steps li.current .tl-mark { border-color: var(--accent); color: var(--accent); }
 .claim-steps li.failed .tl-mark { background: var(--bad); border-color: var(--bad); color: var(--on-accent); }
 .claim-steps-collapsed summary { cursor: pointer; color: var(--muted); margin-bottom: 8px; }
 .next-panel { border-radius: 4px; padding: 14px 16px; border: 1px solid var(--line); border-left-width: 4px; margin-top: 4px; }
-.track .next-actions { margin-top: 10px; }
+.track .next-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.track .next-actions .btn { flex: 1 1 auto; }
+.track .page-sub code { overflow-wrap: anywhere; }
 .track .card { padding: 20px; }
 .next-panel h2 { margin: 0 0 4px; font-size: 17px; }
 .next-panel p { margin: 0 0 8px; }
@@ -18,4 +21,11 @@
 .next-panel.tone-info { background: var(--panel); }
 .prov-banner { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; background: var(--panel); }
 .prov-banner.urgent { background: var(--warn-bg); border-color: var(--warn); }
-@media (max-width: 560px) { .claim-steps { grid-template-columns: repeat(3, 1fr); row-gap: 12px; } }
+@media (max-width: 560px) {
+  .claim-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 12px; }
+  .claim-steps li { font-size: 10px; letter-spacing: 0.02em; line-height: 1.2; }
+  .tl-mark { width: 26px; height: 26px; }
+  .track .card { padding: 14px; }
+  .next-panel { padding: 12px; }
+  .claim-steps-collapsed summary { min-height: 44px; display: flex; align-items: center; }
+}

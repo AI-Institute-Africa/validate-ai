@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, post } from "../api";
 import { demoInfo, prepareKyc, sampleFile } from "../demo";
 import { DOC_TYPES } from "../labels";
@@ -22,8 +22,15 @@ const SAMPLES: { id: string; label: string; hint: string }[] = [
 
 const NEXT_STATES = ["VERIFIED", "NEEDS_REVIEW", "NEEDS_INFORMATION", "REJECTED"];
 
-function Drop({ label, hint, file, onFile, optional }: { label: string; hint: string; file: File | null; onFile: (f: File | null) => void; optional?: boolean }) {
-  const input = useRef<HTMLInputElement>(null);
+function Drop({ id, label, hint, file, onFile, optional, capture }: {
+  id: string;
+  label: string;
+  hint: string;
+  file: File | null;
+  onFile: (f: File | null) => void;
+  optional?: boolean;
+  capture?: "environment" | "user";
+}) {
   const { t } = useI18n();
   const [over, setOver] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
@@ -33,28 +40,37 @@ function Drop({ label, hint, file, onFile, optional }: { label: string; hint: st
     setUrl(u);
     return () => URL.revokeObjectURL(u);
   }, [file]);
+  // A real label owns the file input, and Remove is a sibling button: no nested interactive controls.
   return (
     <div
-      className={`dz${file ? " has" : ""}${over ? " over" : ""}`}
-      onClick={() => input.current?.click()}
+      className={`dz-wrap${file ? " has" : ""}${over ? " over" : ""}`}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); onFile(e.dataTransfer.files?.[0] ?? null); }}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
     >
-      <span className="ph">{url ? <img src={url} alt="" /> : <Icon name="camera" size={22} />}</span>
-      <span style={{ flex: 1 }}>
-        <b>{label} {optional && <span className="muted small">{t("kyc.optional")}</span>}</b>
-        <span className="muted small">{file ? file.name : hint}</span>
-      </span>
+      <label className="dz" htmlFor={id}>
+        <span className="ph">{url ? <img src={url} alt="" /> : <Icon name="camera" size={22} />}</span>
+        <span className="dz-copy">
+          <b>{label} {optional && <span className="muted small">{t("kyc.optional")}</span>}</b>
+          <span className="muted small">{file ? file.name : hint}</span>
+        </span>
+      </label>
       {file && (
-        <button type="button" className="ghost small" onClick={(e) => { e.stopPropagation(); onFile(null); }}>
+        <button type="button" className="ghost small dz-remove" onClick={() => onFile(null)}>
           {t("kyc.remove")}
         </button>
       )}
-      <input ref={input} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+      <input
+        id={id}
+        className="sr-only"
+        type="file"
+        accept="image/*"
+        capture={capture}
+        onChange={(e) => {
+          onFile(e.target.files?.[0] ?? null);
+          e.currentTarget.value = "";
+        }}
+      />
     </div>
   );
 }
@@ -71,6 +87,21 @@ export default function Kyc() {
   const [result, setResult] = useState<Out | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [lookup, setLookup] = useState("");
+  const [frontPreview, setFrontPreview] = useState<string | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!front) return setFrontPreview(null);
+    const u = URL.createObjectURL(front);
+    setFrontPreview(u);
+    return () => URL.revokeObjectURL(u);
+  }, [front]);
+  useEffect(() => {
+    if (!selfie) return setSelfiePreview(null);
+    const u = URL.createObjectURL(selfie);
+    setSelfiePreview(u);
+    return () => URL.revokeObjectURL(u);
+  }, [selfie]);
 
   const sample = useMutation({
     mutationFn: async (variant: string) => {
@@ -147,9 +178,25 @@ export default function Kyc() {
               <input placeholder={t("kyc.ref")} value={subjectRef} onChange={(e) => setSubjectRef(e.target.value)} aria-label={t("kyc.ref")} />
             )}
           </div>
-          <Drop label={t("kyc.front.label")} hint={t("kyc.front.hint")} file={front} onFile={setFront} />
-          <Drop label={t("kyc.back.label")} hint={t("kyc.back.hint")} file={back} onFile={setBack} optional />
-          <Drop label={t("kyc.selfie.label")} hint={t("kyc.selfie.hint")} file={selfie} onFile={setSelfie} />
+          <Drop id="kyc-front" label={t("kyc.front.label")} hint={t("kyc.front.hint")} file={front} onFile={setFront} capture="environment" />
+          <Drop id="kyc-back" label={t("kyc.back.label")} hint={t("kyc.back.hint")} file={back} onFile={setBack} optional capture="environment" />
+          <Drop id="kyc-selfie" label={t("kyc.selfie.label")} hint={t("kyc.selfie.hint")} file={selfie} onFile={setSelfie} capture="user" />
+          {(frontPreview || selfiePreview) && (
+            <div className="compare">
+              {frontPreview && (
+                <figure>
+                  <img src={frontPreview} alt={t("kyc.front.label")} />
+                  <figcaption>{t("kyc.front.label")}</figcaption>
+                </figure>
+              )}
+              {selfiePreview && (
+                <figure>
+                  <img src={selfiePreview} alt={t("kyc.selfie.label")} />
+                  <figcaption>{t("kyc.selfie.label")}</figcaption>
+                </figure>
+              )}
+            </div>
+          )}
           <button type="button" className="lg" disabled={submit.isPending || !front || !selfie} onClick={() => submit.mutate()}>
             {submit.isPending ? t("kyc.checking") : t("kyc.submit")}
           </button>

@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { post } from "../api";
 import { useToast } from "../toast";
+import "./scan.css";
 
 type PageText = {
   page: number;
@@ -103,8 +104,8 @@ function ResultCard({ result }: { result: Conversion }) {
         <h2>Extracted text</h2>
         <span className="badge">{result.character_count.toLocaleString()} characters</span>
         <span className="grow" />
-        <button type="button" className="ghost small" onClick={copy} disabled={!result.text}>
-          Copy
+        <button type="button" className="secondary" onClick={copy} disabled={!result.text} aria-label="Copy extracted text">
+          Copy text
         </button>
         <button
           type="button"
@@ -220,7 +221,7 @@ export default function ImageToText() {
   };
 
   return (
-    <section>
+    <section className="image-to-text">
       <div className="hero">
         <h1>Image to text</h1>
         <p className="muted">

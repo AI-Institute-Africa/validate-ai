@@ -95,6 +95,15 @@
   .file-actions button.icon-only {
     min-width: 44px !important;
   }
+  /* disclosures are tappable controls too, even though they are not <button>s */
+  .reader-errors summary,
+  .scan-staff summary,
+  .claim-steps-collapsed summary,
+  .viewer-adjust > summary {
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center;
+  }
 }
 
 /* ── no page-level horizontal overflow ───────────────────────────────────── */

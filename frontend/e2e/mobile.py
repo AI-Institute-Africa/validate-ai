@@ -7,6 +7,7 @@ usable by touch and keyboard. Run against the standalone demo after a reset.
 
 import json
 import os
+import re
 import sys
 import urllib.request
 
@@ -138,6 +139,48 @@ with sync_playwright() as p:
         small = page.evaluate(SMALL_TARGETS)
         assert not small, f"{path}: touch targets under 44px: {small}"
 
+    # Phase 1 journey: home -> sample payment -> result -> track, on a touch phone.
+    page.goto(f"{base}/?persona=submitter")
+    page.get_by_role("link", name="Try it on your own payment").click()
+    expect(page).to_have_url(re.compile(r"/verify"))
+    page.get_by_role("button", name="Paid, bank has it").click()
+    submit = page.get_by_role("button", name="Validate this payment")
+    expect(submit).to_be_enabled(timeout=30000)
+    submit.click()
+    track_link = page.get_by_role("link", name="Track this payment")
+    expect(track_link).to_be_visible(timeout=40000)
+    track_link.click()
+    expect(page).to_have_url(re.compile(r"/track/"))
+    expect(page.get_by_role("heading", name="Your payment", exact=True)).to_be_visible()
+
+    # ID page: real label/button structure and the right camera on each capture.
+    page.goto(f"{base}/kyc?persona=submitter")
+    expect(page.locator("label.dz")).to_have_count(3)
+    assert page.locator("label.dz button").count() == 0, "no nested controls in a file label"
+    assert page.locator('input[type="file"][capture="environment"]').count() == 2
+    assert page.locator('input[type="file"][capture="user"]').count() == 1
+
+    # Offline submit -> online retry, with exactly one claim reaching the server.
+    page.goto(f"{base}/verify?persona=submitter")
+    page.get_by_role("button", name="Paid, bank has it").click()
+    submit = page.get_by_role("button", name="Validate this payment")
+    expect(submit).to_be_enabled(timeout=30000)
+    posted: list[str] = []
+    page.on(
+        "response",
+        lambda r: posted.append(r.url)
+        if r.url.endswith("/api/claims") and r.request.method == "POST" and r.ok
+        else None,
+    )
+    ctx.set_offline(True)
+    submit.click()
+    expect(page.get_by_text("Waiting to send (1)")).to_be_visible(timeout=15000)
+    assert not posted, "nothing should have reached the server while offline"
+    ctx.set_offline(False)
+    expect(page.locator("body")).to_contain_text("Approved", timeout=40000)
+    expect(page.get_by_text("Waiting to send")).to_have_count(0)
+    assert len(posted) == 1, posted
+
     assert not errors, errors
     browser.close()
-print(f"mobile: ok ({len(PAGES)} pages at 375px)")
+print(f"mobile: ok ({len(PAGES)} pages at 375px; payment, track, ID and offline retry)")

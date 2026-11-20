@@ -1,9 +1,11 @@
 # Mobile view plan
 
-**Status: agreed; Phase 0 complete.** Minimum supported width is **375 px**, **every page** is
+**Status: agreed; Phases 0–1 complete.** Minimum supported width is **375 px**, **every page** is
 in scope (payer and staff), and an installable PWA / service worker is **out of scope**. The
-`frontend/e2e/mobile.py` gate passes on all 20 routed pages at 375 px with a touch context. Wide
-tables now scroll inside `.table-wrap` until Phase 2 gives them card layouts. The rest is planned.
+`frontend/e2e/mobile.py` gate passes on all 20 routed pages at 375 px with a touch context, then
+drives a sample payment through submit → result → track, checks the ID camera inputs, and verifies
+offline submit → online retry. Wide tables still scroll inside `.table-wrap` until Phase 2 gives
+them card layouts. Staff triage is next.
 It follows the existing design tokens
 in [`frontend/src/tokens.css`](../frontend/src/tokens.css) and the contrast rules in
 [`docs/brand/colours.md`](brand/colours.md); it does not propose a new visual language.
@@ -80,6 +82,13 @@ These are cross-cutting fixes. Every later page work assumes them.
 | B5 | **Image to text:** camera capture stays; wrap long extracted text, add a tappable Copy action, keep file info and reader errors readable at 375 px. | `frontend/src/pages/ImageToText.tsx`, `frontend/src/pages/scan.css` | Full extracted text readable with no sideways scroll. |
 | B6 | **Orientation / context:** at ≤560 px the topbar hides the crumb and persona label. Keep a compact page title in topbar or rely on the page heading; verify no page loses its identity. | `frontend/src/ui.css:247-252`, `frontend/src/main.tsx:251-256` | Every page has a visible title on a phone. |
 
+Phase 1 is implemented across `Scan`, `Kyc`, `Track`, `Home` and `ImageToText`. The stepper no longer
+truncates at 375 px, file actions wrap with 44 px targets, the ID page uses real labels with the
+correct camera hints and a stacked preview, Track has a tappable copy-code action, the tour strip
+scroll-snaps to the current story, extracted text wraps without sideways scroll, and the topbar
+keeps a compact page title. `mobile.py` now covers the whole payer journey, including the existing
+submit-and-retry outbox.
+
 ## Workstream C — staff console on small screens
 
 | # | Change | Files | Done when |
@@ -128,7 +137,7 @@ without `is_mobile`/`has_touch`; the rest of `frontend/e2e/run_demo_suite.sh` is
 | Phase | Scope | Exit gate |
 | --- | --- | --- |
 | 0 — Foundations (Workstream A) — **complete** | Safe areas, touch targets, input zoom, drawer a11y, overflow guardrails, `e2e/mobile.py` gate | **Passing:** `mobile: ok (20 pages at 375px)`; drawer a11y test passes |
-| 1 — Payer flows (B) | Verify, ID, track, home/tour, image-to-text | New phone e2e journey passes end to end, including offline retry |
+| 1 — Payer flows (B) — **complete** | Verify, ID, track, home/tour, image-to-text | **Passing:** `mobile: ok (20 pages at 375px; payment, track, ID and offline retry)` |
 | 2 — Staff triage (C) | Card tables, viewer annotations, decision bar, native dialogs | A reviewer can triage and confirm a claim on a 375 px phone and read evidence on a 768 px tablet |
 | 3 — Polish and guardrails (D, E) | Performance budget, CI mobile job, manual checklist | Mobile suite runs in CI; no route-level bundle regression |
 
@@ -140,4 +149,4 @@ largest because it touches many pages; do it after the shared card-table helper 
 1. **Support floor:** 375 px. Smaller widths are not a target.
 2. **Scope:** every page, including the staff console on phones and tablets.
 3. **PWA/offline shell:** ignored for this work. Keep the existing submit-and-retry outbox only.
-4. **Implementation:** Phase 0 (foundations) complete; Phase 1 (payer flows) is next.
+4. **Implementation:** Phases 0–1 complete; Phase 2 (staff triage) is next.

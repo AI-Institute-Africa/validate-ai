@@ -287,6 +287,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <header className="topbar">
           <button type="button" ref={menuBtn} className="menu-btn" onClick={() => setMenu(true)} aria-label={t("shell.menu")} aria-controls="shell-nav" aria-expanded={menu}><Icon name="menu" size={18} /></button>
           <span className="crumb">{title}</span>
+          <span className="mobile-title">{title}</span>
           <span className="spacer" />
           <PersonaMenu onReset={confirmReset} />
         </header>
