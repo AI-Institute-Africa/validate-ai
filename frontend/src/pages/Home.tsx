@@ -207,6 +207,30 @@ function Stats() {
   );
 }
 
+function QuickActions() {
+  const actions = [
+    { to: "/verify", icon: "receipt", title: "Verify a payment", detail: "Upload a receipt and match it to a bank credit", visible: true },
+    { to: "/image-to-text", icon: "text", title: "Read a document", detail: "Extract facts from a photo or PDF", visible: true },
+    { to: "/kyc", icon: "id", title: "Verify an ID", detail: "Check an identity document and holder", visible: true },
+    { to: "/queue", icon: "inbox", title: "Review queue", detail: "Work through payments waiting for a person", visible: hasRole("reviewer") },
+  ].filter((action) => action.visible);
+
+  return (
+    <section className="quick-actions" aria-label="Quick actions">
+      {actions.map((action) => (
+        <Link className="quick-action" key={action.to} to={action.to}>
+          <span className="quick-action-icon" aria-hidden><Icon name={action.icon} size={20} /></span>
+          <span className="quick-action-copy">
+            <b>{action.title}</b>
+            <small>{action.detail}</small>
+          </span>
+          <span className="quick-action-arrow" aria-hidden><Icon name="arrow" size={16} /></span>
+        </Link>
+      ))}
+    </section>
+  );
+}
+
 // Two sample case files, written as ledger rows: what was read, what it was matched to, what was decided.
 // Illustrative values; the reason codes and states are the real ones the product uses.
 const CASES: { title: string; state: string; rows: [string, string, string][]; reasons: string[] }[] = [
@@ -295,6 +319,7 @@ export default function Home() {
     <div>
       <section className="hero2">
         <HeroArt />
+        <div className="hero-eyebrow"><span /> Verification workspace</div>
         <h1>Match every payment proof to the bank record. Check every ID against its holder.</h1>
         <p>
           Validate reads the receipt or document and compares it with the bank credit or the ID. When every rule
@@ -317,6 +342,7 @@ export default function Home() {
         </ol>
       </section>
 
+      <QuickActions />
       <Stats />
 
       {demo ? (
@@ -361,7 +387,7 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <div className="grid reveal">
+          <div className="grid cols-3 reveal">
             {more.map((s) => (
               <ScenarioPanel key={s.id} info={s} quiet />
             ))}
