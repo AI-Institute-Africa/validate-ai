@@ -1,5 +1,7 @@
 # Training data from reviewer corrections
 
+What to collect for each model, how much and in what order: [`data-collection-plan.md`](data-collection-plan.md).
+
 Every time a reviewer corrects a field, the engine keeps the model's reading and the correction (who,
 why, when). With consent, those pairs are the best labelled data for fine-tuning the readers on real
 Zimbabwean receipts and IDs, with no separate labelling job.

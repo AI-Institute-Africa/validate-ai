@@ -163,7 +163,8 @@ score** from explainable signals:
   re-photographed duplicates, run locally with no outside AI and starting in shadow mode. The framework, the
   near-duplicate, image and face detectors and a numpy-only training loop (`backend/training/detect/`) are built; no
   trained model ships, and the deep-learning trainer is written but not yet run:
-  [`docs/authenticity-detectors.md`](docs/authenticity-detectors.md), [`docs/training-data.md`](docs/training-data.md)
+  [`docs/authenticity-detectors.md`](docs/authenticity-detectors.md), [`docs/training-data.md`](docs/training-data.md).
+  What data to collect for every model, and in what order: [`docs/data-collection-plan.md`](docs/data-collection-plan.md)
 
 Suspected fakes (score 60+) go to admins under **Suspected fakes**, through the console badge
 plus a webhook and/or email. They cannot be confirmed until an admin marks them *confirmed fake*
